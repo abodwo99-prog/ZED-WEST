@@ -280,6 +280,65 @@ const sb = (SUPABASE_URL.startsWith('http'))
 
 function configMissing(){ return !sb; }
 
+/* ============================= AUTH ============================= */
+async function fetchProfile(userId){
+  const {data,error} = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+
+async function refreshSession(){
+  const {data} = await sb.auth.getSession();
+  S.session = data.session || null;
+  if(S.session){
+    S.profile = await fetchProfile(S.session.user.id);
+    S.role = (S.profile && S.profile.role==='admin') ? 'admin' : 'supervisor';
+    if(S.profile && S.profile.full_name) S.supervisor_name = S.profile.full_name;
+  } else {
+    S.profile = null;
+  }
+}
+
+async function doSignUp(){
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const full_name = document.getElementById('auth-fullname').value.trim();
+  if(!email || !password || !full_name){ S.authError='من فضلك استكمل كل الحقول'; render(); return; }
+  if(password.length < 6){ S.authError='الباسورد لازم يكون 6 حروف/أرقام على الأقل'; render(); return; }
+  S.authBusy=true; S.authError=''; render();
+  const {error} = await sb.auth.signUp({ email, password, options:{ data:{ full_name } } });
+  S.authBusy=false;
+  if(error){ S.authError = translateAuthError(error.message); render(); return; }
+  await refreshSession();
+  render();
+  toast('تم إنشاء الحساب بنجاح', true);
+}
+
+async function doSignIn(){
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if(!email || !password){ S.authError='من فضلك اكتب الإيميل والباسورد'; render(); return; }
+  S.authBusy=true; S.authError=''; render();
+  const {error} = await sb.auth.signInWithPassword({ email, password });
+  S.authBusy=false;
+  if(error){ S.authError = translateAuthError(error.message); render(); return; }
+  await refreshSession();
+  await loadAll();
+}
+
+async function doSignOut(){
+  await sb.auth.signOut();
+  S.session=null; S.profile=null;
+  render();
+}
+
+function translateAuthError(msg){
+  if(/already registered/i.test(msg)) return 'الإيميل ده مسجل بالفعل، جرب تسجيل الدخول';
+  if(/invalid login credentials/i.test(msg)) return 'الإيميل أو الباسورد غلط';
+  if(/password/i.test(msg)) return 'الباسورد لازم يكون 6 حروف على الأقل';
+  return 'حصل خطأ: '+msg;
+}
+
 /* ============================= STATE ============================= */
 let S = {
   role: 'supervisor',
@@ -297,6 +356,12 @@ let S = {
   editingTask:null,
   qrTarget:null,
   detailInstance:null,
+  session:null,
+  profile:null,
+  authMode:'login',     // 'login' | 'signup'
+  authError:'',
+  authBusy:false,
+  users:[],
 };
 
 function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
@@ -373,19 +438,37 @@ function seedTasks(locs){
 /* ============================= LOAD / SAVE ============================= */
 async function loadAll(){
   if(configMissing()){ render(); return; }
+  if(!S.session){ render(); return; }
 
   let locs = await dbFetchLocations();
   let tasks = await dbFetchTasks();
-  if(!locs.length){ locs = seedLocations(); await dbInsert('locations', locs); }
-  if(!tasks.length){ tasks = seedTasks(locs); await dbInsert('tasks', tasks); }
+  if(!locs.length && S.profile && S.profile.role==='admin'){ locs = seedLocations(); await dbInsert('locations', locs); }
+  if(!tasks.length && locs.length && S.profile && S.profile.role==='admin'){ tasks = seedTasks(locs); await dbInsert('tasks', tasks); }
   S.locations = locs; S.tasks = tasks;
 
   const pref = loadPrefs();
-  if(pref && pref.supervisor_name) S.supervisor_name = pref.supervisor_name;
-  if(pref && pref.role) S.role = pref.role;
+  if(pref && pref.role && S.profile && S.profile.role==='admin') S.role = pref.role;
 
   await ensureTodayInstances();
+  if(S.profile && S.profile.role==='admin') await loadUsers();
   render();
+}
+
+async function saveUser(id){
+  const role = document.querySelector(`[data-u-role="${id}"]`).value;
+  const active = document.querySelector(`[data-u-active="${id}"]`).value === '1';
+  const locsSel = document.querySelector(`[data-u-locs="${id}"]`);
+  const allowed_locations = Array.from(locsSel.selectedOptions).map(o=>o.value);
+  await dbUpdate('profiles', id, { role, active, allowed_locations });
+  await loadUsers();
+  render();
+  toast('تم حفظ صلاحيات المستخدم', true);
+}
+
+async function loadUsers(){
+  const {data,error} = await sb.from('profiles').select('*').order('created_at');
+  if(error){ console.error(error); return; }
+  S.users = (data||[]).map(u=>({...u, allowed_locations: u.allowed_locations||[]}));
 }
 
 async function loadInstancesFor(date){
@@ -457,6 +540,11 @@ function render(){
     </div>`;
     return;
   }
+  if(!S.session){
+    app.innerHTML = renderAuthScreen();
+    bindAuthEvents();
+    return;
+  }
   app.innerHTML = `
     ${renderTopbar()}
     <div class="wrap">
@@ -469,7 +557,47 @@ function render(){
   if(S.role==='admin' && S.tab==='dashboard') drawCharts();
 }
 
+/* ---------- Auth screen ---------- */
+function renderAuthScreen(){
+  const isLogin = S.authMode==='login';
+  return `
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--sand);">
+    <div style="max-width:380px;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px 24px;box-shadow:var(--shadow);">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div class="brand-mark viewfinder" style="margin:0 auto 10px;color:var(--mint);">Z${ICON.bracket()}</div>
+        <div style="font-family:'Cairo';font-weight:900;font-size:17px;color:var(--ink);">ZED WEST</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">نظام إدارة النظافة</div>
+      </div>
+      <h3 style="text-align:center;margin:0 0 16px;font-size:16px;">${isLogin?'تسجيل الدخول':'إنشاء حساب جديد'}</h3>
+      ${!isLogin?`<div class="form-row"><label>الاسم الكامل</label><input id="auth-fullname" placeholder="مثال: أحمد محمود"></div>`:''}
+      <div class="form-row"><label>الإيميل</label><input id="auth-email" type="email" placeholder="example@email.com"></div>
+      <div class="form-row"><label>الباسورد</label><input id="auth-password" type="password" placeholder="6 حروف على الأقل"></div>
+      ${S.authError?`<div style="background:var(--coral-light);color:var(--coral);padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:10px;">${esc(S.authError)}</div>`:''}
+      <button class="primary-btn" id="auth-submit" ${S.authBusy?'disabled':''}>${S.authBusy? '...جارِ التحميل' : (isLogin?'دخول':'إنشاء الحساب')}</button>
+      <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--text-dim);">
+        ${isLogin? 'مفيش حساب؟ ' : 'عندك حساب بالفعل؟ '}
+        <button id="auth-toggle" style="background:none;border:none;color:var(--mint);font-weight:800;cursor:pointer;text-decoration:underline;">${isLogin?'اعمل حساب جديد':'سجّل دخولك'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindAuthEvents(){
+  const submit = document.getElementById('auth-submit');
+  if(submit) submit.onclick = ()=> S.authMode==='login' ? doSignIn() : doSignUp();
+  const toggle = document.getElementById('auth-toggle');
+  if(toggle) toggle.onclick = ()=>{ S.authMode = S.authMode==='login'?'signup':'login'; S.authError=''; render(); };
+}
+
+/* ---------- Topbar ---------- */
 function renderTopbar(){
+  const isAdmin = S.profile && S.profile.role==='admin';
+  const roleSwitch = isAdmin
+    ? `<div class="role-switch">
+        <button data-role="supervisor" class="${S.role==='supervisor'?'active':''}">مشرف</button>
+        <button data-role="admin" class="${S.role==='admin'?'active':''}">الإدارة</button>
+      </div>`
+    : `<div class="role-switch"><button class="active">مشرف</button></div>`;
   return `
   <div class="topbar">
     <div class="brand">
@@ -480,9 +608,10 @@ function renderTopbar(){
       </div>
     </div>
     <div class="top-date">${ICON.clock(13)} ${fmtDate(S.today)}</div>
-    <div class="role-switch">
-      <button data-role="supervisor" class="${S.role==='supervisor'?'active':''}">مشرف</button>
-      <button data-role="admin" class="${S.role==='admin'?'active':''}">الإدارة</button>
+    ${roleSwitch}
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:12px;color:#9FC9BE;">${esc(S.profile?S.profile.full_name:'')}</span>
+      <button id="logout-btn" title="تسجيل الخروج" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">${ICON.x(14)}</button>
     </div>
   </div>`;
 }
@@ -497,9 +626,11 @@ function renderSupervisorTabs(){
 
 function renderSupervisorBody(){
   if(S.tab==='myname') return renderMyName();
-  const list = S.instances[S.today] || [];
+  const allowed = (S.profile && S.profile.allowed_locations && S.profile.allowed_locations.length) ? S.profile.allowed_locations : null;
+  const myLocations = allowed ? S.locations.filter(l=>allowed.includes(l.id)) : S.locations;
+  const list = (S.instances[S.today] || []).filter(i=> myLocations.some(l=>l.id===i.location_id));
   const total = list.length, done = list.filter(i=>i.status==='completed').length;
-  if(!S.locations.length) return `<div class="empty-state"><span class="em">🧹</span>لا توجد مواقع بعد. اطلب من الإدارة إضافتها.</div>`;
+  if(!myLocations.length) return `<div class="empty-state"><span class="em">🧹</span>لا توجد مواقع متاحة لك بعد. اطلب من الإدارة تحديد مواقعك.</div>`;
 
   let html = `<div class="stat-row">
     <div class="stat mint"><div class="num">${done}/${total}</div><div class="lbl">مهام منجزة اليوم</div></div>
@@ -507,7 +638,7 @@ function renderSupervisorBody(){
     <div class="stat ink"><div class="num">${total?Math.round(done/total*100):0}%</div><div class="lbl">نسبة الإنجاز</div></div>
   </div>`;
 
-  S.locations.forEach(loc=>{
+  myLocations.forEach(loc=>{
     const locTasks = S.tasks.filter(t=>t.location_id===loc.id && t.active);
     if(!locTasks.length) return;
     html += `<div class="loc-group">
@@ -556,6 +687,7 @@ function renderAdminTabs(){
     <button data-tab="dashboard" class="${S.tab==='dashboard'?'active':''}">لوحة المتابعة</button>
     <button data-tab="log" class="${S.tab==='log'?'active':''}">سجل المهام</button>
     <button data-tab="manage" class="${S.tab==='manage'?'active':''}">إدارة المواقع والمهام</button>
+    <button data-tab="users" class="${S.tab==='users'?'active':''}">${ICON.pin(13)} المستخدمون والصلاحيات</button>
     <button data-tab="qrsheet" class="${S.tab==='qrsheet'?'active':''}">${ICON.printer(13)} طباعة رموز QR</button>
   </div>`;
 }
@@ -564,6 +696,7 @@ function renderAdminBody(){
   if(S.tab==='dashboard') return renderDashboard();
   if(S.tab==='log') return renderLog();
   if(S.tab==='manage') return renderManage();
+  if(S.tab==='users') return renderUsers();
   if(S.tab==='qrsheet') return renderQrSheet();
   return '';
 }
@@ -687,6 +820,39 @@ function renderManage(){
   </div>`;
 }
 
+function renderUsers(){
+  const users = S.users||[];
+  if(!users.length) return `<div class="empty-state"><span class="em">👤</span>جارِ تحميل المستخدمين...</div>`;
+  return `<div class="tbl-wrap"><table><thead><tr>
+    <th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th></th>
+  </tr></thead><tbody>
+  ${users.map(u=>{
+    const isSelf = S.session && u.id===S.session.user.id;
+    return `<tr>
+      <td>${esc(u.full_name||'-')}${isSelf?' <span class="ms">(أنت)</span>':''}</td>
+      <td style="direction:ltr;text-align:right;">${esc(u.email||'-')}</td>
+      <td><select data-u-role="${u.id}" ${isSelf?'disabled':''}>
+        <option value="supervisor" ${u.role==='supervisor'?'selected':''}>مشرف</option>
+        <option value="admin" ${u.role==='admin'?'selected':''}>إدارة</option>
+      </select></td>
+      <td><select data-u-active="${u.id}" ${isSelf?'disabled':''}>
+        <option value="1" ${u.active?'selected':''}>مفعّل</option>
+        <option value="0" ${!u.active?'selected':''}>موقوف</option>
+      </select></td>
+      <td>
+        <select data-u-locs="${u.id}" multiple style="min-width:160px;min-height:34px;">
+          ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
+        </select>
+        <div class="ms">فاضي = كل المواقع</div>
+      </td>
+      <td><button class="ghost-btn" data-save-user="${u.id}" ${isSelf?'disabled':''}>حفظ</button></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table></div>
+  <p style="font-size:12px;color:var(--text-dim);margin-top:10px;">
+    المستخدمون بيظهروا هنا تلقائيًا بعد ما يعملوا حساب بأنفسهم من شاشة الدخول. أول شخص يعمل حساب على النظام بيبقى "إدارة" تلقائيًا، والباقي "مشرف" لحد ما تغيّر دورهم من هنا.
+  </p>`;
+}
 function renderQrSheet(){
   return `<div class="chart-card">
     <p style="font-size:13px;color:var(--text-dim);margin-top:0;">اطبع الصفحة التالية وعلّق كل رمز QR في مكانه الفعلي بجوار المهمة المطابقة.</p>
@@ -790,13 +956,20 @@ function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;',
 /* ============================= EVENTS ============================= */
 function bindEvents(){
   document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{ S.role=b.dataset.role; S.tab = S.role==='supervisor'?'checklist':'dashboard'; savePrefs(); render(); });
+  const logoutBtn = document.getElementById('logout-btn');
+  if(logoutBtn) logoutBtn.onclick = doSignOut;
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
 
   // supervisor name save
   const saveBtn=document.getElementById('save-sv-name');
   if(saveBtn) saveBtn.onclick=async ()=>{
-    S.supervisor_name = document.getElementById('sv-name-input').value.trim();
-    await savePrefs(); toast('تم حفظ اسمك بنجاح', true);
+    const newName = document.getElementById('sv-name-input').value.trim();
+    if(!newName){ toast('اكتب اسمك أولاً', false); return; }
+    S.supervisor_name = newName;
+    if(S.session) await dbUpdate('profiles', S.session.user.id, { full_name:newName });
+    if(S.profile) S.profile.full_name = newName;
+    render();
+    toast('تم حفظ اسمك بنجاح', true);
   };
 
   // scan buttons
@@ -853,6 +1026,7 @@ function bindEvents(){
   });
 
   const printBtn = document.getElementById('do-print');
+  document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=()=>saveUser(b.dataset.saveUser));
   if(printBtn) printBtn.onclick = doPrintSheet;
 
   if(S.qrTarget) renderQrCanvas();
@@ -1124,8 +1298,14 @@ async function preloadWeek(){
 
 /* ============================= INIT ============================= */
 (async function init(){
-  await loadAll();
   if(!configMissing()){
+    await refreshSession();
+    sb.auth.onAuthStateChange(async (event)=>{
+      if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; render(); }
+    });
+  }
+  await loadAll();
+  if(!configMissing() && S.session){
     await preloadWeek();
     render();
   }
