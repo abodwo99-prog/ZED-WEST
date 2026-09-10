@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Zed West | نظام إدارة النظافة</title>
+<title>Ora Soft Services Operations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
@@ -16,1310 +16,1182 @@
 <script src="supabase.js"></script>
 <style>
 :root{
-  --ink:#0E2A2B;
-  --ink-2:#153B3C;
-  --mint:#1B8A6B;
-  --mint-light:#E4F3EC;
-  --sand:#F5F3EC;
-  --paper:#FFFFFF;
-  --amber:#DA8B1F;
-  --amber-light:#FBF0DD;
-  --coral:#D9483B;
-  --coral-light:#FCE7E5;
-  --line:#E3DFD2;
-  --text:#1B1B18;
-  --text-dim:#6B6A5F;
-  --radius:14px;
+  --ink:#0E2A2B; --ink-2:#153B3C; --mint:#1B8A6B; --mint-light:#E4F3EC;
+  --sand:#F5F3EC; --paper:#FFFFFF; --amber:#DA8B1F; --amber-light:#FBF0DD;
+  --coral:#D9483B; --coral-light:#FCE7E5; --blue:#2463C4; --blue-light:#E5EEFC;
+  --line:#E3DFD2; --text:#1B1B18; --text-dim:#6B6A5F; --radius:14px;
   --shadow: 0 2px 10px rgba(14,42,43,.06), 0 1px 2px rgba(14,42,43,.08);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;}
-body{
-  background:var(--sand);
-  color:var(--text);
-  font-family:'Tajawal',sans-serif;
-  min-height:100vh;
-  font-variant-numeric:tabular-nums;
-}
+body{background:var(--sand); color:var(--text); font-family:'Tajawal',sans-serif; min-height:100vh; font-variant-numeric:tabular-nums;}
 h1,h2,h3,.display{font-family:'Cairo',sans-serif;}
 button{font-family:inherit;cursor:pointer;}
 input,textarea,select{font-family:inherit;}
-::selection{background:var(--mint);color:#fff;}
-
-/* ---------- corner-bracket signature ---------- */
-.brackets{position:relative;}
-.brackets::before,.brackets::after,.brackets .bk-tl,.brackets .bk-tr{content:"";}
 .bk{position:absolute;width:16px;height:16px;pointer-events:none;}
 .bk-tl{top:-1px;right:-1px;border-top:3px solid currentColor;border-right:3px solid currentColor;border-top-right-radius:6px;}
 .bk-tr{top:-1px;left:-1px;border-top:3px solid currentColor;border-left:3px solid currentColor;border-top-left-radius:6px;}
 .bk-bl{bottom:-1px;right:-1px;border-bottom:3px solid currentColor;border-right:3px solid currentColor;border-bottom-right-radius:6px;}
-.bk-br{bottom:-1px;left:-1px;border-bottom:3px solid currentColor;border-left:3px solid currentColor;border-bottom-left-radius:6px;}
+.bk-br{bottom:-1px;left:-1px;border-bottom:3px solid currentColor;border-left:3px solid currentColor;border-bottom-right-radius:6px;}
 .viewfinder{position:relative;color:var(--mint);}
-
-/* ---------- top bar ---------- */
-.topbar{
-  background:var(--ink);
-  color:#fff;
-  padding:14px 20px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  position:sticky;top:0;z-index:50;
-  box-shadow:var(--shadow);
-}
+.topbar{background:var(--ink);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow);flex-wrap:wrap;}
 .brand{display:flex;align-items:center;gap:10px;}
-.brand-mark{
-  width:38px;height:38px;position:relative;color:var(--mint);
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Cairo';font-weight:900;font-size:15px;
-  border:2px solid rgba(255,255,255,.15);
-  border-radius:8px;
-  background:rgba(255,255,255,.04);
-}
+.brand-mark{width:38px;height:38px;position:relative;color:var(--mint);display:flex;align-items:center;justify-content:center;font-family:'Cairo';font-weight:900;font-size:15px;border:2px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.04);}
 .brand-text .t1{font-family:'Cairo';font-weight:900;font-size:16px;letter-spacing:.5px;line-height:1.1;}
 .brand-text .t2{font-size:11px;color:#9FC9BE;margin-top:1px;}
-.role-switch{
-  display:flex;background:rgba(255,255,255,.08);border-radius:999px;padding:3px;gap:2px;
-}
-.role-switch button{
-  border:none;background:transparent;color:#B9CFCB;padding:7px 14px;border-radius:999px;
-  font-size:13px;font-weight:700;transition:.15s;
-}
-.role-switch button.active{background:var(--mint);color:#fff;}
-.top-date{font-size:12px;color:#9FC9BE;display:flex;align-items:center;gap:6px;}
-
-/* ---------- layout ---------- */
-.wrap{max-width:1180px;margin:0 auto;padding:20px;}
+.role-badge{background:rgba(255,255,255,.1);color:#fff;padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:800;}
+.wrap{max-width:1200px;margin:0 auto;padding:20px;}
 .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
-.tabs button{
-  border:1px solid var(--line);background:var(--paper);color:var(--text-dim);
-  padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;transition:.15s;
-}
+.tabs button{border:1px solid var(--line);background:var(--paper);color:var(--text-dim);padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;transition:.15s;}
 .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .tabs button:not(.active):hover{border-color:var(--mint);color:var(--ink);}
-
-.section-title{display:flex;align-items:center;justify-content:space-between;margin:22px 0 12px;}
-.section-title h2{font-size:18px;margin:0;display:flex;align-items:center;gap:8px;}
-.section-title .sub{font-size:12.5px;color:var(--text-dim);font-weight:500;}
-
-/* ---------- cards / grid ---------- */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
-.card{
-  background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;box-shadow:var(--shadow);position:relative;
-}
-.loc-group{margin-bottom:26px;}
-.loc-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.loc-head .pin{
-  width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.loc-head h3{margin:0;font-size:15.5px;}
-.loc-head .cnt{font-size:12px;color:var(--text-dim);}
-
-.task-card{display:flex;flex-direction:column;gap:10px;}
-.task-card .top-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-.task-name{font-weight:700;font-size:14.5px;line-height:1.4;}
-.badge{
-  font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0;
-  display:flex;align-items:center;gap:5px;
-}
-.badge.done{background:var(--mint-light);color:var(--mint);}
-.badge.pending{background:var(--amber-light);color:var(--amber);}
-.badge.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
-.task-meta{font-size:12px;color:var(--text-dim);display:flex;flex-direction:column;gap:3px;}
-.scan-btn{
-  margin-top:4px;border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13.5px;
-  background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s;
-}
-.scan-btn:hover{background:var(--mint);}
-.scan-btn.done{background:var(--mint-light);color:var(--mint);cursor:default;}
-.scan-btn.done:hover{background:var(--mint-light);}
-
-/* stats */
+.section-title{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px;flex-wrap:wrap;gap:8px;}
+.section-title h2{font-size:17px;margin:0;}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
 .stat{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
-.stat .num{font-family:'Cairo';font-weight:900;font-size:26px;line-height:1;}
-.stat .lbl{font-size:12px;color:var(--text-dim);margin-top:6px;font-weight:700;}
-.stat.mint .num{color:var(--mint);}
-.stat.amber .num{color:var(--amber);}
-.stat.coral .num{color:var(--coral);}
-.stat.ink .num{color:var(--ink);}
-
-/* filters */
-.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;background:var(--paper);border:1px solid var(--line);padding:12px;border-radius:12px;}
-.filters select,.filters input{
-  border:1px solid var(--line);background:var(--sand);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);
-}
-.filters label{font-size:11px;color:var(--text-dim);font-weight:700;display:block;margin-bottom:3px;}
-.fgroup{display:flex;flex-direction:column;}
-
-/* table */
-.tbl-wrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
-table{width:100%;border-collapse:collapse;font-size:13px;}
-th{background:var(--ink);color:#fff;text-align:right;padding:11px 12px;font-weight:700;font-size:12px;}
-td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+.stat .num{font-family:'Cairo';font-weight:900;font-size:24px;line-height:1;}
+.stat .lbl{font-size:11.5px;color:var(--text-dim);margin-top:6px;font-weight:700;}
+.stat.mint .num{color:var(--mint);} .stat.amber .num{color:var(--amber);} .stat.coral .num{color:var(--coral);} .stat.ink .num{color:var(--ink);} .stat.blue .num{color:var(--blue);}
+.tbl-wrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;box-shadow:var(--shadow);margin-bottom:18px;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+th{background:var(--ink);color:#fff;text-align:right;padding:10px 12px;font-weight:700;font-size:11.5px;white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;}
 tr:last-child td{border-bottom:none;}
-tr.rowbtn{cursor:pointer;transition:.1s;}
-tr.rowbtn:hover{background:var(--sand);}
-.thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid var(--line);}
-.empty-cell{color:var(--text-dim);font-size:12px;}
-
-/* charts */
-.chart-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
-.chart-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
-@media(max-width:800px){.chart-grid{grid-template-columns:1fr;}}
-
-/* manage */
-.manage-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-@media(max-width:850px){.manage-cols{grid-template-columns:1fr;}}
-.manage-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
-.manage-card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;}
-.manage-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);gap:8px;}
-.manage-row:last-child{border-bottom:none;}
-.manage-row .mi{font-size:13.5px;font-weight:700;}
-.manage-row .ms{font-size:11.5px;color:var(--text-dim);}
-.icon-btn{border:none;background:var(--sand);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);flex-shrink:0;transition:.15s;}
-.icon-btn:hover{background:var(--coral-light);color:var(--coral);}
-.icon-btn.qr:hover{background:var(--mint-light);color:var(--mint);}
+.badge{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.badge.done{background:var(--mint-light);color:var(--mint);} .badge.pending{background:var(--amber-light);color:var(--amber);}
+.badge.progress{background:var(--blue-light);color:var(--blue);} .badge.postponed{background:var(--coral-light);color:var(--coral);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px;background:var(--paper);border:1px solid var(--line);padding:12px;border-radius:12px;}
+.fgroup{display:flex;flex-direction:column;gap:3px;}
+.fgroup label{font-size:11px;color:var(--text-dim);font-weight:700;}
+.fgroup input,.fgroup select{border:1px solid var(--line);background:var(--sand);border-radius:8px;padding:8px 10px;font-size:13px;}
+.primary-btn{border:none;background:var(--mint);color:#fff;border-radius:10px;padding:10px 16px;font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;transition:.15s;}
+.primary-btn:hover{background:#157058;} .primary-btn:disabled{background:#ccc;}
+.ghost-btn{border:1px solid var(--line);background:var(--paper);color:var(--text);border-radius:9px;padding:8px 13px;font-weight:700;font-size:12.5px;}
+.ghost-btn:hover{border-color:var(--mint);color:var(--mint);}
+.ghost-btn.danger:hover{border-color:var(--coral);color:var(--coral);}
 .form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
 .form-row label{font-size:12px;font-weight:700;color:var(--text-dim);}
-.form-row input,.form-row select,.form-row textarea{
-  border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px;background:var(--sand);
-}
-.form-row textarea{resize:vertical;min-height:60px;}
-.primary-btn{
-  border:none;background:var(--mint);color:#fff;border-radius:10px;padding:11px;font-weight:800;font-size:14px;width:100%;
-  display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s;
-}
-.primary-btn:hover{background:#157058;}
-.primary-btn:disabled{background:#ccc;cursor:not-allowed;}
-.ghost-btn{border:1px solid var(--line);background:var(--paper);color:var(--text);border-radius:10px;padding:10px;font-weight:700;font-size:13px;}
-.ghost-btn:hover{border-color:var(--mint);color:var(--mint);}
-
-/* modal */
-.modal-bg{position:fixed;inset:0;background:rgba(14,42,43,.55);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .15s ease;}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:var(--paper);border-radius:18px;max-width:440px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:pop .18s ease;}
-@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
-.modal.wide{max-width:560px;}
-.modal-head{padding:18px 20px 10px;display:flex;justify-content:space-between;align-items:flex-start;}
-.modal-head h3{margin:0;font-size:16.5px;}
-.modal-head .close{border:none;background:var(--sand);width:30px;height:30px;border-radius:50%;color:var(--text-dim);flex-shrink:0;font-size:15px;}
+.form-row input,.form-row select,.form-row textarea{border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px;background:var(--sand);}
+.form-row textarea{resize:vertical;min-height:55px;}
+.modal-bg{position:fixed;inset:0;background:rgba(14,42,43,.55);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal{background:var(--paper);border-radius:18px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal.wide{max-width:640px;}
+.modal-head{padding:18px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;}
+.modal-head h3{margin:0;font-size:16px;}
+.modal-head .close{border:none;background:var(--sand);width:30px;height:30px;border-radius:50%;color:var(--text-dim);flex-shrink:0;font-size:14px;}
 .modal-body{padding:6px 20px 20px;}
-
+.tag-shift{font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:800;}
+.tag-shift.morning{background:var(--amber-light);color:var(--amber);}
+.tag-shift.evening{background:#EDE6FA;color:#6B3FBF;}
+.tag-shift.both{background:var(--mint-light);color:var(--mint);}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-dim);}
+.empty-state .em{font-size:34px;display:block;margin-bottom:8px;}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:13.5px;box-shadow:var(--shadow);z-index:400;}
+.toast.ok{background:var(--mint);}
 .scan-stage{background:var(--ink);border-radius:14px;overflow:hidden;position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;}
 .scan-stage video{width:100%;height:100%;object-fit:cover;}
-.scan-frame{position:absolute;inset:16%;border-radius:16px;}
-.scan-frame .bk{width:26px;height:26px;color:#fff;}
-.scan-hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:12px;background:rgba(0,0,0,.35);padding:6px;}
+.scan-frame{position:absolute;inset:16%;border-radius:16px;color:#fff;}
 .scan-msg{color:#fff;text-align:center;padding:20px;font-size:13px;line-height:1.7;}
-.scan-msg .em{font-size:34px;display:block;margin-bottom:8px;}
-.scan-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+.scan-msg .em{font-size:32px;display:block;margin-bottom:8px;}
 .file-btn{position:relative;overflow:hidden;text-align:center;}
 .file-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
-.manual-toggle{text-align:center;font-size:11.5px;color:var(--text-dim);margin-top:10px;text-decoration:underline;background:none;border:none;}
-
-.confirm-task{background:var(--mint-light);color:var(--ink);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
-.confirm-task .ct-name{font-family:'Cairo';font-weight:800;font-size:15px;}
-.confirm-task .ct-loc{font-size:12px;color:var(--mint);font-weight:700;margin-top:2px;}
-.photo-preview{width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-top:8px;border:1px solid var(--line);}
-
-.qr-modal-body{text-align:center;}
+.photo-preview{width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:8px;border:1px solid var(--line);}
 #qr-render-target{display:flex;justify-content:center;margin:10px 0;}
 #qr-render-target img,#qr-render-target canvas{border-radius:10px;border:8px solid #fff;box-shadow:var(--shadow);}
-.qr-caption{font-family:'Cairo';font-weight:800;font-size:14px;margin-top:4px;}
-.qr-sub{font-size:12px;color:var(--text-dim);}
-
-/* detail modal */
-.dl{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;}
-.dl:last-child{border-bottom:none;}
-.dl .k{color:var(--text-dim);}
-.dl .v{font-weight:700;text-align:left;}
-.detail-photo{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line);}
-.detail-notes{background:var(--sand);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:8px;}
-
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:13.5px;box-shadow:var(--shadow);z-index:400;display:flex;align-items:center;gap:8px;animation:pop .18s ease;}
-.toast.ok{background:var(--mint);}
-.empty-state{text-align:center;padding:50px 20px;color:var(--text-dim);}
-.empty-state .em{font-size:38px;display:block;margin-bottom:10px;}
-.print-sheet{display:none;}
-@media print{
-  body *{visibility:hidden;}
-  .print-sheet,.print-sheet *{visibility:visible;}
-  .print-sheet{display:block;position:absolute;top:0;right:0;left:0;}
-}
 .print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px;}
 .print-tile{border:2px dashed #999;border-radius:10px;text-align:center;padding:12px;}
 .print-tile .pn{font-family:'Cairo';font-weight:800;font-size:12px;margin-top:6px;}
-.print-tile .pl{font-size:10px;color:#666;}
-@media(max-width:640px){
-  .wrap{padding:12px;}
-  .grid{grid-template-columns:1fr;}
-  .chart-grid{grid-template-columns:1fr;}
-  .brand-text .t2{display:none;}
-}
+@media print{ body *{visibility:hidden;} .print-sheet,.print-sheet *{visibility:visible;} .print-sheet{display:block;position:absolute;top:0;right:0;left:0;} }
+.home-blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px;}
+.pill-group{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;background:var(--paper);cursor:pointer;}
+.pill.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.multi-sel{min-width:150px;min-height:70px;}
+@media(max-width:640px){ .wrap{padding:12px;} table{min-width:480px;} }
 </style>
 </head>
 <body>
 <div id="app"></div>
-<div id="toast-host"></div>
 
 <script>
 /* ============================= SUPABASE CONFIG ============================= */
-/* 1) روح على https://supabase.com وأنشئ مشروع مجاني
-   2) من Project Settings > API خد "Project URL" و "anon public key"
-   3) الصقهم هنا مكان القيمتين التاليتين قبل ما ترفع الملف */
 const SUPABASE_URL = 'https://msszjzechwurofsrjydt.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_xtYKER8VsZPhQSBVmclExg_aQv_-xZZ';
-
-const sb = (SUPABASE_URL.startsWith('http'))
-  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
-
+const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 function configMissing(){ return !sb; }
+
+/* ============================= STATE ============================= */
+let S = {
+  session:null, profile:null, authMode:'login', authError:'', authBusy:false,
+  tab:null, today: todayStr(),
+  locations:[], users:[],
+  deliveries:[], deliveryDate: todayStr(),
+  orders:[], ordersDate:'',
+  installs:[], installsDate: todayStr(),
+  checklistDefs:[], checklistInstances:[],
+  attendance:[], attendanceDate: todayStr(),
+  availability:[],
+  pest:[], facade:[], facadeDate: todayStr(), waste:[],
+  modal:null,
+  scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
+};
+const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'FM Dispatcher', supervisor:'مشرف', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول' };
+const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين' };
+const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
+function fmtTime(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+function nowTimeStr(){ const d=new Date(); return d.toTimeString().slice(0,5); }
+function uid(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================= DB HELPERS ============================= */
+async function dbSelect(table, filters){
+  let q = sb.from(table).select('*');
+  if(filters) Object.keys(filters).forEach(k=>{ q = q.eq(k, filters[k]); });
+  const {data,error} = await q;
+  if(error){ console.error(table, error); return []; }
+  return data||[];
+}
+async function dbInsert(table, rows){ const {error}=await sb.from(table).insert(rows); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
+async function dbUpdate(table, id, patch){ const {error}=await sb.from(table).update(patch).eq('id',id); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
+async function dbDelete(table, id){ const {error}=await sb.from(table).delete().eq('id',id); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
 
 /* ============================= AUTH ============================= */
 async function fetchProfile(userId){
-  const {data,error} = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+  const {data,error} = await sb.from('profiles').select('*').eq('id',userId).maybeSingle();
   if(error){ console.error(error); return null; }
   return data;
 }
-
 async function refreshSession(){
   const {data} = await sb.auth.getSession();
   S.session = data.session || null;
-  if(S.session){
-    S.profile = await fetchProfile(S.session.user.id);
-    S.role = (S.profile && S.profile.role==='admin') ? 'admin' : 'supervisor';
-    if(S.profile && S.profile.full_name) S.supervisor_name = S.profile.full_name;
-  } else {
-    S.profile = null;
-  }
+  S.profile = S.session ? await fetchProfile(S.session.user.id) : null;
 }
-
-async function doSignUp(){
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  const full_name = document.getElementById('auth-fullname').value.trim();
-  if(!email || !password || !full_name){ S.authError='من فضلك استكمل كل الحقول'; render(); return; }
-  if(password.length < 6){ S.authError='الباسورد لازم يكون 6 حروف/أرقام على الأقل'; render(); return; }
-  S.authBusy=true; S.authError=''; render();
-  const {error} = await sb.auth.signUp({ email, password, options:{ data:{ full_name } } });
-  S.authBusy=false;
-  if(error){ S.authError = translateAuthError(error.message); render(); return; }
-  await refreshSession();
-  render();
-  toast('تم إنشاء الحساب بنجاح', true);
-}
-
-async function doSignIn(){
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  if(!email || !password){ S.authError='من فضلك اكتب الإيميل والباسورد'; render(); return; }
-  S.authBusy=true; S.authError=''; render();
-  const {error} = await sb.auth.signInWithPassword({ email, password });
-  S.authBusy=false;
-  if(error){ S.authError = translateAuthError(error.message); render(); return; }
-  await refreshSession();
-  await loadAll();
-}
-
-async function doSignOut(){
-  await sb.auth.signOut();
-  S.session=null; S.profile=null;
-  render();
-}
-
 function translateAuthError(msg){
   if(/already registered/i.test(msg)) return 'الإيميل ده مسجل بالفعل، جرب تسجيل الدخول';
   if(/invalid login credentials/i.test(msg)) return 'الإيميل أو الباسورد غلط';
   if(/password/i.test(msg)) return 'الباسورد لازم يكون 6 حروف على الأقل';
   return 'حصل خطأ: '+msg;
 }
+async function doSignUp(){
+  const email=document.getElementById('auth-email').value.trim();
+  const password=document.getElementById('auth-password').value;
+  const full_name=document.getElementById('auth-fullname').value.trim();
+  if(!email||!password||!full_name){ S.authError='من فضلك استكمل كل الحقول'; render(); return; }
+  S.authBusy=true; S.authError=''; render();
+  const {error} = await sb.auth.signUp({ email, password, options:{ data:{ full_name } } });
+  S.authBusy=false;
+  if(error){ S.authError=translateAuthError(error.message); render(); return; }
+  await refreshSession(); await bootApp();
+}
+async function doSignIn(){
+  const email=document.getElementById('auth-email').value.trim();
+  const password=document.getElementById('auth-password').value;
+  if(!email||!password){ S.authError='اكتب الإيميل والباسورد'; render(); return; }
+  S.authBusy=true; S.authError=''; render();
+  const {error} = await sb.auth.signInWithPassword({ email, password });
+  S.authBusy=false;
+  if(error){ S.authError=translateAuthError(error.message); render(); return; }
+  await refreshSession(); await bootApp();
+}
+async function doSignOut(){ await sb.auth.signOut(); S.session=null; S.profile=null; S.tab=null; render(); }
 
-/* ============================= STATE ============================= */
-let S = {
-  role: 'supervisor',
-  tab: 'checklist',
-  locations: [],
-  tasks: [],
-  instances: {},        // date -> array of instance objects
-  today: todayStr(),
-  supervisor_name: '',
-  filters: { date:'', location:'all', supervisor:'all', status:'all' },
-  scanCtx: null,        // {instance, task, location}
-  manualOpen:false,
-  stream:null,
-  editingLoc:null,
-  editingTask:null,
-  qrTarget:null,
-  detailInstance:null,
-  session:null,
-  profile:null,
-  authMode:'login',     // 'login' | 'signup'
-  authError:'',
-  authBusy:false,
-  users:[],
-};
-
-function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
-function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
-function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
-function uid(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
-
-async function dbFetchLocations(){
-  const {data,error} = await sb.from('locations').select('*').order('name');
-  if(error){ console.error(error); return []; }
-  return data||[];
-}
-async function dbFetchTasks(){
-  const {data,error} = await sb.from('tasks').select('*');
-  if(error){ console.error(error); return []; }
-  return data||[];
-}
-async function dbFetchInstances(date){
-  const {data,error} = await sb.from('instances').select('*').eq('date', date);
-  if(error){ console.error(error); return []; }
-  return data||[];
-}
-async function dbInsert(table, rows){
-  if(!rows || !rows.length) return;
-  const {error} = await sb.from(table).insert(rows);
-  if(error) console.error(table, error);
-}
-async function dbUpsert(table, rows){
-  if(!rows || !rows.length) return;
-  const {error} = await sb.from(table).upsert(rows);
-  if(error) console.error(table, error);
-}
-async function dbUpdate(table, id, patch){
-  const {error} = await sb.from(table).update(patch).eq('id', id);
-  if(error) console.error(table, error);
-}
-async function dbUpdateWhere(table, column, value, patch){
-  const {error} = await sb.from(table).update(patch).eq(column, value);
-  if(error) console.error(table, error);
-}
-async function dbDelete(table, id){
-  const {error} = await sb.from(table).delete().eq('id', id);
-  if(error) console.error(table, error);
-}
-
-/* local, per-device preferences (name / role) — no need to centralize these */
-function loadPrefs(){
-  try{ return JSON.parse(localStorage.getItem('zw_prefs')||'null'); }catch(e){ return null; }
-}
-function savePrefsLocal(){
-  try{ localStorage.setItem('zw_prefs', JSON.stringify({supervisor_name:S.supervisor_name, role:S.role})); }catch(e){}
-}
-
-/* ============================= SEED DATA ============================= */
-function seedLocations(){
-  return [
-    {id:uid('loc'), name:'عمارة A', building:'قطاع الشمال'},
-    {id:uid('loc'), name:'عمارة B', building:'قطاع الشمال'},
-    {id:uid('loc'), name:'الجراج الرئيسي', building:'خدمات عامة'},
-  ];
-}
-function seedTasks(locs){
-  const items = ['تنظيف مدخل العمارة','تنظيف المصعد','تفريغ سلال المهملات','كنس ومسح الدرج','تعقيم مقابض الأبواب'];
-  const tasks=[];
-  locs.slice(0,2).forEach(loc=>{
-    items.forEach(name=>{
-      tasks.push({id:uid('task'), name, description:'', frequency:'يومي', location_id:loc.id, active:true});
-    });
-  });
-  tasks.push({id:uid('task'), name:'تنظيف أرضية الجراج', description:'إزالة البقع وكنس الأرضية', frequency:'يومي', location_id:locs[2].id, active:true});
-  return tasks;
-}
-
-/* ============================= LOAD / SAVE ============================= */
-async function loadAll(){
-  if(configMissing()){ render(); return; }
-  if(!S.session){ render(); return; }
-
-  let locs = await dbFetchLocations();
-  let tasks = await dbFetchTasks();
-  if(!locs.length && S.profile && S.profile.role==='admin'){ locs = seedLocations(); await dbInsert('locations', locs); }
-  if(!tasks.length && locs.length && S.profile && S.profile.role==='admin'){ tasks = seedTasks(locs); await dbInsert('tasks', tasks); }
-  S.locations = locs; S.tasks = tasks;
-
-  const pref = loadPrefs();
-  if(pref && pref.role && S.profile && S.profile.role==='admin') S.role = pref.role;
-
-  await ensureTodayInstances();
-  if(S.profile && S.profile.role==='admin') await loadUsers();
-  render();
-}
-
-async function saveUser(id){
-  const role = document.querySelector(`[data-u-role="${id}"]`).value;
-  const active = document.querySelector(`[data-u-active="${id}"]`).value === '1';
-  const locsSel = document.querySelector(`[data-u-locs="${id}"]`);
-  const allowed_locations = Array.from(locsSel.selectedOptions).map(o=>o.value);
-  await dbUpdate('profiles', id, { role, active, allowed_locations });
-  await loadUsers();
-  render();
-  toast('تم حفظ صلاحيات المستخدم', true);
-}
-
-async function loadUsers(){
-  const {data,error} = await sb.from('profiles').select('*').order('created_at');
-  if(error){ console.error(error); return; }
-  S.users = (data||[]).map(u=>({...u, allowed_locations: u.allowed_locations||[]}));
-}
-
-async function loadInstancesFor(date){
-  const data = await dbFetchInstances(date);
-  S.instances[date] = data;
-  return data;
-}
-
-async function saveInstancesFor(date){
-  await dbUpsert('instances', S.instances[date] || []);
-}
-
-async function ensureTodayInstances(){
-  const date = todayStr();
-  let list = await loadInstancesFor(date);
-  const activeTasks = S.tasks.filter(t=>t.active);
-  const missing=[];
-  activeTasks.forEach(t=>{
-    if(!list.find(i=>i.task_id===t.id)){
-      missing.push({
-        id: uid('inst'), date, task_id:t.id, location_id:t.location_id,
-        status:'incomplete', supervisor_name:'', completed_at:null, notes:'', photo:null, scanned:false
-      });
-    }
-  });
-  if(missing.length){ await dbInsert('instances', missing); list = list.concat(missing); }
-  S.instances[date]=list;
-}
-
-/* ============================= TOAST ============================= */
+/* ============================= TOAST / ICONS ============================= */
 function toast(msg, ok){
-  const host=document.getElementById('toast-host');
-  const el=document.createElement('div');
-  el.className='toast'+(ok?' ok':'');
-  el.innerHTML = (ok?ICON.check(16):ICON.info(16)) + '<span>'+msg+'</span>';
-  host.appendChild(el);
+  const el=document.createElement('div'); el.className='toast'+(ok?' ok':'');
+  el.textContent=msg; document.body.appendChild(el);
   setTimeout(()=>el.remove(), 2600);
 }
-
-/* ============================= ICONS (inline svg) ============================= */
 const ICON = {
   qr:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="14.01"/><line x1="17.5" y1="14" x2="17.5" y2="17.5"/><line x1="21" y1="14" x2="21" y2="14.01"/><line x1="14" y1="17.5" x2="17.5" y2="17.5"/><line x1="14" y1="21" x2="17.5" y2="21"/><line x1="21" y1="17.5" x2="21" y2="21"/></svg>`,
   check:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   clock:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-  pin:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-  camera:(s=20)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
-  upload:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
-  plus:(s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
-  trash:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  edit:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>`,
-  x:(s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  info:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  x:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  plus:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  upload:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
+  camera:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   printer:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
+  trash:(s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
 };
+
+/* ============================= ROLE → TABS ============================= */
+function tabsForRole(role){
+  if(role==='admin') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','الشيك ليست'],['qrsheet','طباعة QR'],['attendance','الحضور'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
+  if(role==='opm') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
+  if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['myname','بياناتي']];
+  if(role==='contractor_manager') return [['home','الرئيسية'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
+  if(role==='contractor_admin') return [['attendance','الحضور']];
+  return [];
+}
 
 /* ============================= RENDER ROOT ============================= */
 function render(){
   const app=document.getElementById('app');
   if(configMissing()){
-    app.innerHTML = `
-    <div style="max-width:480px;margin:60px auto;padding:24px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);text-align:center;">
-      <div style="font-size:34px;margin-bottom:10px;">🔌</div>
-      <h2 style="margin:0 0 10px;">التطبيق يحتاج إعداد</h2>
-      <p style="font-size:13.5px;color:var(--text-dim);line-height:1.8;">
-        من فضلك افتح ملف <b>index.html</b> وضع مفاتيح Supabase الخاصة بك في أعلى كود الجافاسكريبت
-        (<code>SUPABASE_URL</code> و <code>SUPABASE_ANON_KEY</code>)، ثم أعد رفع الملف.
-      </p>
-    </div>`;
+    app.innerHTML = `<div class="card" style="max-width:480px;margin:60px auto;text-align:center;">
+      <h2>التطبيق يحتاج إعداد</h2><p>ضع مفاتيح Supabase في أعلى الكود.</p></div>`;
     return;
   }
-  if(!S.session){
-    app.innerHTML = renderAuthScreen();
-    bindAuthEvents();
-    return;
-  }
+  if(!S.session){ app.innerHTML = renderAuthScreen(); bindAuthEvents(); return; }
+  if(!S.profile){ app.innerHTML = `<div style="padding:60px;text-align:center;">جارِ التحميل...</div>`; return; }
+  const tabs = tabsForRole(S.profile.role);
+  if(!S.tab || !tabs.find(t=>t[0]===S.tab)) S.tab = tabs.length?tabs[0][0]:null;
   app.innerHTML = `
     ${renderTopbar()}
     <div class="wrap">
-      ${S.role==='supervisor' ? renderSupervisorTabs() : renderAdminTabs()}
-      ${S.role==='supervisor' ? renderSupervisorBody() : renderAdminBody()}
+      <div class="tabs">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${esc(label)}</button>`).join('')}</div>
+      <div id="tab-body">${renderTabBody()}</div>
     </div>
-    ${renderModals()}
+    ${renderModal()}
   `;
-  bindEvents();
-  if(S.role==='admin' && S.tab==='dashboard') drawCharts();
+  bindGlobalEvents();
+  bindTabEvents();
+  if(S.tab==='home') drawHomeCharts();
 }
 
-/* ---------- Auth screen ---------- */
 function renderAuthScreen(){
   const isLogin = S.authMode==='login';
-  return `
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--sand);">
+  return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
     <div style="max-width:380px;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px 24px;box-shadow:var(--shadow);">
       <div style="text-align:center;margin-bottom:20px;">
-        <div class="brand-mark viewfinder" style="margin:0 auto 10px;color:var(--mint);">Z${ICON.bracket()}</div>
-        <div style="font-family:'Cairo';font-weight:900;font-size:17px;color:var(--ink);">ZED WEST</div>
-        <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">نظام إدارة النظافة</div>
+        <img src="logo-dark.png" alt="logo" style="height:70px;margin:0 auto 10px;display:block;">
+        <div style="font-family:'Cairo';font-weight:900;font-size:16px;color:var(--ink);">ORA SOFT SERVICES</div>
+        <div style="font-size:12px;color:var(--text-dim);">Operations</div>
       </div>
       <h3 style="text-align:center;margin:0 0 16px;font-size:16px;">${isLogin?'تسجيل الدخول':'إنشاء حساب جديد'}</h3>
-      ${!isLogin?`<div class="form-row"><label>الاسم الكامل</label><input id="auth-fullname" placeholder="مثال: أحمد محمود"></div>`:''}
-      <div class="form-row"><label>الإيميل</label><input id="auth-email" type="email" placeholder="example@email.com"></div>
-      <div class="form-row"><label>الباسورد</label><input id="auth-password" type="password" placeholder="6 حروف على الأقل"></div>
+      ${!isLogin?`<div class="form-row"><label>الاسم الكامل</label><input id="auth-fullname"></div>`:''}
+      <div class="form-row"><label>الإيميل</label><input id="auth-email" type="email"></div>
+      <div class="form-row"><label>الباسورد</label><input id="auth-password" type="password"></div>
       ${S.authError?`<div style="background:var(--coral-light);color:var(--coral);padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:10px;">${esc(S.authError)}</div>`:''}
-      <button class="primary-btn" id="auth-submit" ${S.authBusy?'disabled':''}>${S.authBusy? '...جارِ التحميل' : (isLogin?'دخول':'إنشاء الحساب')}</button>
+      <button class="primary-btn" style="width:100%;justify-content:center;" id="auth-submit" ${S.authBusy?'disabled':''}>${S.authBusy?'...':(isLogin?'دخول':'إنشاء الحساب')}</button>
       <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--text-dim);">
-        ${isLogin? 'مفيش حساب؟ ' : 'عندك حساب بالفعل؟ '}
-        <button id="auth-toggle" style="background:none;border:none;color:var(--mint);font-weight:800;cursor:pointer;text-decoration:underline;">${isLogin?'اعمل حساب جديد':'سجّل دخولك'}</button>
+        ${isLogin?'مفيش حساب؟ ':'عندك حساب؟ '}
+        <button id="auth-toggle" style="background:none;border:none;color:var(--mint);font-weight:800;text-decoration:underline;">${isLogin?'اعمل حساب جديد':'سجّل دخولك'}</button>
       </div>
-    </div>
-  </div>`;
+    </div></div>`;
 }
-
 function bindAuthEvents(){
-  const submit = document.getElementById('auth-submit');
-  if(submit) submit.onclick = ()=> S.authMode==='login' ? doSignIn() : doSignUp();
-  const toggle = document.getElementById('auth-toggle');
-  if(toggle) toggle.onclick = ()=>{ S.authMode = S.authMode==='login'?'signup':'login'; S.authError=''; render(); };
+  const s=document.getElementById('auth-submit'); if(s) s.onclick=()=> S.authMode==='login'?doSignIn():doSignUp();
+  const t=document.getElementById('auth-toggle'); if(t) t.onclick=()=>{ S.authMode=S.authMode==='login'?'signup':'login'; S.authError=''; render(); };
 }
 
-/* ---------- Topbar ---------- */
 function renderTopbar(){
-  const isAdmin = S.profile && S.profile.role==='admin';
-  const roleSwitch = isAdmin
-    ? `<div class="role-switch">
-        <button data-role="supervisor" class="${S.role==='supervisor'?'active':''}">مشرف</button>
-        <button data-role="admin" class="${S.role==='admin'?'active':''}">الإدارة</button>
-      </div>`
-    : `<div class="role-switch"><button class="active">مشرف</button></div>`;
-  return `
-  <div class="topbar">
+  return `<div class="topbar">
     <div class="brand">
-      <div class="brand-mark viewfinder">Z<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span></div>
-      <div class="brand-text">
-        <div class="t1">ZED WEST</div>
-        <div class="t2">نظام إدارة النظافة</div>
-      </div>
+      <img src="logo-light.png" alt="logo" style="height:34px;">
+      <div class="brand-text"><div class="t1">ORA SOFT SERVICES</div><div class="t2">Operations</div></div>
     </div>
-    <div class="top-date">${ICON.clock(13)} ${fmtDate(S.today)}</div>
-    ${roleSwitch}
+    <div style="font-size:12px;color:#9FC9BE;">${ICON.clock(13)} ${fmtDate(S.today)}</div>
     <div style="display:flex;align-items:center;gap:10px;">
-      <span style="font-size:12px;color:#9FC9BE;">${esc(S.profile?S.profile.full_name:'')}</span>
-      <button id="logout-btn" title="تسجيل الخروج" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">${ICON.x(14)}</button>
+      <span class="role-badge">${esc(ROLE_LABEL[S.profile.role]||S.profile.role)}</span>
+      <span style="font-size:12px;color:#9FC9BE;">${esc(S.profile.full_name||'')}</span>
+      <button id="logout-btn" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;">${ICON.x(13)}</button>
     </div>
   </div>`;
 }
 
-/* ---------- Supervisor ---------- */
-function renderSupervisorTabs(){
-  return `<div class="tabs">
-    <button data-tab="checklist" class="${S.tab==='checklist'?'active':''}">${ICON.check(14)} قائمة اليوم</button>
-    <button data-tab="myname" class="${S.tab==='myname'?'active':''}">${ICON.pin(14)} بياناتي</button>
-  </div>`;
+function bindGlobalEvents(){
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
+  const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
 }
 
-function renderSupervisorBody(){
-  if(S.tab==='myname') return renderMyName();
-  const allowed = (S.profile && S.profile.allowed_locations && S.profile.allowed_locations.length) ? S.profile.allowed_locations : null;
-  const myLocations = allowed ? S.locations.filter(l=>allowed.includes(l.id)) : S.locations;
-  const list = (S.instances[S.today] || []).filter(i=> myLocations.some(l=>l.id===i.location_id));
-  const total = list.length, done = list.filter(i=>i.status==='completed').length;
-  if(!myLocations.length) return `<div class="empty-state"><span class="em">🧹</span>لا توجد مواقع متاحة لك بعد. اطلب من الإدارة تحديد مواقعك.</div>`;
-
-  let html = `<div class="stat-row">
-    <div class="stat mint"><div class="num">${done}/${total}</div><div class="lbl">مهام منجزة اليوم</div></div>
-    <div class="stat amber"><div class="num">${total-done}</div><div class="lbl">متبقية</div></div>
-    <div class="stat ink"><div class="num">${total?Math.round(done/total*100):0}%</div><div class="lbl">نسبة الإنجاز</div></div>
-  </div>`;
-
-  myLocations.forEach(loc=>{
-    const locTasks = S.tasks.filter(t=>t.location_id===loc.id && t.active);
-    if(!locTasks.length) return;
-    html += `<div class="loc-group">
-      <div class="loc-head">
-        <div class="pin">${ICON.pin(15)}</div>
-        <div><h3>${esc(loc.name)}</h3><div class="cnt">${loc.building||''} · ${locTasks.length} مهمة</div></div>
-      </div>
-      <div class="grid">
-        ${locTasks.map(t=>{
-          const inst = list.find(i=>i.task_id===t.id) || {};
-          const isDone = inst.status==='completed';
-          return `<div class="card task-card">
-            <div class="top-row">
-              <div class="task-name">${esc(t.name)}</div>
-              <div class="badge ${isDone?'done':'pending'}"><span class="dot"></span>${isDone?'منجز':'لم يُنفذ'}</div>
-            </div>
-            <div class="task-meta">
-              ${isDone ? `<span>${ICON.clock(12)} نُفذ الساعة ${fmtTime(inst.completed_at)} بواسطة ${esc(inst.supervisor_name||'-')}</span>` : `<span>يتطلب مسح رمز QR الموجود في الموقع فعليًا</span>`}
-            </div>
-            <button class="scan-btn ${isDone?'done':''}" data-scan="${t.id}">
-              ${isDone? ICON.check(15) : ICON.qr(15)}
-              ${isDone? 'تم التنفيذ' : 'مسح QR وتأكيد التنفيذ'}
-            </button>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  });
-  return html;
+/* ============================= TAB DISPATCH ============================= */
+function renderTabBody(){
+  switch(S.tab){
+    case 'home': return renderHome();
+    case 'deliveries': return renderDeliveries();
+    case 'orders': return renderOrders();
+    case 'pest': return renderPest();
+    case 'facade': return renderFacade();
+    case 'waste': return renderWaste();
+    case 'installs': return renderInstalls();
+    case 'checklist': return renderChecklistAdmin();
+    case 'qrsheet': return renderQrSheet();
+    case 'attendance': return renderAttendance();
+    case 'locations': return renderLocations();
+    case 'users': return renderUsers();
+    case 'reports': return renderReports();
+    case 'today': return renderSupervisorToday();
+    case 'myname': return renderMyName();
+    default: return '';
+  }
+}
+function bindTabEvents(){
+  switch(S.tab){
+    case 'home': bindHome(); break;
+    case 'deliveries': bindDeliveries(); break;
+    case 'orders': bindOrders(); break;
+    case 'pest': bindPest(); break;
+    case 'facade': bindFacade(); break;
+    case 'waste': bindWaste(); break;
+    case 'installs': bindInstalls(); break;
+    case 'checklist': bindChecklistAdmin(); break;
+    case 'qrsheet': bindQrSheet(); break;
+    case 'attendance': bindAttendance(); break;
+    case 'locations': bindLocations(); break;
+    case 'users': bindUsers(); break;
+    case 'reports': break;
+    case 'today': bindSupervisorToday(); break;
+    case 'myname': bindMyName(); break;
+  }
+  bindModalEvents();
 }
 
-function renderMyName(){
-  return `<div class="manage-card" style="max-width:420px;margin:0 auto;">
-    <h3>${ICON.pin(16)} بيانات المشرف</h3>
-    <div class="form-row">
-      <label>اسمك (يُستخدم تلقائيًا عند تأكيد المهام)</label>
-      <input id="sv-name-input" placeholder="مثال: أحمد محمود" value="${esc(S.supervisor_name)}">
-    </div>
-    <button class="primary-btn" id="save-sv-name">${ICON.check(15)} حفظ</button>
-  </div>`;
-}
-
-/* ---------- Admin ---------- */
-function renderAdminTabs(){
-  return `<div class="tabs">
-    <button data-tab="dashboard" class="${S.tab==='dashboard'?'active':''}">لوحة المتابعة</button>
-    <button data-tab="log" class="${S.tab==='log'?'active':''}">سجل المهام</button>
-    <button data-tab="manage" class="${S.tab==='manage'?'active':''}">إدارة المواقع والمهام</button>
-    <button data-tab="users" class="${S.tab==='users'?'active':''}">${ICON.pin(13)} المستخدمون والصلاحيات</button>
-    <button data-tab="qrsheet" class="${S.tab==='qrsheet'?'active':''}">${ICON.printer(13)} طباعة رموز QR</button>
-  </div>`;
-}
-
-function renderAdminBody(){
-  if(S.tab==='dashboard') return renderDashboard();
-  if(S.tab==='log') return renderLog();
-  if(S.tab==='manage') return renderManage();
-  if(S.tab==='users') return renderUsers();
-  if(S.tab==='qrsheet') return renderQrSheet();
-  return '';
-}
-
-function allInstancesFlat(){
-  let out=[];
-  Object.keys(S.instances).forEach(date=>{ out = out.concat(S.instances[date]); });
-  return out;
-}
-
-function renderDashboard(){
-  const todayList = S.instances[S.today] || [];
-  const total = todayList.length, done = todayList.filter(i=>i.status==='completed').length;
-  const supervisorsToday = new Set(todayList.filter(i=>i.supervisor_name).map(i=>i.supervisor_name)).size;
-
+/* ============================= HOME (admin/opm/contractor_manager) ============================= */
+function renderHome(){
+  const todayInstalls = S.installs.filter(i=>i.date===S.today);
+  const todayDeliv = S.deliveries.filter(d=>d.date===S.today);
+  const todayOrders = S.orders.filter(o=>o.scheduled_date===S.today);
+  const todayPest = (S.pest||[]).filter(p=>p.scheduled_date===S.today);
+  const delivDone = todayDeliv.filter(d=>d.status==='completed').length;
+  const ordersDone = todayOrders.filter(o=>o.status==='completed').length;
+  const pestDone = todayPest.filter(p=>p.status==='completed').length;
+  const installsDone = todayInstalls.filter(i=>i.status!=='scheduled').length;
   return `
   <div class="stat-row">
-    <div class="stat ink"><div class="num">${total}</div><div class="lbl">إجمالي مهام اليوم</div></div>
-    <div class="stat mint"><div class="num">${done}</div><div class="lbl">مهام منجزة</div></div>
-    <div class="stat amber"><div class="num">${total-done}</div><div class="lbl">مهام غير منجزة</div></div>
-    <div class="stat coral"><div class="num">${total?Math.round(done/total*100):0}%</div><div class="lbl">نسبة الإنجاز اليوم</div></div>
+    <div class="stat mint"><div class="num">${delivDone}/${todayDeliv.length}</div><div class="lbl">وحدات تسليم اليوم</div></div>
+    <div class="stat blue"><div class="num">${ordersDone}/${todayOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة اليوم</div></div>
+    <div class="stat amber"><div class="num">${installsDone}/${todayInstalls.length}</div><div class="lbl">أعمال تأسيسات اليوم</div></div>
+    <div class="stat coral"><div class="num">${pestDone}/${todayPest.length}</div><div class="lbl">مكافحة حشرات اليوم</div></div>
   </div>
-  <div class="chart-grid">
-    <div class="chart-card"><h3 style="margin-top:0;font-size:14px;">الإنجاز حسب الموقع (اليوم)</h3><canvas id="chartLoc" height="200"></canvas></div>
-    <div class="chart-card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام</h3><canvas id="chartWeek" height="200"></canvas></div>
-  </div>
-  <div class="section-title"><h2>مهام اليوم غير المنجزة</h2></div>
-  ${renderPendingList(todayList)}
-  `;
-}
-
-function renderPendingList(list){
-  const pending = list.filter(i=>i.status!=='completed');
-  if(!pending.length) return `<div class="empty-state"><span class="em">✅</span>كل المهام منجزة اليوم — عمل رائع!</div>`;
-  return `<div class="tbl-wrap"><table><thead><tr><th>المهمة</th><th>الموقع</th><th>الحالة</th></tr></thead><tbody>
-    ${pending.map(i=>{
-      const t=S.tasks.find(x=>x.id===i.task_id); const loc=S.locations.find(x=>x.id===i.location_id);
-      return `<tr><td>${esc(t?t.name:'-')}</td><td>${esc(loc?loc.name:'-')}</td><td><span class="badge pending"><span class="dot"></span>لم يُنفذ</span></td></tr>`;
-    }).join('')}
-  </tbody></table></div>`;
-}
-
-function renderLog(){
-  const flat = allInstancesFlat().filter(i=>i.status==='completed').sort((a,b)=> new Date(b.completed_at) - new Date(a.completed_at));
-  const supervisors = Array.from(new Set(flat.map(i=>i.supervisor_name).filter(Boolean)));
-  const f = S.filters;
-  let rows = flat;
-  if(f.date) rows = rows.filter(i=>i.date===f.date);
-  if(f.location!=='all') rows = rows.filter(i=>i.location_id===f.location);
-  if(f.supervisor!=='all') rows = rows.filter(i=>i.supervisor_name===f.supervisor);
-
-  return `
-  <div class="filters">
-    <div class="fgroup"><label>التاريخ</label><input type="date" id="f-date" value="${f.date}"></div>
-    <div class="fgroup"><label>الموقع</label><select id="f-loc">
-      <option value="all">كل المواقع</option>
-      ${S.locations.map(l=>`<option value="${l.id}" ${f.location===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}
-    </select></div>
-    <div class="fgroup"><label>المشرف</label><select id="f-sup">
-      <option value="all">كل المشرفين</option>
-      ${supervisors.map(s=>`<option value="${esc(s)}" ${f.supervisor===s?'selected':''}>${esc(s)}</option>`).join('')}
-    </select></div>
-    <div class="fgroup" style="justify-content:flex-end;"><button class="ghost-btn" id="f-clear">مسح الفلاتر</button></div>
-  </div>
-  <div class="tbl-wrap"><table><thead><tr><th>المهمة</th><th>الموقع</th><th>المشرف</th><th>الوقت</th><th>صورة</th></tr></thead><tbody>
-  ${rows.length? rows.map(i=>{
-    const t=S.tasks.find(x=>x.id===i.task_id); const loc=S.locations.find(x=>x.id===i.location_id);
-    return `<tr class="rowbtn" data-detail="${i.date}|${i.id}">
-      <td>${esc(t?t.name:'-')}</td>
-      <td>${esc(loc?loc.name:'-')}</td>
-      <td>${esc(i.supervisor_name||'-')}</td>
-      <td>${fmtTime(i.completed_at)} · ${i.date}</td>
-      <td>${i.photo?`<img class="thumb" src="${i.photo}">`:'<span class="empty-cell">-</span>'}</td>
-    </tr>`;
-  }).join('') : `<tr><td colspan="5" class="empty-cell" style="text-align:center;padding:26px;">لا توجد سجلات مطابقة</td></tr>`}
-  </tbody></table></div>`;
-}
-
-function renderManage(){
-  return `<div class="manage-cols">
-    <div class="manage-card">
-      <h3>${ICON.pin(15)} المواقع</h3>
-      ${S.locations.map(l=>`<div class="manage-row">
-        <div><div class="mi">${esc(l.name)}</div><div class="ms">${esc(l.building||'')}</div></div>
-        <div style="display:flex;gap:6px;">
-          <button class="icon-btn qr" data-qr-loc="${l.id}" title="عرض QR">${ICON.qr(14)}</button>
-          <button class="icon-btn" data-del-loc="${l.id}" title="حذف">${ICON.trash(14)}</button>
-        </div>
-      </div>`).join('') || '<div class="empty-cell">لا توجد مواقع</div>'}
-      <div style="margin-top:12px;">
-        <div class="form-row"><input id="new-loc-name" placeholder="اسم الموقع الجديد"></div>
-        <div class="form-row"><input id="new-loc-building" placeholder="القطاع / المبنى (اختياري)"></div>
-        <button class="primary-btn" id="add-loc">${ICON.plus(14)} إضافة موقع</button>
-      </div>
-    </div>
-
-    <div class="manage-card">
-      <h3>${ICON.check(15)} المهام</h3>
-      ${S.tasks.map(t=>{
-        const loc = S.locations.find(l=>l.id===t.location_id);
-        return `<div class="manage-row">
-          <div><div class="mi">${esc(t.name)}</div><div class="ms">${esc(loc?loc.name:'—')} · ${t.frequency}</div></div>
-          <div style="display:flex;gap:6px;">
-            <button class="icon-btn qr" data-qr-task="${t.id}" title="عرض QR">${ICON.qr(14)}</button>
-            <button class="icon-btn" data-del-task="${t.id}" title="حذف">${ICON.trash(14)}</button>
-          </div>
-        </div>`;
-      }).join('') || '<div class="empty-cell">لا توجد مهام</div>'}
-      <div style="margin-top:12px;">
-        <div class="form-row"><input id="new-task-name" placeholder="اسم المهمة الجديدة"></div>
-        <div class="form-row"><select id="new-task-loc">
-          ${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}
-        </select></div>
-        <div class="form-row"><select id="new-task-freq">
-          <option value="يومي">تكرار يومي</option>
-          <option value="أسبوعي">تكرار أسبوعي</option>
-        </select></div>
-        <button class="primary-btn" id="add-task">${ICON.plus(14)} إضافة مهمة</button>
-      </div>
+  <div class="home-blocks">
+    <div class="card"><canvas id="chartHome" height="180"></canvas></div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
+      ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
+        ${todayInstalls.map(i=>`<tr><td>${esc(i.description)}</td><td>${SHIFT_LABEL[i.shift]}</td><td>${statusBadge(i.status)}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty-state" style="padding:20px;"><span class="em">🧱</span>مفيش أعمال تأسيسات مجدولة النهاردة</div>`}
     </div>
   </div>`;
 }
+function bindHome(){}
+function drawHomeCharts(){
+  const el=document.getElementById('chartHome'); if(!el || typeof Chart==='undefined') return;
+  const days=[]; const vals=[];
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().slice(0,10);
+    days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
+    vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
+  }
+  new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'شيك ليست منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+}
+function statusBadge(s){
+  const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending' };
+  return `<span class="badge ${map[s]||'pending'}"><span class="dot"></span>${STATUS_LABEL[s]||s}</span>`;
+}
 
-function renderUsers(){
-  const users = S.users||[];
-  if(!users.length) return `<div class="empty-state"><span class="em">👤</span>جارِ تحميل المستخدمين...</div>`;
-  return `<div class="tbl-wrap"><table><thead><tr>
-    <th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th></th>
-  </tr></thead><tbody>
-  ${users.map(u=>{
-    const isSelf = S.session && u.id===S.session.user.id;
+/* ============================= DELIVERIES ============================= */
+function renderDeliveries(){
+  const list = S.deliveries.filter(d=>d.date===S.deliveryDate);
+  return `
+  <div class="toolbar">
+    <div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>
+    <button class="primary-btn" id="dv-add">${ICON.plus()} إضافة وحدة</button>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>المشرف المسؤول</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(d=>{
+    const sup = S.users.find(u=>u.id===d.assigned_supervisor_id);
+    const canChangeStatus = S.profile.role==='admin'||S.profile.role==='opm'||d.assigned_supervisor_id===S.session.user.id;
     return `<tr>
-      <td>${esc(u.full_name||'-')}${isSelf?' <span class="ms">(أنت)</span>':''}</td>
-      <td style="direction:ltr;text-align:right;">${esc(u.email||'-')}</td>
+      <td>${esc(d.unit_code)}</td>
+      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">لم يُحدد</span>'}</td>
+      <td>${canChangeStatus? `<select data-dv-status="${d.id}">
+        <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+      </select>` : statusBadge(d.status)}</td>
+      <td>${esc(d.notes||'-')}</td>
+      <td>${(S.profile.role==='admin'||S.profile.role==='opm')?`<button class="ghost-btn" data-dv-assign="${d.id}">تعيين</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindDeliveries(){
+  document.getElementById('dv-date').onchange=e=>{ S.deliveryDate=e.target.value; loadDeliveries().then(render); };
+  document.getElementById('dv-add').onclick=()=>{ S.modal={type:'addDelivery'}; render(); };
+  document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.dvStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم تحديث الحالة',true); });
+  document.querySelectorAll('[data-dv-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignDelivery', id:b.dataset.dvAssign}; render(); });
+  document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
+}
+async function loadDeliveries(){ S.deliveries = await dbSelect('delivery_units'); }
+
+/* ============================= PAID SERVICE ORDERS ============================= */
+function renderOrders(){
+  const role=S.profile.role;
+  const list = S.ordersDate ? S.orders.filter(o=>o.scheduled_date===S.ordersDate) : S.orders;
+  const canCreate = role==='fm_dispatcher'||role==='admin'||role==='opm';
+  const canAssign = role==='opm'||role==='admin';
+  return `
+  <div class="toolbar">
+    <div class="fgroup"><label>فلتر بالتاريخ</label><input type="date" id="ord-date" value="${S.ordersDate}"></div>
+    <button class="ghost-btn" id="ord-clear">مسح الفلتر</button>
+    ${canCreate?`<button class="primary-btn" id="ord-add">${ICON.plus()} أوردر جديد</button>`:''}
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>النوع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(o=>{
+    const sup = S.users.find(u=>u.id===o.assigned_supervisor_id);
+    const canChangeStatus = role==='admin'||role==='opm'||o.assigned_supervisor_id===S.session.user.id;
+    return `<tr>
+      <td>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</td>
+      <td>${o.scheduled_date}</td>
+      <td>${esc(o.scheduled_time||'-')}</td>
+      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
+      <td>${esc(o.opm_notes||'-')}</td>
+      <td>${canChangeStatus? `<select data-ord-status="${o.id}">
+        <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
+      </select>`:statusBadge(o.status)}</td>
+      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}</td>
+    </tr>`;
+  }).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindOrders(){
+  document.getElementById('ord-date').onchange=e=>{ S.ordersDate=e.target.value; render(); };
+  document.getElementById('ord-clear').onclick=()=>{ S.ordersDate=''; render(); };
+  const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
+  document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadOrders(); render(); toast('تم تحديث الحالة',true); });
+  document.querySelectorAll('[data-ord-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignOrder', id:b.dataset.ordAssign}; render(); });
+}
+async function loadOrders(){ S.orders = await dbSelect('paid_service_orders'); }
+
+/* ============================= PEST CONTROL ============================= */
+const PEST_TYPE_LABEL = { full_service:'خدمة كاملة', inspection:'معاينة', flying_spray:'رش طائر', crawling_spray:'رش زاحف', specialized_spray:'رش متخصص', rodent_control:'مكافحة قوارض' };
+function renderPest(){
+  const role=S.profile.role;
+  const canCreate = role==='admin'||role==='opm'||role==='fm_dispatcher';
+  const canAssign = role==='admin'||role==='opm';
+  const list = S.pest.slice().sort((a,b)=> a.scheduled_date < b.scheduled_date ? 1 : -1);
+  return `
+  <div class="toolbar">${canCreate?`<button class="primary-btn" id="pest-add">${ICON.plus()} طلب جديد</button>`:''}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(p=>{
+    const sup=S.users.find(u=>u.id===p.assigned_supervisor_id);
+    const canChangeStatus = role==='admin'||role==='opm'||p.assigned_supervisor_id===S.session.user.id;
+    return `<tr>
+      <td>${esc(p.unit_code)}</td><td>${PEST_TYPE_LABEL[p.service_type]||p.service_type}</td><td>${p.scheduled_date}</td><td>${esc(p.scheduled_time||'-')}</td>
+      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
+      <td>${canChangeStatus? `<select data-pest-status="${p.id}">
+        <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
+      </select>`:statusBadge(p.status)}</td>
+      <td>${canAssign?`<button class="ghost-btn" data-pest-assign="${p.id}">تعيين مشرف</button>`:''}</td>
+    </tr>`;
+  }).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindPest(){
+  const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
+  document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-pest-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignPest', id:b.dataset.pestAssign}; render(); });
+}
+async function loadPest(){ S.pest = await dbSelect('pest_control_requests'); }
+
+/* ============================= FACADE CLEANING ============================= */
+function renderFacade(){
+  const role=S.profile.role;
+  const canCreate = role==='admin'||role==='opm';
+  const list = S.facade.filter(f=>f.date===S.facadeDate);
+  return `
+  <div class="toolbar">
+    <div class="fgroup"><label>التاريخ</label><input type="date" id="fc-date" value="${S.facadeDate}"></div>
+    ${canCreate?`<button class="primary-btn" id="fc-add">${ICON.plus()} إضافة عمل</button>`:''}
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الموقع</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(f=>{
+    const loc=S.locations.find(l=>l.id===f.location_id);
+    return `<tr>
+      <td>${esc(f.description||'-')}</td><td>${loc?esc(loc.name):'-'}</td><td>${statusBadge(f.status)}</td>
+      <td>${f.status==='scheduled'?`<button class="ghost-btn" data-fc-complete="${f.id}">تم الانتهاء</button>`:(f.photo?`<img src="${f.photo}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;">`:'')}</td>
+    </tr>`;
+  }).join(''): `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindFacade(){
+  document.getElementById('fc-date').onchange=e=>{ S.facadeDate=e.target.value; render(); };
+  const add=document.getElementById('fc-add'); if(add) add.onclick=()=>{ S.modal={type:'addFacade'}; render(); };
+  document.querySelectorAll('[data-fc-complete]').forEach(b=>b.onclick=()=>{ S.modal={type:'completeFacade', id:b.dataset.fcComplete}; render(); });
+}
+async function loadFacade(){ S.facade = await dbSelect('facade_works'); }
+
+/* ============================= WASTE REMOVAL ============================= */
+function renderWaste(){
+  const role=S.profile.role;
+  const canCreate = role==='admin'||role==='opm';
+  const list = S.waste.slice().sort((a,b)=> a.date < b.date ? 1 : -1);
+  return `
+  <div class="toolbar">${canCreate?`<button class="primary-btn" id="wr-add">${ICON.plus()} عمل جديد</button>`:''}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>التاريخ</th><th>المشرف</th><th>الحالة</th><th>السبب</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(w=>{
+    const sup=S.users.find(u=>u.id===w.assigned_supervisor_id);
+    const canAct = (role==='admin'||role==='opm'||w.assigned_supervisor_id===S.session.user.id) && w.status==='scheduled';
+    return `<tr>
+      <td>${esc(w.description)}</td><td>${w.date}</td>
+      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
+      <td>${w.status==='not_done'?'<span class="badge postponed"><span class="dot"></span>لم يتم العمل</span>':statusBadge(w.status)}</td>
+      <td>${esc(w.reason||'-')}</td>
+      <td>${canAct?`<button class="ghost-btn" data-wr-done="${w.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-wr-notdone="${w.id}">لم يتم</button>`:''}</td>
+    </tr>`;
+  }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindWaste(){
+  const add=document.getElementById('wr-add'); if(add) add.onclick=()=>{ S.modal={type:'addWaste'}; render(); };
+  document.querySelectorAll('[data-wr-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.wrDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم تسجيل الانتهاء',true); });
+  document.querySelectorAll('[data-wr-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.wrNotdone}; render(); });
+}
+async function loadWaste(){ S.waste = await dbSelect('waste_removal_jobs'); }
+
+/* ============================= INSTALLATION WORKS ============================= */
+function renderInstalls(){
+  const role=S.profile.role;
+  const list = S.installs.filter(i=>i.date===S.installsDate);
+  const canUpdate = role==='admin'||role==='opm'||role==='contractor_manager';
+  return `
+  <div class="toolbar">
+    <div class="fgroup"><label>التاريخ</label><input type="date" id="in-date" value="${S.installsDate}"></div>
+    ${role==='admin'?`<button class="primary-btn" id="in-add">${ICON.plus()} جدولة عمل جديد</button>`:''}
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th><th>سبب التأجيل</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(i=>`<tr>
+      <td>${esc(i.description)}</td>
+      <td><span class="tag-shift ${i.shift}">${SHIFT_LABEL[i.shift]}</span></td>
+      <td>${statusBadge(i.status)}</td>
+      <td>${esc(i.postpone_reason||'-')}</td>
+      <td>${canUpdate && i.status==='scheduled' ? `<button class="ghost-btn" data-in-done="${i.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-in-postpone="${i.id}">تأجيل</button>`:''}</td>
+    </tr>`).join(''): `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindInstalls(){
+  document.getElementById('in-date').onchange=e=>{ S.installsDate=e.target.value; render(); };
+  const add=document.getElementById('in-add'); if(add) add.onclick=()=>{ S.modal={type:'addInstall'}; render(); };
+  document.querySelectorAll('[data-in-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('installation_works', b.dataset.inDone, {status:'completed', updated_by:S.session.user.id, updated_at:new Date().toISOString()}); await loadInstalls(); render(); toast('تم تسجيل الانتهاء',true); });
+  document.querySelectorAll('[data-in-postpone]').forEach(b=>b.onclick=()=>{ S.modal={type:'postponeInstall', id:b.dataset.inPostpone}; render(); });
+}
+async function loadInstalls(){ S.installs = await dbSelect('installation_works'); }
+
+/* ============================= CHECKLIST DEFINITIONS (admin) ============================= */
+function renderChecklistAdmin(){
+  return `
+  <div class="toolbar"><button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر شيك ليست</button></div>
+  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الموقع</th><th>الوردية</th><th>وقت السماح</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${S.checklistDefs.length? S.checklistDefs.map(c=>{
+    const loc=S.locations.find(l=>l.id===c.location_id);
+    return `<tr>
+      <td>${esc(c.name)}</td>
+      <td>${loc?esc(loc.name):'-'}</td>
+      <td><span class="tag-shift ${c.shift}">${SHIFT_LABEL[c.shift]}</span></td>
+      <td>${c.valid_from&&c.valid_to? esc(c.valid_from)+' - '+esc(c.valid_to) : 'بدون قيد'}</td>
+      <td>${c.active?'<span class="badge done"><span class="dot"></span>مفعّل</span>':'<span class="badge pending"><span class="dot"></span>موقوف</span>'}</td>
+      <td><button class="ghost-btn" data-cl-qr="${c.id}">${ICON.qr(13)}</button> <button class="ghost-btn danger" data-cl-del="${c.id}">${ICON.trash()}</button></td>
+    </tr>`;
+  }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد عناصر بعد</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindChecklistAdmin(){
+  document.getElementById('cl-add').onclick=()=>{ S.modal={type:'addChecklistDef'}; render(); };
+  document.querySelectorAll('[data-cl-qr]').forEach(b=>b.onclick=()=>{ const c=S.checklistDefs.find(x=>x.id===b.dataset.clQr); S.qrTarget={code:'ZEDWEST|CL|'+c.id, label:c.name}; S.modal={type:'qr'}; render(); });
+  document.querySelectorAll('[data-cl-del]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('checklist_definitions', b.dataset.clDel, {active:false}); await loadChecklistDefs(); render(); });
+}
+async function loadChecklistDefs(){ S.checklistDefs = await dbSelect('checklist_definitions'); }
+
+function renderQrSheet(){
+  return `<div class="card"><p style="font-size:13px;color:var(--text-dim);margin-top:0;">اطبع الصفحة واعلّق كل رمز في مكانه.</p>
+  <button class="primary-btn" id="do-print">${ICON.printer(13)} طباعة كل الرموز</button></div>
+  <div class="print-grid" id="print-preview" style="margin-top:16px;"></div>`;
+}
+function bindQrSheet(){
+  document.getElementById('do-print').onclick=()=>window.print();
+  buildPrintPreview();
+}
+function buildPrintPreview(){
+  const holder=document.getElementById('print-preview'); if(!holder) return;
+  holder.innerHTML='';
+  S.checklistDefs.filter(c=>c.active).forEach(c=>{
+    const loc=S.locations.find(l=>l.id===c.location_id);
+    const tile=document.createElement('div'); tile.className='print-tile';
+    const qrDiv=document.createElement('div'); tile.appendChild(qrDiv);
+    const pn=document.createElement('div'); pn.className='pn'; pn.textContent=c.name; tile.appendChild(pn);
+    const pl=document.createElement('div'); pl.style.fontSize='10px'; pl.style.color='#666'; pl.textContent=(loc?loc.name:'')+' · '+SHIFT_LABEL[c.shift]; tile.appendChild(pl);
+    holder.appendChild(tile);
+    new QRCode(qrDiv, { text:'ZEDWEST|CL|'+c.id, width:110, height:110, colorDark:'#0E2A2B', colorLight:'#fff' });
+  });
+}
+
+/* ============================= ATTENDANCE ============================= */
+function renderAttendance(){
+  const role=S.profile.role;
+  const needsApproval = role==='contractor_manager'||role==='contractor_admin';
+  const canApprove = role==='admin'||role==='opm';
+  const list = S.attendance.filter(a=>a.date===S.attendanceDate);
+  const pending = S.attendance.filter(a=>a.status==='pending');
+  return `
+  <div class="card" style="margin-bottom:18px;">
+    <h3 style="margin-top:0;font-size:14px;">تسجيل حضور جديد</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+      <div class="form-row"><label>التاريخ</label><input type="date" id="at-date" value="${S.today}"></div>
+      <div class="form-row"><label>الوردية</label><select id="at-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+      <div class="form-row"><label>مدير موقع</label><input type="number" min="0" id="at-sm" value="0"></div>
+      <div class="form-row"><label>إداري موقع</label><input type="number" min="0" id="at-sa" value="0"></div>
+      <div class="form-row"><label>مشرف أول</label><input type="number" min="0" id="at-ss" value="0"></div>
+      <div class="form-row"><label>مشرف</label><input type="number" min="0" id="at-sv" value="0"></div>
+      <div class="form-row"><label>عامل</label><input type="number" min="0" id="at-w" value="0"></div>
+    </div>
+    <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="at-notes"></textarea></div>
+    <button class="primary-btn" id="at-save">${needsApproval? 'إرسال للموافقة':'حفظ'}</button>
+  </div>
+  ${canApprove && pending.length ? `<div class="card" style="margin-bottom:18px;border-color:var(--amber);">
+    <h3 style="margin-top:0;font-size:14px;color:var(--amber);">بانتظار الموافقة (${pending.length})</h3>
+    ${pending.map(a=>renderAttendanceRow(a,true)).join('')}
+  </div>`:''}
+  <div class="toolbar"><div class="fgroup"><label>عرض تاريخ</label><input type="date" id="at-filter-date" value="${S.attendanceDate}"></div></div>
+  <div class="tbl-wrap"><table><thead><tr><th>الوردية</th><th>مدير موقع</th><th>إداري موقع</th><th>مشرف أول</th><th>مشرف</th><th>عامل</th><th>الحالة</th></tr></thead><tbody>
+  ${list.length? list.map(a=>`<tr>
+    <td>${SHIFT_LABEL[a.shift]}</td><td>${a.site_manager_count}</td><td>${a.site_admin_count}</td><td>${a.senior_supervisor_count}</td><td>${a.supervisor_count}</td><td>${a.worker_count}</td>
+    <td>${a.status==='approved'?'<span class="badge done"><span class="dot"></span>معتمد</span>':'<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'}</td>
+  </tr>`).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد سجلات في هذا اليوم</td></tr>`}
+  </tbody></table></div>`;
+}
+function renderAttendanceRow(a,withActions){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;">
+    <span>${a.date} · ${SHIFT_LABEL[a.shift]} — مدير:${a.site_manager_count} إداري:${a.site_admin_count} مشرف أول:${a.senior_supervisor_count} مشرف:${a.supervisor_count} عامل:${a.worker_count}</span>
+    ${withActions?`<span style="display:flex;gap:6px;"><button class="ghost-btn" data-at-approve="${a.id}">قبول</button><button class="ghost-btn danger" data-at-reject="${a.id}">رفض</button></span>`:''}
+  </div>`;
+}
+function bindAttendance(){
+  document.getElementById('at-filter-date').onchange=e=>{ S.attendanceDate=e.target.value; render(); };
+  document.getElementById('at-save').onclick=async ()=>{
+    const role=S.profile.role;
+    const row = {
+      id: uid('att'), date: document.getElementById('at-date').value, shift: document.getElementById('at-shift').value,
+      site_manager_count: +document.getElementById('at-sm').value||0, site_admin_count: +document.getElementById('at-sa').value||0,
+      senior_supervisor_count: +document.getElementById('at-ss').value||0, supervisor_count: +document.getElementById('at-sv').value||0,
+      worker_count: +document.getElementById('at-w').value||0, notes: document.getElementById('at-notes').value.trim(),
+      entered_by: S.session.user.id, status: (role==='contractor_manager'||role==='contractor_admin') ? 'pending':'approved'
+    };
+    const ok = await dbInsert('attendance_records', [row]);
+    if(ok){ await loadAttendance(); render(); toast(row.status==='pending'?'تم الإرسال للموافقة':'تم حفظ الحضور', true); }
+  };
+  document.querySelectorAll('[data-at-approve]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('attendance_records', b.dataset.atApprove, {status:'approved', approved_by:S.session.user.id, approved_at:new Date().toISOString()}); await loadAttendance(); render(); toast('تم اعتماد الحضور',true); });
+  document.querySelectorAll('[data-at-reject]').forEach(b=>b.onclick=async ()=>{ await dbDelete('attendance_records', b.dataset.atReject); await loadAttendance(); render(); });
+}
+async function loadAttendance(){ S.attendance = await dbSelect('attendance_records'); }
+
+/* ============================= LOCATIONS (admin) ============================= */
+function renderLocations(){
+  return `<div class="card">
+    <h3 style="margin-top:0;">المواقع</h3>
+    ${S.locations.map(l=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);">
+      <div><b>${esc(l.name)}</b> <span style="color:var(--text-dim);font-size:12px;">${esc(l.building||'')}</span></div>
+      <button class="ghost-btn danger" data-loc-del="${l.id}">${ICON.trash()}</button>
+    </div>`).join('') || '<p style="color:var(--text-dim);">لا توجد مواقع</p>'}
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="new-loc-name" placeholder="اسم الموقع" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
+      <input id="new-loc-building" placeholder="القطاع (اختياري)" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
+      <button class="primary-btn" id="add-loc">${ICON.plus()} إضافة</button>
+    </div>
+  </div>`;
+}
+function bindLocations(){
+  document.getElementById('add-loc').onclick=async ()=>{
+    const name=document.getElementById('new-loc-name').value.trim();
+    const building=document.getElementById('new-loc-building').value.trim();
+    if(!name){ toast('اكتب اسم الموقع',false); return; }
+    const ok = await dbInsert('locations', [{id:uid('loc'), name, building}]);
+    if(ok){ await loadLocations(); render(); }
+  };
+  document.querySelectorAll('[data-loc-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('locations', b.dataset.locDel); await loadLocations(); render(); });
+}
+async function loadLocations(){ S.locations = await dbSelect('locations'); }
+
+/* ============================= USERS (admin) ============================= */
+function renderUsers(){
+  return `<div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الوردية</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
+  ${S.users.map(u=>{
+    const isSelf = u.id===S.session.user.id;
+    return `<tr>
+      <td>${esc(u.full_name)}${isSelf?' (أنت)':''}</td>
+      <td style="direction:ltr;text-align:right;">${esc(u.email)}</td>
       <td><select data-u-role="${u.id}" ${isSelf?'disabled':''}>
-        <option value="supervisor" ${u.role==='supervisor'?'selected':''}>مشرف</option>
-        <option value="admin" ${u.role==='admin'?'selected':''}>إدارة</option>
+        ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
+      </select></td>
+      <td><select data-u-shift="${u.id}">
+        <option value="both" ${u.shift==='both'?'selected':''}>الاثنين</option>
+        <option value="morning" ${u.shift==='morning'?'selected':''}>صباحي</option>
+        <option value="evening" ${u.shift==='evening'?'selected':''}>مسائي</option>
       </select></td>
       <td><select data-u-active="${u.id}" ${isSelf?'disabled':''}>
         <option value="1" ${u.active?'selected':''}>مفعّل</option>
         <option value="0" ${!u.active?'selected':''}>موقوف</option>
       </select></td>
-      <td>
-        <select data-u-locs="${u.id}" multiple style="min-width:160px;min-height:34px;">
-          ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
-        </select>
-        <div class="ms">فاضي = كل المواقع</div>
-      </td>
+      <td><select multiple class="multi-sel" data-u-locs="${u.id}">
+        ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
+      </select></td>
       <td><button class="ghost-btn" data-save-user="${u.id}" ${isSelf?'disabled':''}>حفظ</button></td>
     </tr>`;
   }).join('')}
-  </tbody></table></div>
-  <p style="font-size:12px;color:var(--text-dim);margin-top:10px;">
-    المستخدمون بيظهروا هنا تلقائيًا بعد ما يعملوا حساب بأنفسهم من شاشة الدخول. أول شخص يعمل حساب على النظام بيبقى "إدارة" تلقائيًا، والباقي "مشرف" لحد ما تغيّر دورهم من هنا.
-  </p>`;
+  </tbody></table></div>`;
 }
-function renderQrSheet(){
-  return `<div class="chart-card">
-    <p style="font-size:13px;color:var(--text-dim);margin-top:0;">اطبع الصفحة التالية وعلّق كل رمز QR في مكانه الفعلي بجوار المهمة المطابقة.</p>
-    <button class="primary-btn" style="max-width:220px;" id="do-print">${ICON.printer(14)} طباعة كل الرموز</button>
+function bindUsers(){
+  document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.saveUser;
+    const role=document.querySelector(`[data-u-role="${id}"]`).value;
+    const shift=document.querySelector(`[data-u-shift="${id}"]`).value;
+    const active=document.querySelector(`[data-u-active="${id}"]`).value==='1';
+    const locsSel=document.querySelector(`[data-u-locs="${id}"]`);
+    const allowed_locations=Array.from(locsSel.selectedOptions).map(o=>o.value);
+    await dbUpdate('profiles', id, {role, shift, active, allowed_locations});
+    await loadUsers(); render(); toast('تم حفظ بيانات المستخدم', true);
+  });
+}
+async function loadUsers(){ S.users = await dbSelect('profiles'); }
+
+/* ============================= REPORTS (admin) ============================= */
+function renderReports(){
+  const totalDeliv = S.deliveries.length, doneDeliv = S.deliveries.filter(d=>d.status==='completed').length;
+  const totalOrders = S.orders.length, doneOrders = S.orders.filter(o=>o.status==='completed').length;
+  const totalInstalls = S.installs.length, doneInstalls = S.installs.filter(i=>i.status==='completed').length, postponedInstalls = S.installs.filter(i=>i.status==='postponed').length;
+  const totalChecklist = S.checklistInstances.length, doneChecklist = S.checklistInstances.filter(c=>c.status==='completed').length;
+  const attendanceTotal = S.attendance.reduce((sum,a)=> sum + a.site_manager_count+a.site_admin_count+a.senior_supervisor_count+a.supervisor_count+a.worker_count, 0);
+  return `<div class="stat-row">
+    <div class="stat mint"><div class="num">${doneDeliv}/${totalDeliv}</div><div class="lbl">وحدات تسليم منجزة (كل الفترة)</div></div>
+    <div class="stat blue"><div class="num">${doneOrders}/${totalOrders}</div><div class="lbl">أوردرات خدمة مدفوعة منجزة</div></div>
+    <div class="stat amber"><div class="num">${doneInstalls}/${totalInstalls}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
+    <div class="stat coral"><div class="num">${postponedInstalls}</div><div class="lbl">أعمال تأسيسات مؤجلة</div></div>
+    <div class="stat ink"><div class="num">${doneChecklist}/${totalChecklist}</div><div class="lbl">شيك ليست منجزة</div></div>
+    <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور المسجلين</div></div>
   </div>
-  <div class="print-grid" id="print-preview" style="margin-top:16px;"></div>`;
+  <p style="color:var(--text-dim);font-size:12.5px;">البيانات دي تراكمية من كل السجلات المحمّلة في الجلسة الحالية. لتقرير فترة محددة، استخدم فلاتر التاريخ داخل كل شاشة (وحدات التسليم / الأوردرات / التأسيسات / الحضور).</p>`;
+}
+
+/* ============================= SUPERVISOR: TODAY ============================= */
+function renderSupervisorToday(){
+  const uidMe = S.session.user.id;
+  const myDeliv = S.deliveries.filter(d=>d.date===S.today && d.assigned_supervisor_id===uidMe);
+  const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && o.assigned_supervisor_id===uidMe);
+  const allowedLocs = (S.profile.allowed_locations&&S.profile.allowed_locations.length)? S.profile.allowed_locations : S.locations.map(l=>l.id);
+  const myShift = S.profile.shift||'both';
+  const myChecklist = S.checklistInstances.filter(ci=> ci.date===S.today && allowedLocs.includes(ci.location_id) && (ci.shift==='both'||ci.shift===myShift));
+  const myPest = S.pest.filter(p=>p.scheduled_date===S.today && p.assigned_supervisor_id===uidMe);
+  const myFacade = S.facade.filter(f=>f.date===S.today && f.status==='scheduled' && (allowedLocs.includes(f.location_id)));
+  const myWaste = S.waste.filter(w=>w.date===S.today && w.assigned_supervisor_id===uidMe && w.status==='scheduled');
+
+  return `
+  <div class="stat-row">
+    <div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
+    <div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
+    <div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">شيك ليست</div></div>
+  </div>
+
+  <div class="section-title"><h2>مكافحة الحشرات</h2></div>
+  ${myPest.length? myPest.map(p=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div><b>${esc(p.unit_code)}</b> — ${PEST_TYPE_LABEL[p.service_type]} ${esc(p.scheduled_time||'')}</div>
+    <select data-my-pest="${p.id}">
+      <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
+      <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
+      <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
+    </select>
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد طلبات مكافحة حشرات لك اليوم</p>`}
+
+  <div class="section-title"><h2>نظافة الواجهات</h2></div>
+  ${myFacade.length? myFacade.map(f=>{ const loc=S.locations.find(l=>l.id===f.location_id); return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div>${esc(loc?loc.name:'')} ${f.description?`<div style="font-size:12px;color:var(--text-dim);">${esc(f.description)}</div>`:''}</div>
+    <button class="ghost-btn" data-my-facade="${f.id}">تم الانتهاء</button>
+  </div>`; }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال نظافة واجهات لك اليوم</p>`}
+
+  <div class="section-title"><h2>رفع المخلفات</h2></div>
+  ${myWaste.length? myWaste.map(w=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div>${esc(w.description)}</div>
+    <span style="display:flex;gap:6px;"><button class="ghost-btn" data-my-waste-done="${w.id}">تم الانتهاء</button><button class="ghost-btn danger" data-my-waste-notdone="${w.id}">لم يتم</button></span>
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}
+
+  <div class="section-title"><h2>وحدات التسليم</h2></div>
+  ${myDeliv.length? myDeliv.map(d=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
+    <select data-my-dv="${d.id}">
+      <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
+      <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
+      <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+    </select>
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
+
+  <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
+  ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div><b>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
+      ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
+    </div>
+    <select data-my-ord="${o.id}">
+      <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
+      <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
+      <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
+    </select>
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
+
+  <div class="section-title"><h2>الشيك ليست</h2></div>
+  ${myChecklist.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+    ${myChecklist.map(ci=>{
+      const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
+      const loc=S.locations.find(l=>l.id===ci.location_id);
+      const isDone=ci.status==='completed';
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;"><b>${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
+        <button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl="${ci.id}" ${isDone?'disabled':''}>${isDone?ICON.check(14)+' تم':ICON.qr(14)+' مسح QR'}</button>
+      </div>`;
+    }).join('')}
+  </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر شيك ليست لك اليوم</p>`}
+  `;
+}
+function bindSupervisorToday(){
+  document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.myDv, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.myOrd, {status:sel.value, updated_at:new Date().toISOString()}); await loadOrders(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-my-pest]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.myPest, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-my-facade]').forEach(b=>b.onclick=()=>{ S.modal={type:'completeFacade', id:b.dataset.myFacade}; render(); });
+  document.querySelectorAll('[data-my-waste-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.myWasteDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-my-waste-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.myWasteNotdone}; render(); });
+  document.querySelectorAll('[data-scan-cl]').forEach(b=>b.onclick=()=>{ S.scanCtx={instanceId:b.dataset.scanCl}; S.modal={type:'scan'}; render(); });
+}
+
+function renderMyName(){
+  return `<div class="card" style="max-width:420px;">
+    <h3 style="margin-top:0;">بياناتي</h3>
+    <div class="form-row"><label>الاسم الكامل</label><input id="sv-name-input" value="${esc(S.profile.full_name)}"></div>
+    <button class="primary-btn" id="save-sv-name">${ICON.check(14)} حفظ</button>
+  </div>`;
+}
+function bindMyName(){
+  document.getElementById('save-sv-name').onclick=async ()=>{
+    const name=document.getElementById('sv-name-input').value.trim();
+    if(!name){ toast('اكتب اسمك',false); return; }
+    await dbUpdate('profiles', S.session.user.id, {full_name:name});
+    S.profile.full_name=name; render(); toast('تم الحفظ',true);
+  };
 }
 
 /* ============================= MODALS ============================= */
-function renderModals(){
-  let html='';
-  if(S.scanCtx) html += renderScanModal();
-  if(S.confirmCtx) html += renderConfirmModal();
-  if(S.qrTarget) html += renderQrModal();
-  if(S.detailInstance) html += renderDetailModal();
-  return html;
-}
-
-function renderScanModal(){
-  return `<div class="modal-bg" data-close="scan"><div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-head"><h3>${ICON.qr(17)} مسح رمز QR</h3><button class="close" data-close="scan">${ICON.x(14)}</button></div>
-    <div class="modal-body">
-      <div class="scan-stage" id="scan-stage">
-        <div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div>
-      </div>
-      <div class="scan-actions">
-        <label class="ghost-btn file-btn">${ICON.upload(14)} أو ارفع صورة لرمز QR
-          <input type="file" accept="image/*" id="qr-file-input" capture="environment">
-        </label>
-        <button class="manual-toggle" id="manual-toggle">إدخال يدوي (للدعم الفني فقط)</button>
-        <div id="manual-box" style="display:none;margin-top:6px;">
-          <div class="form-row"><input id="manual-code" placeholder="اكتب كود المهمة الظاهر أسفل الـQR"></div>
-          <button class="ghost-btn" id="manual-submit" style="width:100%;">تأكيد الكود</button>
-        </div>
-      </div>
+function renderModal(){
+  if(!S.modal) return '';
+  const m=S.modal;
+  if(m.type==='addDelivery') return modalWrap('إضافة وحدة تسليم', `
+    <div class="form-row"><label>كود الوحدة</label><input id="m-unit-code"></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-unit-date" value="${S.deliveryDate}"></div>
+    <div class="form-row"><label>المشرف (اختياري الآن)</label><select id="m-unit-sup"><option value="">بدون تعيين</option>${supervisorOptions()}</select></div>
+    <div class="form-row"><label>ملاحظات</label><textarea id="m-unit-notes"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='assignDelivery') return modalWrap('تعيين مشرف للوحدة', `
+    <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
+  if(m.type==='addOrder') return modalWrap('أوردر خدمة مدفوعة جديد', `
+    <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option></select></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
+    <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
+    <div class="form-row"><label>بيانات العميل (اختياري)</label><input id="m-ord-client"></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الأوردر</button>`);
+  if(m.type==='assignOrder') return modalWrap('تعيين مشرف للأوردر', `
+    <div class="form-row"><label>المشرف المتاح</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
+    <div class="form-row"><label>ملاحظات للمشرف</label><textarea id="m-ord-notes"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
+  if(m.type==='addInstall') return modalWrap('جدولة عمل تأسيسات', `
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-in-date" value="${S.installsDate}"></div>
+    <div class="form-row"><label>الوردية</label><select id="m-in-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+    <div class="form-row"><label>وصف العمل</label><textarea id="m-in-desc"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='postponeInstall') return modalWrap('تأجيل العمل', `
+    <div class="form-row"><label>سبب التأجيل</label><textarea id="m-postpone-reason" placeholder="لازم تكتب السبب"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
+  if(m.type==='addChecklistDef') return modalWrap('عنصر شيك ليست جديد', `
+    <div class="form-row"><label>الاسم</label><input id="m-cl-name" placeholder="مثال: تنظيف مدخل عمارة A"></div>
+    <div class="form-row"><label>الموقع</label><select id="m-cl-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
+    <div class="form-row"><label>الوردية</label><select id="m-cl-shift"><option value="both">الاثنين</option><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+    <div class="form-row"><label>وقت السماح من (اختياري)</label><input type="time" id="m-cl-from"></div>
+    <div class="form-row"><label>وقت السماح إلى (اختياري)</label><input type="time" id="m-cl-to"></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='qr') return modalWrap('رمز QR', `<div style="text-align:center;"><div id="qr-render-target"></div><div style="font-family:'Cairo';font-weight:800;">${esc(S.qrTarget.label)}</div></div>`);
+  if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
+    <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit"></div>
+    <div class="form-row"><label>نوع الخدمة</label><select id="m-pest-type">${Object.keys(PEST_TYPE_LABEL).map(k=>`<option value="${k}">${PEST_TYPE_LABEL[k]}</option>`).join('')}</select></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-pest-date" value="${S.today}"></div>
+    <div class="form-row"><label>الميعاد</label><input type="time" id="m-pest-time"></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الطلب</button>`);
+  if(m.type==='assignPest') return modalWrap('تعيين مشرف', `
+    <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
+  if(m.type==='addFacade') return modalWrap('إضافة عمل نظافة واجهات', `
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-fc-date" value="${S.facadeDate}"></div>
+    <div class="form-row"><label>الموقع</label><select id="m-fc-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
+    <div class="form-row"><label>وصف العمل (اختياري)</label><textarea id="m-fc-desc"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='completeFacade') return modalWrap('تأكيد الانتهاء', `
+    <div class="form-row"><label>صورة بعد الانتهاء (إلزامية)</label>
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
+      <img id="cf-photo-preview" class="photo-preview" style="display:none;">
     </div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} تم الانتهاء</button>`);
+  if(m.type==='addWaste') return modalWrap('عمل رفع مخلفات جديد', `
+    <div class="form-row"><label>الوصف</label><input id="m-wr-desc" placeholder="مثال: رفع مخلفات عمارة B"></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-wr-date" value="${S.today}"></div>
+    <div class="form-row"><label>المشرف</label><select id="m-wr-sup">${supervisorOptions()}</select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
+    <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
+  if(m.type==='scan') return modalWrap('مسح رمز QR', `
+    <div class="scan-stage" id="scan-stage"><div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div></div>
+    <div style="margin-top:12px;">
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.upload()} أو ارفع صورة لرمز QR<input type="file" accept="image/*" id="qr-file-input" capture="environment"></label>
+    </div>`);
+  if(m.type==='confirmChecklist') return modalWrap('تأكيد تنفيذ المهمة', `
+    <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="cf-notes"></textarea></div>
+    <div class="form-row"><label>صورة إثبات (اختياري)</label>
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
+      <img id="cf-photo-preview" class="photo-preview" style="display:none;">
+    </div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} تم التنفيذ</button>`);
+  return '';
+}
+function modalWrap(title, body){
+  return `<div class="modal-bg" data-close-modal="1"><div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head"><h3>${esc(title)}</h3><button class="close" data-close-modal="1">${ICON.x()}</button></div>
+    <div class="modal-body">${body}</div>
   </div></div>`;
 }
-
-function renderConfirmModal(){
-  const {task, location, instance} = S.confirmCtx;
-  return `<div class="modal-bg" data-close="confirm"><div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-head"><h3>${ICON.check(17)} تأكيد تنفيذ المهمة</h3><button class="close" data-close="confirm">${ICON.x(14)}</button></div>
-    <div class="modal-body">
-      <div class="confirm-task">
-        <div class="ct-name">${esc(task.name)}</div>
-        <div class="ct-loc">${ICON.pin(11)} ${esc(location?location.name:'')}</div>
-      </div>
-      <div class="form-row"><label>اسم المشرف</label><input id="cf-name" placeholder="اكتب اسمك" value="${esc(S.supervisor_name)}"></div>
-      <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="cf-notes" placeholder="أي ملاحظات عن حالة الموقع..."></textarea></div>
-      <div class="form-row">
-        <label>صورة إثبات (اختياري)</label>
-        <label class="ghost-btn file-btn" style="text-align:center;">${ICON.camera(15)} إضافة صورة
-          <input type="file" accept="image/*" capture="environment" id="cf-photo">
-        </label>
-        <img id="cf-photo-preview" class="photo-preview" style="display:none;">
-      </div>
-      <div class="form-row" style="font-size:11.5px;color:var(--text-dim);flex-direction:row;gap:6px;align-items:center;">
-        ${ICON.clock(13)} سيتم تسجيل التاريخ والوقت تلقائيًا عند الحفظ
-      </div>
-      <button class="primary-btn" id="cf-submit">${ICON.check(15)} تم التنفيذ</button>
-    </div>
-  </div></div>`;
+function supervisorOptions(){
+  return S.users.filter(u=>u.role==='supervisor' && u.active).map(u=>`<option value="${u.id}">${esc(u.full_name)}</option>`).join('');
 }
 
-function renderQrModal(){
-  const target = S.qrTarget;
-  return `<div class="modal-bg" data-close="qr"><div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-head"><h3>${ICON.qr(17)} رمز QR</h3><button class="close" data-close="qr">${ICON.x(14)}</button></div>
-    <div class="modal-body qr-modal-body">
-      <div id="qr-render-target"></div>
-      <div class="qr-caption">${esc(target.label)}</div>
-      <div class="qr-sub">${esc(target.sub||'')}</div>
-      <div class="qr-sub" style="margin-top:6px;">الكود: ${esc(target.code)}</div>
-    </div>
-  </div></div>`;
+function bindModalEvents(){
+  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); S.modal=null; S.scanCtx=null; render(); });
+  const saveBtn=document.getElementById('m-save');
+  if(saveBtn) saveBtn.onclick=handleModalSave;
+  if(S.modal && S.modal.type==='qr') renderQrCanvas();
+  if(S.modal && S.modal.type==='scan') startScanner();
+  const qf=document.getElementById('qr-file-input'); if(qf) qf.onchange=e=>decodeFromFile(e.target.files[0]);
+  const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
 }
 
-function renderDetailModal(){
-  const {date,id} = S.detailInstance;
-  const inst = (S.instances[date]||[]).find(i=>i.id===id);
-  if(!inst) return '';
-  const t=S.tasks.find(x=>x.id===inst.task_id); const loc=S.locations.find(x=>x.id===inst.location_id);
-  return `<div class="modal-bg" data-close="detail"><div class="modal wide" onclick="event.stopPropagation()">
-    <div class="modal-head"><h3>تفاصيل المهمة</h3><button class="close" data-close="detail">${ICON.x(14)}</button></div>
-    <div class="modal-body">
-      <div class="dl"><span class="k">المهمة</span><span class="v">${esc(t?t.name:'-')}</span></div>
-      <div class="dl"><span class="k">الموقع</span><span class="v">${esc(loc?loc.name:'-')}</span></div>
-      <div class="dl"><span class="k">المشرف</span><span class="v">${esc(inst.supervisor_name||'-')}</span></div>
-      <div class="dl"><span class="k">التاريخ والوقت</span><span class="v">${inst.date} · ${fmtTime(inst.completed_at)}</span></div>
-      <div class="dl"><span class="k">تم عبر مسح QR</span><span class="v">${inst.scanned?'نعم ✓':'لا'}</span></div>
-      ${inst.notes?`<div class="detail-notes">${esc(inst.notes)}</div>`:''}
-      ${inst.photo?`<img class="detail-photo" src="${inst.photo}">`:''}
-    </div>
-  </div></div>`;
+async function handleModalSave(){
+  const m=S.modal;
+  if(m.type==='addDelivery'){
+    const unit_code=document.getElementById('m-unit-code').value.trim();
+    if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
+    const row={ id:uid('dv'), unit_code, date:document.getElementById('m-unit-date').value, assigned_supervisor_id: document.getElementById('m-unit-sup').value||null, notes: document.getElementById('m-unit-notes').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('delivery_units',[row])){ await loadDeliveries(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='assignDelivery'){
+    const sup=document.getElementById('m-assign-sup').value;
+    if(await dbUpdate('delivery_units', m.id, {assigned_supervisor_id:sup})){ await loadDeliveries(); S.modal=null; render(); toast('تم التعيين',true); }
+  }
+  else if(m.type==='addOrder'){
+    const row={ id:uid('ord'), order_type:document.getElementById('m-ord-type').value, scheduled_date:document.getElementById('m-ord-date').value, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('paid_service_orders',[row])){ await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
+  }
+  else if(m.type==='assignOrder'){
+    const sup=document.getElementById('m-assign-sup').value;
+    const notes=document.getElementById('m-ord-notes').value.trim();
+    if(await dbUpdate('paid_service_orders', m.id, {assigned_supervisor_id:sup, opm_notes:notes, assigned_by:S.session.user.id})){ await loadOrders(); S.modal=null; render(); toast('تم التعيين',true); }
+  }
+  else if(m.type==='addInstall'){
+    const description=document.getElementById('m-in-desc').value.trim();
+    if(!description){ toast('اكتب وصف العمل',false); return; }
+    const row={ id:uid('in'), date:document.getElementById('m-in-date').value, shift:document.getElementById('m-in-shift').value, description, status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('installation_works',[row])){ await loadInstalls(); S.modal=null; render(); toast('تمت الجدولة',true); }
+  }
+  else if(m.type==='postponeInstall'){
+    const reason=document.getElementById('m-postpone-reason').value.trim();
+    if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
+    if(await dbUpdate('installation_works', m.id, {status:'postponed', postpone_reason:reason, updated_by:S.session.user.id, updated_at:new Date().toISOString()})){ await loadInstalls(); S.modal=null; render(); toast('تم تسجيل التأجيل',true); }
+  }
+  else if(m.type==='addChecklistDef'){
+    const name=document.getElementById('m-cl-name').value.trim();
+    if(!name){ toast('اكتب اسم العنصر',false); return; }
+    const row={ id:uid('cldef'), name, location_id:document.getElementById('m-cl-loc').value, shift:document.getElementById('m-cl-shift').value, valid_from:document.getElementById('m-cl-from').value||null, valid_to:document.getElementById('m-cl-to').value||null, active:true };
+    if(await dbInsert('checklist_definitions',[row])){ await loadChecklistDefs(); await ensureTodayChecklistInstances(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='confirmChecklist'){
+    await submitChecklistConfirm();
+  }
+  else if(m.type==='addPest'){
+    const unit_code=document.getElementById('m-pest-unit').value.trim();
+    if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
+    const row={ id:uid('pest'), unit_code, service_type:document.getElementById('m-pest-type').value, scheduled_date:document.getElementById('m-pest-date').value, scheduled_time:document.getElementById('m-pest-time').value, status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('pest_control_requests',[row])){ await loadPest(); S.modal=null; render(); toast('تم إنشاء الطلب',true); }
+  }
+  else if(m.type==='assignPest'){
+    const sup=document.getElementById('m-assign-sup').value;
+    if(await dbUpdate('pest_control_requests', m.id, {assigned_supervisor_id:sup})){ await loadPest(); S.modal=null; render(); toast('تم التعيين',true); }
+  }
+  else if(m.type==='addFacade'){
+    const row={ id:uid('fc'), date:document.getElementById('m-fc-date').value, location_id:document.getElementById('m-fc-loc').value, description:document.getElementById('m-fc-desc').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('facade_works',[row])){ await loadFacade(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='completeFacade'){
+    if(!pendingPhoto){ toast('لازم ترفع صورة عشان تقفل العمل',false); return; }
+    const patch={ status:'completed', photo:pendingPhoto, completed_by:S.session.user.id, completed_at:new Date().toISOString() };
+    if(await dbUpdate('facade_works', m.id, patch)){ await loadFacade(); pendingPhoto=null; S.modal=null; render(); toast('تم تسجيل الانتهاء',true); }
+  }
+  else if(m.type==='addWaste'){
+    const description=document.getElementById('m-wr-desc').value.trim();
+    if(!description){ toast('اكتب وصف العمل',false); return; }
+    const row={ id:uid('wr'), description, date:document.getElementById('m-wr-date').value, assigned_supervisor_id:document.getElementById('m-wr-sup').value, status:'scheduled', created_by:S.session.user.id };
+    if(await dbInsert('waste_removal_jobs',[row])){ await loadWaste(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='markWaste'){
+    const reason=document.getElementById('m-wr-reason').value.trim();
+    if(!reason){ toast('لازم تكتب السبب',false); return; }
+    if(await dbUpdate('waste_removal_jobs', m.id, {status:'not_done', reason, updated_at:new Date().toISOString()})){ await loadWaste(); S.modal=null; render(); toast('تم التسجيل',true); }
+  }
 }
 
-/* ============================= HELPERS ============================= */
-function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-/* ============================= EVENTS ============================= */
-function bindEvents(){
-  document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{ S.role=b.dataset.role; S.tab = S.role==='supervisor'?'checklist':'dashboard'; savePrefs(); render(); });
-  const logoutBtn = document.getElementById('logout-btn');
-  if(logoutBtn) logoutBtn.onclick = doSignOut;
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
-
-  // supervisor name save
-  const saveBtn=document.getElementById('save-sv-name');
-  if(saveBtn) saveBtn.onclick=async ()=>{
-    const newName = document.getElementById('sv-name-input').value.trim();
-    if(!newName){ toast('اكتب اسمك أولاً', false); return; }
-    S.supervisor_name = newName;
-    if(S.session) await dbUpdate('profiles', S.session.user.id, { full_name:newName });
-    if(S.profile) S.profile.full_name = newName;
-    render();
-    toast('تم حفظ اسمك بنجاح', true);
-  };
-
-  // scan buttons
-  document.querySelectorAll('[data-scan]').forEach(b=>b.onclick=()=>{
-    if(b.classList.contains('done')) return;
-    openScan(b.dataset.scan);
-  });
-
-  // modal close
-  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=(e)=>{
-    if(e.target!==b) return;
-    closeModal(b.dataset.close);
-  });
-
-  // manual toggle
-  const mt = document.getElementById('manual-toggle');
-  if(mt) mt.onclick=()=>{ const box=document.getElementById('manual-box'); box.style.display = box.style.display==='none'?'block':'none'; };
-  const ms = document.getElementById('manual-submit');
-  if(ms) ms.onclick=()=>{
-    const code = document.getElementById('manual-code').value.trim();
-    handleScannedCode(code);
-  };
-  const qf = document.getElementById('qr-file-input');
-  if(qf) qf.onchange=(e)=> decodeFromFile(e.target.files[0]);
-
-  // confirm modal
-  const cfPhoto = document.getElementById('cf-photo');
-  if(cfPhoto) cfPhoto.onchange=(e)=> handlePhotoSelect(e.target.files[0]);
-  const cfSubmit = document.getElementById('cf-submit');
-  if(cfSubmit) cfSubmit.onclick = submitConfirm;
-
-  // manage - locations
-  const addLoc = document.getElementById('add-loc');
-  if(addLoc) addLoc.onclick = addLocation;
-  document.querySelectorAll('[data-del-loc]').forEach(b=>b.onclick=()=>deleteLocation(b.dataset.delLoc));
-  document.querySelectorAll('[data-qr-loc]').forEach(b=>b.onclick=()=>showLocQr(b.dataset.qrLoc));
-
-  // manage - tasks
-  const addTask = document.getElementById('add-task');
-  if(addTask) addTask.onclick = addTask_;
-  document.querySelectorAll('[data-del-task]').forEach(b=>b.onclick=()=>deleteTask(b.dataset.delTask));
-  document.querySelectorAll('[data-qr-task]').forEach(b=>b.onclick=()=>showTaskQr(b.dataset.qrTask));
-
-  // dashboard filters
-  const fd=document.getElementById('f-date'), fl=document.getElementById('f-loc'), fs=document.getElementById('f-sup'), fc=document.getElementById('f-clear');
-  if(fd) fd.onchange=()=>{ S.filters.date=fd.value; render(); };
-  if(fl) fl.onchange=()=>{ S.filters.location=fl.value; render(); };
-  if(fs) fs.onchange=()=>{ S.filters.supervisor=fs.value; render(); };
-  if(fc) fc.onclick=()=>{ S.filters={date:'',location:'all',supervisor:'all',status:'all'}; render(); };
-
-  document.querySelectorAll('[data-detail]').forEach(r=>r.onclick=()=>{
-    const [date,id] = r.dataset.detail.split('|');
-    S.detailInstance={date,id}; render();
-  });
-
-  const printBtn = document.getElementById('do-print');
-  document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=()=>saveUser(b.dataset.saveUser));
-  if(printBtn) printBtn.onclick = doPrintSheet;
-
-  if(S.qrTarget) renderQrCanvas();
-  if(S.scanCtx) startScanner();
+/* ============================= QR SCAN (checklist) ============================= */
+function renderQrCanvas(){
+  const el=document.getElementById('qr-render-target'); if(!el||typeof QRCode==='undefined') return;
+  el.innerHTML=''; new QRCode(el,{text:S.qrTarget.code,width:190,height:190,colorDark:'#0E2A2B',colorLight:'#ffffff'});
 }
-
-async function savePrefs(){ savePrefsLocal(); }
-
-function closeModal(which){
-  if(which==='scan'){ stopScanner(); S.scanCtx=null; }
-  if(which==='confirm') S.confirmCtx=null;
-  if(which==='qr') S.qrTarget=null;
-  if(which==='detail') S.detailInstance=null;
-  render();
-}
-
-/* ============================= SUPERVISOR: SCAN FLOW ============================= */
-function openScan(task_id){
-  const task = S.tasks.find(t=>t.id===task_id);
-  const location = S.locations.find(l=>l.id===task.location_id);
-  S.scanCtx = { task_id, task, location };
-  render();
-}
-
 async function startScanner(){
-  const stage = document.getElementById('scan-stage');
-  const msgBox = document.getElementById('scan-msg');
-  if(!stage) return;
+  const stage=document.getElementById('scan-stage'); const msgBox=document.getElementById('scan-msg'); if(!stage) return;
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
-    S.stream = stream;
-    stage.innerHTML = `<video id="scan-video" autoplay playsinline muted></video>
-      <div class="scan-frame">${ICON.bracket()}</div>
-      <div class="scan-hint">وجّه الكاميرا نحو رمز QR الملصق في الموقع</div>`;
-    const video = document.getElementById('scan-video');
-    video.srcObject = stream;
-    await video.play();
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    let stopped=false;
-    S.stopLoop = ()=>{ stopped=true; };
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    S.stream=stream;
+    stage.innerHTML=`<video id="scan-video" autoplay playsinline muted></video><div class="scan-frame">${ICON.bracket()}</div>`;
+    const video=document.getElementById('scan-video'); video.srcObject=stream; await video.play();
+    const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d'); let stopped=false;
+    S.stopLoop=()=>{stopped=true;};
     function tick(){
-      if(stopped || !S.scanCtx) return;
+      if(stopped||!S.scanCtx) return;
       if(video.readyState===video.HAVE_ENOUGH_DATA){
-        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = jsQR(img.data, img.width, img.height);
-        if(code && code.data){ stopped=true; handleScannedCode(code.data); return; }
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight; ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img=ctx.getImageData(0,0,canvas.width,canvas.height); const code=jsQR(img.data,img.width,img.height);
+        if(code&&code.data){ stopped=true; handleScannedCode(code.data); return; }
       }
       requestAnimationFrame(tick);
     }
     tick();
   }catch(e){
-    if(msgBox) msgBox.innerHTML = `<span class="em">🚫</span>تعذّر الوصول إلى الكاميرا (قد تكون غير مسموحة في هذه البيئة).<br>استخدم "رفع صورة لرمز QR" أدناه بدلاً من ذلك.`;
+    if(msgBox) msgBox.innerHTML=`<span class="em">🚫</span>تعذّر الوصول للكاميرا. استخدم رفع صورة بدلاً من ذلك.`;
   }
 }
-
-function stopScanner(){
-  if(S.stopLoop) S.stopLoop();
-  if(S.stream){ S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; }
-}
-
+function stopScanner(){ if(S.stopLoop) S.stopLoop(); if(S.stream){ S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; } }
 function decodeFromFile(file){
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = (e)=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const canvas=document.createElement('canvas');
-      canvas.width=img.width; canvas.height=img.height;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0);
-      const data = ctx.getImageData(0,0,canvas.width,canvas.height);
-      const code = jsQR(data.data, data.width, data.height);
-      if(code && code.data) handleScannedCode(code.data);
-      else toast('لم يتم التعرف على رمز QR في الصورة، حاول مرة أخرى', false);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleScannedCode(code){
-  const clean = (code||'').trim();
-  const task_id = clean.startsWith('ZEDWEST|TASK|') ? clean.split('|')[2] : clean;
-  const task = S.tasks.find(t=>t.id===task_id);
-  if(!task){ toast('الكود غير صحيح أو المهمة غير موجودة', false); return; }
-  if(S.scanCtx && task.id !== S.scanCtx.task_id){
-    toast('هذا الرمز يخص مهمة مختلفة عن التي تحاول تنفيذها', false); return;
-  }
-  const location = S.locations.find(l=>l.id===task.location_id);
-  const list = S.instances[S.today]||[];
-  const instance = list.find(i=>i.task_id===task.id);
-  stopScanner();
-  S.scanCtx=null;
-  S.confirmCtx = { task, location, instance };
-  render();
-}
-
-let pendingPhoto = null;
-function handlePhotoSelect(file){
-  if(!file) return;
-  const reader = new FileReader();
+  const reader=new FileReader();
   reader.onload=(e)=>{
     const img=new Image();
     img.onload=()=>{
-      const maxW=700;
-      const scale = Math.min(1, maxW/img.width);
-      const canvas=document.createElement('canvas');
-      canvas.width=img.width*scale; canvas.height=img.height*scale;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0,canvas.width,canvas.height);
-      pendingPhoto = canvas.toDataURL('image/jpeg',0.6);
-      const prev=document.getElementById('cf-photo-preview');
-      prev.src=pendingPhoto; prev.style.display='block';
+      const canvas=document.createElement('canvas'); canvas.width=img.width; canvas.height=img.height;
+      const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+      const data=ctx.getImageData(0,0,canvas.width,canvas.height); const code=jsQR(data.data,data.width,data.height);
+      if(code&&code.data) handleScannedCode(code.data); else toast('لم يتم التعرف على الرمز',false);
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
-
-async function submitConfirm(){
-  const name = document.getElementById('cf-name').value.trim();
-  if(!name){ toast('من فضلك اكتب اسم المشرف', false); return; }
-  const notes = document.getElementById('cf-notes').value.trim();
-  const {task, instance} = S.confirmCtx;
-  const list = S.instances[S.today];
-  const idx = list.findIndex(i=>i.id===instance.id);
-  if(idx===-1) return;
-  const patch = {
-    status:'completed', supervisor_name:name, completed_at:new Date().toISOString(),
-    notes, photo: pendingPhoto, scanned:true
+function handleScannedCode(code){
+  const clean=(code||'').trim();
+  const defId = clean.startsWith('ZEDWEST|CL|') ? clean.split('|')[2] : clean;
+  const inst = S.checklistInstances.find(ci=>ci.id===S.scanCtx.instanceId);
+  if(!inst){ toast('تعذر إيجاد المهمة',false); return; }
+  if(inst.checklist_definition_id !== defId){ toast('هذا الرمز يخص مهمة مختلفة',false); return; }
+  const def=S.checklistDefs.find(c=>c.id===defId);
+  if(def && def.valid_from && def.valid_to){
+    const now=nowTimeStr();
+    if(now < def.valid_from || now > def.valid_to){ toast('خارج وقت السماح بتنفيذ هذه المهمة ('+def.valid_from+' - '+def.valid_to+')', false); stopScanner(); S.modal=null; S.scanCtx=null; render(); return; }
+  }
+  stopScanner();
+  S.modal={type:'confirmChecklist'};
+  render();
+}
+let pendingPhoto=null;
+function handlePhotoSelect(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=700; const scale=Math.min(1,maxW/img.width);
+      const canvas=document.createElement('canvas'); canvas.width=img.width*scale; canvas.height=img.height*scale;
+      const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      pendingPhoto=canvas.toDataURL('image/jpeg',0.6);
+      const prev=document.getElementById('cf-photo-preview'); prev.src=pendingPhoto; prev.style.display='block';
+    };
+    img.src=e.target.result;
   };
-  list[idx] = { ...list[idx], ...patch };
-  await dbUpdate('instances', instance.id, patch);
-  S.supervisor_name = name; await savePrefs();
-  pendingPhoto=null;
-  S.confirmCtx=null;
-  render();
-  toast('تم تسجيل تنفيذ المهمة بنجاح', true);
+  reader.readAsDataURL(file);
 }
-
-/* ============================= MANAGE: CRUD ============================= */
-async function addLocation(){
-  const name=document.getElementById('new-loc-name').value.trim();
-  const building=document.getElementById('new-loc-building').value.trim();
-  if(!name){ toast('اكتب اسم الموقع', false); return; }
-  const row = {id:uid('loc'), name, building};
-  S.locations.push(row);
-  await dbInsert('locations', [row]);
-  render(); toast('تمت إضافة الموقع', true);
-}
-async function deleteLocation(id){
-  S.locations = S.locations.filter(l=>l.id!==id);
-  S.tasks = S.tasks.map(t=> t.location_id===id ? {...t, active:false} : t);
-  await dbDelete('locations', id);
-  await dbUpdateWhere('tasks', 'location_id', id, {active:false});
-  render(); toast('تم حذف الموقع', true);
-}
-async function addTask_(){
-  const name=document.getElementById('new-task-name').value.trim();
-  const location_id=document.getElementById('new-task-loc').value;
-  const frequency=document.getElementById('new-task-freq').value;
-  if(!name || !location_id){ toast('استكمل بيانات المهمة', false); return; }
-  const row = {id:uid('task'), name, description:'', frequency, location_id, active:true};
-  S.tasks.push(row);
-  await dbInsert('tasks', [row]);
-  await ensureTodayInstances();
-  render(); toast('تمت إضافة المهمة', true);
-}
-async function deleteTask(id){
-  S.tasks = S.tasks.map(t=> t.id===id ? {...t, active:false} : t);
-  await dbUpdate('tasks', id, {active:false});
-  render(); toast('تم حذف المهمة', true);
-}
-
-/* ============================= QR RENDER ============================= */
-function showLocQr(id){
-  const loc = S.locations.find(l=>l.id===id);
-  S.qrTarget = { code:'ZEDWEST|LOC|'+loc.id, label:loc.name, sub:'رمز الموقع العام' };
-  render();
-}
-function showTaskQr(id){
-  const t = S.tasks.find(x=>x.id===id);
-  const loc = S.locations.find(l=>l.id===t.location_id);
-  S.qrTarget = { code:'ZEDWEST|TASK|'+t.id, label:t.name, sub:loc?loc.name:'' };
-  render();
-}
-function renderQrCanvas(){
-  const el=document.getElementById('qr-render-target');
-  if(!el || typeof QRCode==='undefined') return;
-  el.innerHTML='';
-  new QRCode(el, { text:S.qrTarget.code, width:190, height:190, colorDark:'#0E2A2B', colorLight:'#ffffff' });
-}
-
-function doPrintSheet(){
-  window.print();
-}
-
-/* build hidden print sheet with a QR per active task, rendered right before print */
-function buildPrintPreview(){
-  const holder = document.getElementById('print-preview');
-  if(!holder) return;
-  holder.innerHTML='';
-  const activeTasks = S.tasks.filter(t=>t.active);
-  activeTasks.forEach(t=>{
-    const loc = S.locations.find(l=>l.id===t.location_id);
-    const tile = document.createElement('div');
-    tile.className='print-tile brackets';
-    const qrDiv = document.createElement('div');
-    tile.appendChild(qrDiv);
-    const pn = document.createElement('div'); pn.className='pn'; pn.textContent=t.name;
-    const pl = document.createElement('div'); pl.className='pl'; pl.textContent=loc?loc.name:'';
-    tile.appendChild(pn); tile.appendChild(pl);
-    holder.appendChild(tile);
-    new QRCode(qrDiv, { text:'ZEDWEST|TASK|'+t.id, width:120, height:120, colorDark:'#0E2A2B', colorLight:'#ffffff' });
-  });
-}
-
-/* ============================= CHARTS ============================= */
-let chartLocInst=null, chartWeekInst=null;
-function drawCharts(){
-  if(typeof Chart==='undefined') return;
-  const cLoc = document.getElementById('chartLoc');
-  const cWeek = document.getElementById('chartWeek');
-  if(chartLocInst){ chartLocInst.destroy(); chartLocInst=null; }
-  if(chartWeekInst){ chartWeekInst.destroy(); chartWeekInst=null; }
-
-  if(cLoc){
-    const todayList = S.instances[S.today]||[];
-    const labels = S.locations.map(l=>l.name);
-    const data = S.locations.map(l=>{
-      const items = todayList.filter(i=>i.location_id===l.id);
-      if(!items.length) return 0;
-      return Math.round(items.filter(i=>i.status==='completed').length/items.length*100);
-    });
-    chartLocInst = new Chart(cLoc, {
-      type:'bar',
-      data:{ labels, datasets:[{ label:'نسبة الإنجاز %', data, backgroundColor:'#1B8A6B', borderRadius:6, maxBarThickness:40 }] },
-      options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100, ticks:{callback:v=>v+'%'} } } }
-    });
+async function submitChecklistConfirm(){
+  const notes=document.getElementById('cf-notes').value.trim();
+  const patch={ status:'completed', supervisor_id:S.session.user.id, completed_at:new Date().toISOString(), notes, photo:pendingPhoto, scanned:true };
+  if(await dbUpdate('checklist_instances', S.scanCtx.instanceId, patch)){
+    await loadChecklistInstances(); pendingPhoto=null; S.modal=null; S.scanCtx=null; render(); toast('تم تسجيل تنفيذ المهمة', true);
   }
-  if(cWeek){
-    const days=[]; const vals=[];
-    for(let i=6;i>=0;i--){
-      const d=new Date(); d.setDate(d.getDate()-i);
-      const ds=d.toISOString().slice(0,10);
-      days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
-      const list = S.instances[ds] || [];
-      vals.push(list.filter(x=>x.status==='completed').length);
+}
+async function loadChecklistInstances(){ S.checklistInstances = await dbSelect('checklist_instances'); }
+
+/* ============================= ENSURE DAILY INSTANCES ============================= */
+async function ensureTodayChecklistInstances(){
+  const date=S.today;
+  const existing = S.checklistInstances.filter(ci=>ci.date===date);
+  const missing=[];
+  S.checklistDefs.filter(c=>c.active).forEach(def=>{
+    if(!existing.find(ci=>ci.checklist_definition_id===def.id)){
+      missing.push({ id:uid('cli'), date, checklist_definition_id:def.id, location_id:def.location_id, shift:def.shift, status:'incomplete', supervisor_id:null, completed_at:null, notes:'', photo:null, scanned:false });
     }
-    chartWeekInst = new Chart(cWeek, {
-      type:'line',
-      data:{ labels:days, datasets:[{ label:'مهام منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35, pointBackgroundColor:'#1B8A6B' }] },
-      options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{stepSize:1} } } }
-    });
-  }
-}
-
-/* ============================= LOAD WEEK DATA FOR CHART (best effort) ============================= */
-async function preloadWeek(){
-  for(let i=0;i<7;i++){
-    const d=new Date(); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().slice(0,10);
-    if(!S.instances[ds]) await loadInstancesFor(ds);
-  }
-}
-
-/* ============================= INIT ============================= */
-(async function init(){
-  if(!configMissing()){
-    await refreshSession();
-    sb.auth.onAuthStateChange(async (event)=>{
-      if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; render(); }
-    });
-  }
-  await loadAll();
-  if(!configMissing() && S.session){
-    await preloadWeek();
-    render();
-  }
-  // hook print preview build whenever qrsheet tab active
-  const obs = new MutationObserver(()=>{
-    if(document.getElementById('print-preview')) buildPrintPreview();
   });
-  obs.observe(document.getElementById('app'), {childList:true, subtree:true});
+  if(missing.length){ await dbInsert('checklist_instances', missing); }
+  S.checklistInstances = await dbSelect('checklist_instances');
+}
+
+/* ============================= BOOT ============================= */
+async function bootApp(){
+  if(!S.profile){ render(); return; }
+  if(S.profile.active===false){
+    await sb.auth.signOut();
+    S.session=null; S.profile=null;
+    S.authError='تم تجميد هذا الحساب من قبل الإدارة. تواصل مع الإدارة لإعادة التفعيل.';
+    render();
+    return;
+  }
+  const role=S.profile.role;
+  S.locations = await dbSelect('locations');
+  S.users = await dbSelect('profiles');
+  if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.orders = await dbSelect('paid_service_orders');
+  if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.pest = await dbSelect('pest_control_requests');
+  if(role==='admin'||role==='opm') S.facade = await dbSelect('facade_works');
+  if(role==='admin'||role==='opm') S.waste = await dbSelect('waste_removal_jobs');
+  if(role==='admin'||role==='opm') S.deliveries = await dbSelect('delivery_units');
+  if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
+  if(role==='admin') S.checklistDefs = await dbSelect('checklist_definitions');
+  if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
+  if(role==='admin'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); }
+  if(role==='supervisor'){
+    S.deliveries = await dbSelect('delivery_units');
+    S.orders = await dbSelect('paid_service_orders');
+    S.pest = await dbSelect('pest_control_requests');
+    S.facade = await dbSelect('facade_works');
+    S.waste = await dbSelect('waste_removal_jobs');
+    S.checklistDefs = await dbSelect('checklist_definitions');
+    await ensureTodayChecklistInstances();
+  }
+  if(role==='admin') await ensureTodayChecklistInstances();
+  render();
+}
+
+(async function init(){
+  if(configMissing()){ render(); return; }
+  await refreshSession();
+  sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; render(); } });
+  if(S.session) await bootApp(); else render();
 })();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }
 </script>
 </body>
