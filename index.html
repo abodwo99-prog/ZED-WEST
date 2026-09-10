@@ -41,7 +41,21 @@ input,textarea,select{font-family:inherit;}
 .brand-text .t2{font-size:11px;color:#9FC9BE;margin-top:1px;}
 .role-badge{background:rgba(255,255,255,.1);color:#fff;padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:800;}
 .wrap{max-width:1200px;margin:0 auto;padding:20px;}
-.tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+.shell{display:flex;gap:18px;align-items:flex-start;max-width:1300px;margin:0 auto;padding:20px;}
+.sidebar{width:230px;flex-shrink:0;display:flex;flex-direction:column;gap:3px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:var(--shadow);position:sticky;top:78px;}
+.sidebar button{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:none;background:transparent;color:var(--text-dim);font-weight:700;font-size:13px;text-align:right;width:100%;transition:.15s;}
+.sidebar button svg{flex-shrink:0;opacity:.75;}
+.sidebar button.active{background:var(--ink);color:#fff;}
+.sidebar button.active svg{opacity:1;}
+.sidebar button:not(.active):hover{background:var(--sand);color:var(--ink);}
+.content{flex:1;min-width:0;}
+@media(max-width:820px){
+  .shell{flex-direction:column;padding:12px;gap:12px;}
+  .sidebar{width:100%;flex-direction:row;overflow-x:auto;position:static;-webkit-overflow-scrolling:touch;}
+  .sidebar button{width:auto;white-space:nowrap;flex-shrink:0;}
+}
+.service-card{cursor:pointer;transition:.15s;}
+.service-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(14,42,43,.12);}
 .tabs button{border:1px solid var(--line);background:var(--paper);color:var(--text-dim);padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;transition:.15s;}
 .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .tabs button:not(.active):hover{border-color:var(--mint);color:var(--ink);}
@@ -217,7 +231,20 @@ const ICON = {
   printer:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
   trash:(s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
+  home:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  truck:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+  droplet:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69s-6 6.34-6 10.31a6 6 0 0 0 12 0c0-3.97-6-10.31-6-10.31z"/></svg>`,
+  bug:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M8 10H4M20 10h-4M8 16H4M20 16h-4M12 6V3M9 3l1.5 2M15 3l-1.5 2"/></svg>`,
+  building:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/></svg>`,
+  trash2:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  brick:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16"/><line x1="2" y1="10" x2="9" y2="10"/><line x1="15" y1="10" x2="22" y2="10"/><line x1="2" y1="16" x2="7" y2="16"/><line x1="12" y1="16" x2="17" y2="16"/><line x1="9" y1="4" x2="9" y2="10"/><line x1="15" y1="10" x2="15" y2="16"/><line x1="7" y1="16" x2="7" y2="20"/><line x1="17" y1="4" x2="17" y2="10"/></svg>`,
+  users:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  pin2:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  chart:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  list:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+  idcard:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>`,
 };
+const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
@@ -244,9 +271,9 @@ function render(){
   if(!S.tab || !tabs.find(t=>t[0]===S.tab)) S.tab = tabs.length?tabs[0][0]:null;
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="wrap">
-      <div class="tabs">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${esc(label)}</button>`).join('')}</div>
-      <div id="tab-body">${renderTabBody()}</div>
+    <div class="shell">
+      <div class="sidebar">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](16):''}<span>${esc(label)}</span></button>`).join('')}</div>
+      <div class="content" id="tab-body">${renderTabBody()}</div>
     </div>
     ${renderModal()}
   `;
@@ -344,33 +371,55 @@ function bindTabEvents(){
 }
 
 /* ============================= HOME (admin/opm/contractor_manager) ============================= */
+function serviceCard(color, icon, label, valueHtml, tabId){
+  return `<div class="stat ${color} service-card" data-goto="${tabId}">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="num">${valueHtml}</div>
+      <div style="color:var(--text-dim);opacity:.6;">${ICON[icon]?ICON[icon](20):''}</div>
+    </div>
+    <div class="lbl">${esc(label)}</div>
+  </div>`;
+}
 function renderHome(){
+  const role = S.profile.role;
+  const roleTabs = tabsForRole(role).map(t=>t[0]);
   const todayInstalls = S.installs.filter(i=>i.date===S.today);
-  const todayDeliv = S.deliveries.filter(d=>d.date===S.today);
-  const todayOrders = S.orders.filter(o=>o.scheduled_date===S.today);
-  const todayPest = (S.pest||[]).filter(p=>p.scheduled_date===S.today);
-  const delivDone = todayDeliv.filter(d=>d.status==='completed').length;
-  const ordersDone = todayOrders.filter(o=>o.status==='completed').length;
-  const pestDone = todayPest.filter(p=>p.status==='completed').length;
-  const installsDone = todayInstalls.filter(i=>i.status!=='scheduled').length;
+
+  const cardDefs = [
+    { id:'deliveries', color:'mint', icon:'truck', label:'وحدات التسليم اليوم', data:S.deliveries, field:'date' },
+    { id:'orders', color:'blue', icon:'droplet', label:'الخدمة المدفوعة اليوم', data:S.orders, field:'scheduled_date' },
+    { id:'pest', color:'coral', icon:'bug', label:'مكافحة الحشرات اليوم', data:S.pest||[], field:'scheduled_date' },
+    { id:'facade', color:'amber', icon:'building', label:'نظافة الواجهات اليوم', data:S.facade||[], field:'date' },
+    { id:'waste', color:'ink', icon:'trash2', label:'رفع المخلفات اليوم', data:S.waste||[], field:'date' },
+    { id:'installs', color:'amber', icon:'brick', label:'أعمال التأسيسات اليوم', data:S.installs, field:'date' },
+    { id:'checklist', color:'mint', icon:'qr', label:'الشيك ليست اليوم', data:S.checklistInstances||[], field:'date' },
+  ];
+  const cardsHtml = cardDefs.filter(c=>roleTabs.includes(c.id)).map(c=>{
+    const items = c.data.filter(x=>x[c.field]===S.today);
+    const done = items.filter(x=> x.status==='completed').length;
+    return serviceCard(c.color, c.icon, c.label, `${done}/${items.length}`, c.id);
+  }).join('');
+  const attendanceCard = roleTabs.includes('attendance') ? (()=>{
+    const att=(S.attendance||[]).filter(a=>a.date===S.today);
+    return serviceCard('blue','idcard','سجلات حضور اليوم', `${att.length}`, 'attendance');
+  })() : '';
+
   return `
-  <div class="stat-row">
-    <div class="stat mint"><div class="num">${delivDone}/${todayDeliv.length}</div><div class="lbl">وحدات تسليم اليوم</div></div>
-    <div class="stat blue"><div class="num">${ordersDone}/${todayOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة اليوم</div></div>
-    <div class="stat amber"><div class="num">${installsDone}/${todayInstalls.length}</div><div class="lbl">أعمال تأسيسات اليوم</div></div>
-    <div class="stat coral"><div class="num">${pestDone}/${todayPest.length}</div><div class="lbl">مكافحة حشرات اليوم</div></div>
-  </div>
+  <div class="stat-row">${cardsHtml}${attendanceCard}</div>
   <div class="home-blocks">
-    <div class="card"><canvas id="chartHome" height="180"></canvas></div>
+    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (الشيك ليست)</h3><canvas id="chartHome" height="180"></canvas></div>
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
-      ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
+      ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
         ${todayInstalls.map(i=>`<tr><td>${esc(i.description)}</td><td>${SHIFT_LABEL[i.shift]}</td><td>${statusBadge(i.status)}</td></tr>`).join('')}
       </tbody></table></div>` : `<div class="empty-state" style="padding:20px;"><span class="em">🧱</span>مفيش أعمال تأسيسات مجدولة النهاردة</div>`}
     </div>
-  </div>`;
+  </div>
+  <p style="text-align:center;font-size:12px;color:var(--text-dim);">👆 دوس على أي كارت فوق عشان تروح مباشرة لشاشته</p>`;
 }
-function bindHome(){}
+function bindHome(){
+  document.querySelectorAll('[data-goto]').forEach(el=>el.onclick=()=>{ S.tab=el.dataset.goto; render(); });
+}
 function drawHomeCharts(){
   const el=document.getElementById('chartHome'); if(!el || typeof Chart==='undefined') return;
   const days=[]; const vals=[];
