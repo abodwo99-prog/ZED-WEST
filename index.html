@@ -147,7 +147,7 @@ let S = {
   checklistDefs:[], checklistInstances:[],
   attendance:[], attendanceDate: todayStr(),
   availability:[],
-  pest:[], facade:[], facadeDate: todayStr(), waste:[],
+  pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
   modal:null,
   scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
 };
@@ -248,7 +248,7 @@ const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug'
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  if(role==='admin') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','الشيك ليست'],['qrsheet','طباعة QR'],['attendance','الحضور'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
+  if(role==='admin') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
   if(role==='opm') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['myname','بياناتي']];
@@ -392,7 +392,7 @@ function renderHome(){
     { id:'facade', color:'amber', icon:'building', label:'نظافة الواجهات اليوم', data:S.facade||[], field:'date' },
     { id:'waste', color:'ink', icon:'trash2', label:'رفع المخلفات اليوم', data:S.waste||[], field:'date' },
     { id:'installs', color:'amber', icon:'brick', label:'أعمال التأسيسات اليوم', data:S.installs, field:'date' },
-    { id:'checklist', color:'mint', icon:'qr', label:'الشيك ليست اليوم', data:S.checklistInstances||[], field:'date' },
+    { id:'checklist', color:'mint', icon:'qr', label:'قوائم التحقق اليومية اليوم', data:S.checklistInstances||[], field:'date' },
   ];
   const cardsHtml = cardDefs.filter(c=>roleTabs.includes(c.id)).map(c=>{
     const items = c.data.filter(x=>x[c.field]===S.today);
@@ -407,7 +407,7 @@ function renderHome(){
   return `
   <div class="stat-row">${cardsHtml}${attendanceCard}</div>
   <div class="home-blocks">
-    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (الشيك ليست)</h3><canvas id="chartHome" height="180"></canvas></div>
+    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
       ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
@@ -427,7 +427,7 @@ function drawHomeCharts(){
     days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
     vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
   }
-  new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'شيك ليست منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+  new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
 }
 function statusBadge(s){
   const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending' };
@@ -442,10 +442,11 @@ function renderDeliveries(){
     <div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>
     <button class="primary-btn" id="dv-add">${ICON.plus()} إضافة وحدة</button>
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>المشرف المسؤول</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>المشرف المسؤول</th><th>الحالة</th><th>ملاحظات</th><th>بلاغات المشرف</th><th></th></tr></thead><tbody>
   ${list.length? list.map(d=>{
     const sup = S.users.find(u=>u.id===d.assigned_supervisor_id);
     const canChangeStatus = S.profile.role==='admin'||S.profile.role==='opm'||d.assigned_supervisor_id===S.session.user.id;
+    const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
     return `<tr>
       <td>${esc(d.unit_code)}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">لم يُحدد</span>'}</td>
@@ -455,9 +456,10 @@ function renderDeliveries(){
         <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
       </select>` : statusBadge(d.status)}</td>
       <td>${esc(d.notes||'-')}</td>
+      <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
       <td>${(S.profile.role==='admin'||S.profile.role==='opm')?`<button class="ghost-btn" data-dv-assign="${d.id}">تعيين</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
 function bindDeliveries(){
@@ -466,8 +468,10 @@ function bindDeliveries(){
   document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.dvStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم تحديث الحالة',true); });
   document.querySelectorAll('[data-dv-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignDelivery', id:b.dataset.dvAssign}; render(); });
   document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
+  document.querySelectorAll('[data-view-notes]').forEach(b=>b.onclick=()=>{ S.modal={type:'viewUnitNotes', id:b.dataset.viewNotes}; render(); });
 }
 async function loadDeliveries(){ S.deliveries = await dbSelect('delivery_units'); }
+async function loadUnitNotes(){ S.unitNotes = await dbSelect('unit_notes'); }
 
 /* ============================= PAID SERVICE ORDERS ============================= */
 function renderOrders(){
@@ -629,7 +633,7 @@ async function loadInstalls(){ S.installs = await dbSelect('installation_works')
 /* ============================= CHECKLIST DEFINITIONS (admin) ============================= */
 function renderChecklistAdmin(){
   return `
-  <div class="toolbar"><button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر شيك ليست</button></div>
+  <div class="toolbar"><button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر قوائم تحقق يومية</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الموقع</th><th>الوردية</th><th>وقت السماح</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${S.checklistDefs.length? S.checklistDefs.map(c=>{
     const loc=S.locations.find(l=>l.id===c.location_id);
@@ -814,7 +818,7 @@ function renderReports(){
     <div class="stat blue"><div class="num">${doneOrders}/${totalOrders}</div><div class="lbl">أوردرات خدمة مدفوعة منجزة</div></div>
     <div class="stat amber"><div class="num">${doneInstalls}/${totalInstalls}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
     <div class="stat coral"><div class="num">${postponedInstalls}</div><div class="lbl">أعمال تأسيسات مؤجلة</div></div>
-    <div class="stat ink"><div class="num">${doneChecklist}/${totalChecklist}</div><div class="lbl">شيك ليست منجزة</div></div>
+    <div class="stat ink"><div class="num">${doneChecklist}/${totalChecklist}</div><div class="lbl">قوائم تحقق منجزة</div></div>
     <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور المسجلين</div></div>
   </div>
   <p style="color:var(--text-dim);font-size:12.5px;">البيانات دي تراكمية من كل السجلات المحمّلة في الجلسة الحالية. لتقرير فترة محددة، استخدم فلاتر التاريخ داخل كل شاشة (وحدات التسليم / الأوردرات / التأسيسات / الحضور).</p>`;
@@ -836,7 +840,7 @@ function renderSupervisorToday(){
   <div class="stat-row">
     <div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
     <div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
-    <div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">شيك ليست</div></div>
+    <div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>
   </div>
 
   <div class="section-title"><h2>مكافحة الحشرات</h2></div>
@@ -862,14 +866,23 @@ function renderSupervisorToday(){
   </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}
 
   <div class="section-title"><h2>وحدات التسليم</h2></div>
-  ${myDeliv.length? myDeliv.map(d=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
-    <select data-my-dv="${d.id}">
-      <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
-      <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
-      <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
-    </select>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
+  ${myDeliv.length? myDeliv.map(d=>{
+    const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
+    return `<div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
+      <select data-my-dv="${d.id}">
+        <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+      </select>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+      <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
+      ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
+    </div>
+  </div>`;
+  }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
 
   <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
   ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -883,7 +896,7 @@ function renderSupervisorToday(){
     </select>
   </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
 
-  <div class="section-title"><h2>الشيك ليست</h2></div>
+  <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
   ${myChecklist.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
     ${myChecklist.map(ci=>{
       const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
@@ -895,7 +908,7 @@ function renderSupervisorToday(){
         <button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl="${ci.id}" ${isDone?'disabled':''}>${isDone?ICON.check(14)+' تم':ICON.qr(14)+' مسح QR'}</button>
       </div>`;
     }).join('')}
-  </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر شيك ليست لك اليوم</p>`}
+  </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر قوائم تحقق لك اليوم</p>`}
   `;
 }
 function bindSupervisorToday(){
@@ -906,6 +919,7 @@ function bindSupervisorToday(){
   document.querySelectorAll('[data-my-waste-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.myWasteDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-my-waste-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.myWasteNotdone}; render(); });
   document.querySelectorAll('[data-scan-cl]').forEach(b=>b.onclick=()=>{ S.scanCtx={instanceId:b.dataset.scanCl}; S.modal={type:'scan'}; render(); });
+  document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
 }
 
 function renderMyName(){
@@ -955,7 +969,7 @@ function renderModal(){
   if(m.type==='postponeInstall') return modalWrap('تأجيل العمل', `
     <div class="form-row"><label>سبب التأجيل</label><textarea id="m-postpone-reason" placeholder="لازم تكتب السبب"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
-  if(m.type==='addChecklistDef') return modalWrap('عنصر شيك ليست جديد', `
+  if(m.type==='addChecklistDef') return modalWrap('عنصر قوائم تحقق يومية جديد', `
     <div class="form-row"><label>الاسم</label><input id="m-cl-name" placeholder="مثال: تنظيف مدخل عمارة A"></div>
     <div class="form-row"><label>الموقع</label><select id="m-cl-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
     <div class="form-row"><label>الوردية</label><select id="m-cl-shift"><option value="both">الاثنين</option><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
@@ -991,6 +1005,22 @@ function renderModal(){
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
+  if(m.type==='addUnitNote') return modalWrap('إضافة ملاحظة عن الوحدة', `
+    <div class="form-row"><label>وصف العطل أو التلفية</label><textarea id="m-note-text" placeholder="مثال: الباب الزجاجي مكسور"></textarea></div>
+    <div class="form-row"><label>صورة (اختياري لكن يُفضّل)</label>
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
+      <img id="cf-photo-preview" class="photo-preview" style="display:none;">
+    </div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ الملاحظة</button>`);
+  if(m.type==='viewUnitNotes'){
+    const notes=(S.unitNotes||[]).filter(n=>n.delivery_unit_id===m.id);
+    return modalWrap('ملاحظات الوحدة', notes.length? notes.map(n=>`
+      <div style="border-bottom:1px dashed var(--line);padding:10px 0;">
+        <div style="font-size:13px;">${esc(n.note)}</div>
+        ${n.photo?`<img src="${n.photo}" class="photo-preview" style="max-height:180px;">`:''}
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtTime(n.created_at)} · ${n.created_at?n.created_at.slice(0,10):''}</div>
+      </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد ملاحظات على هذه الوحدة</p>`);
+  }
   if(m.type==='scan') return modalWrap('مسح رمز QR', `
     <div class="scan-stage" id="scan-stage"><div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div></div>
     <div style="margin-top:12px;">
@@ -1095,6 +1125,12 @@ async function handleModalSave(){
     const reason=document.getElementById('m-wr-reason').value.trim();
     if(!reason){ toast('لازم تكتب السبب',false); return; }
     if(await dbUpdate('waste_removal_jobs', m.id, {status:'not_done', reason, updated_at:new Date().toISOString()})){ await loadWaste(); S.modal=null; render(); toast('تم التسجيل',true); }
+  }
+  else if(m.type==='addUnitNote'){
+    const note=document.getElementById('m-note-text').value.trim();
+    if(!note){ toast('اكتب وصف الملاحظة',false); return; }
+    const row={ id:uid('un'), delivery_unit_id:m.id, note, photo:pendingPhoto, created_by:S.session.user.id };
+    if(await dbInsert('unit_notes',[row])){ await loadUnitNotes(); pendingPhoto=null; S.modal=null; render(); toast('تم حفظ الملاحظة',true); }
   }
 }
 
@@ -1215,12 +1251,14 @@ async function bootApp(){
   if(role==='admin'||role==='opm') S.facade = await dbSelect('facade_works');
   if(role==='admin'||role==='opm') S.waste = await dbSelect('waste_removal_jobs');
   if(role==='admin'||role==='opm') S.deliveries = await dbSelect('delivery_units');
+  if(role==='admin'||role==='opm') S.unitNotes = await dbSelect('unit_notes');
   if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
   if(role==='admin') S.checklistDefs = await dbSelect('checklist_definitions');
   if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
-  if(role==='admin'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); }
+  if(role==='admin'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
   if(role==='supervisor'){
     S.deliveries = await dbSelect('delivery_units');
+    S.unitNotes = await dbSelect('unit_notes');
     S.orders = await dbSelect('paid_service_orders');
     S.pest = await dbSelect('pest_control_requests');
     S.facade = await dbSelect('facade_works');
