@@ -14,6 +14,7 @@
 <script src="jsQR.js"></script>
 <script src="chart.umd.min.js"></script>
 <script src="supabase.js"></script>
+<script src="xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#0E2A2B; --ink-2:#153B3C; --mint:#1B8A6B; --mint-light:#E4F3EC;
@@ -148,10 +149,14 @@ let S = {
   attendance:[], attendanceDate: todayStr(),
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
+  reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
+  reportTo: todayStr(), reportType:'all',
+  notifications:[], bellOpen:false,
   modal:null,
   scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
 };
 const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'FM Dispatcher', supervisor:'مشرف', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول' };
+const SUP_TYPE_LABEL = { housekeeping:'HK SV — تسليمات وخدمة مدفوعة', pest_control:'Pest Control SV — مكافحة حشرات', facade:'Facade Operations SV — نظافة واجهات', waste:'Waste MGT SV — رفع مخلفات' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين' };
 const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
 
@@ -309,23 +314,59 @@ function bindAuthEvents(){
 }
 
 function renderTopbar(){
-  return `<div class="topbar">
+  const unread = S.notifications.filter(n=>!n.read).length;
+  return `<div class="topbar" style="position:relative;">
     <div class="brand">
       <img src="logo-light.png" alt="logo" style="height:34px;">
       <div class="brand-text"><div class="t1">ORA SOFT SERVICES</div><div class="t2">Operations</div></div>
     </div>
     <div style="font-size:12px;color:#9FC9BE;">${ICON.clock(13)} ${fmtDate(S.today)}</div>
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;position:relative;">
+      <button id="refresh-btn" title="تحديث البيانات" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button id="bell-btn" title="الإشعارات" style="position:relative;border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        ${unread?`<span style="position:absolute;top:-3px;left:-3px;background:var(--coral);color:#fff;font-size:9px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${unread>9?'9+':unread}</span>`:''}
+      </button>
+      ${S.bellOpen? renderBellDropdown() : ''}
       <span class="role-badge">${esc(ROLE_LABEL[S.profile.role]||S.profile.role)}</span>
       <span style="font-size:12px;color:#9FC9BE;">${esc(S.profile.full_name||'')}</span>
       <button id="logout-btn" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;">${ICON.x(13)}</button>
     </div>
   </div>`;
 }
+function renderBellDropdown(){
+  return `<div id="bell-dropdown" style="position:absolute;top:42px;left:0;width:290px;max-height:360px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:100;text-align:right;">
+    <div style="padding:10px 14px;font-weight:800;font-size:13px;color:var(--ink);border-bottom:1px solid var(--line);">الإشعارات</div>
+    ${S.notifications.length? S.notifications.map(n=>`
+      <div data-ntf-goto="${n.tab}" data-ntf-id="${n.id}" style="padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;background:${n.read?'#fff':'var(--mint-light)'};">
+        <div style="font-size:12.5px;color:var(--text);font-weight:700;">${esc(n.text)}</div>
+        <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">${fmtTime(n.time)}</div>
+      </div>`).join('') : `<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:12.5px;">لا توجد إشعارات</div>`}
+  </div>`;
+}
 
 function bindGlobalEvents(){
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
+  const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
+  const bb=document.getElementById('bell-btn'); if(bb) bb.onclick=(e)=>{
+    e.stopPropagation();
+    S.bellOpen = !S.bellOpen;
+    if(S.bellOpen) S.notifications.forEach(n=>n.read=true);
+    render();
+  };
+  document.querySelectorAll('[data-ntf-goto]').forEach(el=>el.onclick=()=>{
+    S.tab = el.dataset.ntfGoto; S.bellOpen=false; render();
+  });
+  if(S.bellOpen){
+    document.addEventListener('click', function closeBell(e){
+      if(!e.target.closest('#bell-dropdown') && !e.target.closest('#bell-btn')){
+        S.bellOpen=false; render(); document.removeEventListener('click', closeBell);
+      }
+    });
+  }
 }
 
 /* ============================= TAB DISPATCH ============================= */
@@ -363,7 +404,7 @@ function bindTabEvents(){
     case 'attendance': bindAttendance(); break;
     case 'locations': bindLocations(); break;
     case 'users': bindUsers(); break;
-    case 'reports': break;
+    case 'reports': bindReports(); break;
     case 'today': bindSupervisorToday(); break;
     case 'myname': bindMyName(); break;
   }
@@ -405,6 +446,14 @@ function renderHome(){
   })() : '';
 
   return `
+  <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,var(--ink),var(--ink-2));color:#fff;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:800;font-size:14px;">✨ اسأل النظام</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="ai-question" placeholder="مثال: كام وحدة تسليم لسه متنفذتش النهاردة؟" style="flex:1;min-width:220px;border:none;border-radius:9px;padding:11px 14px;font-size:13.5px;">
+      <button class="primary-btn" id="ai-ask" style="background:var(--mint);">اسأل</button>
+    </div>
+    <div id="ai-answer" style="margin-top:12px;font-size:13.5px;line-height:1.8;"></div>
+  </div>
   <div class="stat-row">${cardsHtml}${attendanceCard}</div>
   <div class="home-blocks">
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
@@ -417,8 +466,48 @@ function renderHome(){
   </div>
   <p style="text-align:center;font-size:12px;color:var(--text-dim);">👆 دوس على أي كارت فوق عشان تروح مباشرة لشاشته</p>`;
 }
+function buildAIContext(){
+  const today=S.today;
+  const summarize=(arr,field)=>{
+    const t=(arr||[]).filter(x=>x[field]===today);
+    return { total:t.length, completed:t.filter(x=>x.status==='completed').length, pending:t.filter(x=>x.status!=='completed') };
+  };
+  return JSON.stringify({
+    date:today,
+    deliveries: summarize(S.deliveries,'date'),
+    orders: summarize(S.orders,'scheduled_date'),
+    pest: summarize(S.pest,'scheduled_date'),
+    facade: summarize(S.facade,'date'),
+    waste: summarize(S.waste,'date'),
+    installs: summarize(S.installs,'date'),
+    checklist: summarize(S.checklistInstances,'date'),
+    attendanceToday: (S.attendance||[]).filter(a=>a.date===today),
+    locations: S.locations.map(l=>l.name),
+    supervisors: (S.users||[]).filter(u=>u.role==='supervisor').map(u=>({name:u.full_name, type:u.supervisor_type})),
+  }).slice(0, 12000);
+}
+async function askAI(){
+  const q = document.getElementById('ai-question').value.trim();
+  const answerBox = document.getElementById('ai-answer');
+  if(!q) return;
+  answerBox.innerHTML = 'جارِ التفكير...';
+  try{
+    const res = await fetch(SUPABASE_URL + '/functions/v1/ai-assistant', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+S.session.access_token },
+      body: JSON.stringify({ question:q, context: buildAIContext() })
+    });
+    const data = await res.json();
+    if(data.answer) answerBox.innerHTML = esc(data.answer).replace(/\n/g,'<br>');
+    else answerBox.innerHTML = 'حصل خطأ: تأكد إن الـ Edge Function متظبطة (راجع التعليمات).';
+  }catch(e){
+    answerBox.innerHTML = 'تعذر الوصول للمساعد الذكي. تأكد إن الـ Edge Function اتعملت في Supabase.';
+  }
+}
 function bindHome(){
   document.querySelectorAll('[data-goto]').forEach(el=>el.onclick=()=>{ S.tab=el.dataset.goto; render(); });
+  const askBtn=document.getElementById('ai-ask'); if(askBtn) askBtn.onclick=askAI;
+  const qInput=document.getElementById('ai-question'); if(qInput) qInput.onkeydown=(e)=>{ if(e.key==='Enter') askAI(); };
 }
 function drawHomeCharts(){
   const el=document.getElementById('chartHome'); if(!el || typeof Chart==='undefined') return;
@@ -766,14 +855,17 @@ async function loadLocations(){ S.locations = await dbSelect('locations'); }
 
 /* ============================= USERS (admin) ============================= */
 function renderUsers(){
-  return `<div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الوردية</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
+  return `<div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>التخصص</th><th>الوردية</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{
     const isSelf = u.id===S.session.user.id;
     return `<tr>
-      <td>${esc(u.full_name)}${isSelf?' (أنت)':''}</td>
+      <td><input data-u-name="${u.id}" value="${esc(u.full_name)}" style="width:120px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;">${isSelf?' (أنت)':''}</td>
       <td style="direction:ltr;text-align:right;">${esc(u.email)}</td>
       <td><select data-u-role="${u.id}" ${isSelf?'disabled':''}>
         ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
+      </select></td>
+      <td><select data-u-suptype="${u.id}">
+        ${Object.keys(SUP_TYPE_LABEL).map(k=>`<option value="${k}" ${(u.supervisor_type||'housekeeping')===k?'selected':''}>${SUP_TYPE_LABEL[k]}</option>`).join('')}
       </select></td>
       <td><select data-u-shift="${u.id}">
         <option value="both" ${u.shift==='both'?'selected':''}>الاثنين</option>
@@ -787,7 +879,7 @@ function renderUsers(){
       <td><select multiple class="multi-sel" data-u-locs="${u.id}">
         ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
       </select></td>
-      <td><button class="ghost-btn" data-save-user="${u.id}" ${isSelf?'disabled':''}>حفظ</button></td>
+      <td><button class="ghost-btn" data-save-user="${u.id}">حفظ</button></td>
     </tr>`;
   }).join('')}
   </tbody></table></div>`;
@@ -795,38 +887,140 @@ function renderUsers(){
 function bindUsers(){
   document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=async ()=>{
     const id=b.dataset.saveUser;
+    const full_name=document.querySelector(`[data-u-name="${id}"]`).value.trim();
     const role=document.querySelector(`[data-u-role="${id}"]`).value;
     const shift=document.querySelector(`[data-u-shift="${id}"]`).value;
     const active=document.querySelector(`[data-u-active="${id}"]`).value==='1';
+    const supervisor_type=document.querySelector(`[data-u-suptype="${id}"]`).value;
     const locsSel=document.querySelector(`[data-u-locs="${id}"]`);
     const allowed_locations=Array.from(locsSel.selectedOptions).map(o=>o.value);
-    await dbUpdate('profiles', id, {role, shift, active, allowed_locations});
+    if(!full_name){ toast('اكتب اسم صحيح',false); return; }
+    await dbUpdate('profiles', id, {full_name, role, shift, active, allowed_locations, supervisor_type});
     await loadUsers(); render(); toast('تم حفظ بيانات المستخدم', true);
   });
 }
 async function loadUsers(){ S.users = await dbSelect('profiles'); }
 
 /* ============================= REPORTS (admin) ============================= */
+function getReportData(){
+  const from=S.reportFrom, to=S.reportTo;
+  const inRange = ds => ds && ds>=from && ds<=to;
+  return {
+    deliv: S.deliveries.filter(d=>inRange(d.date)),
+    orders: S.orders.filter(o=>inRange(o.scheduled_date)),
+    pest: (S.pest||[]).filter(p=>inRange(p.scheduled_date)),
+    facade: (S.facade||[]).filter(f=>inRange(f.date)),
+    waste: (S.waste||[]).filter(w=>inRange(w.date)),
+    installs: S.installs.filter(i=>inRange(i.date)),
+    checklist: S.checklistInstances.filter(c=>inRange(c.date)),
+    attendance: S.attendance.filter(a=>inRange(a.date)),
+  };
+}
 function renderReports(){
-  const totalDeliv = S.deliveries.length, doneDeliv = S.deliveries.filter(d=>d.status==='completed').length;
-  const totalOrders = S.orders.length, doneOrders = S.orders.filter(o=>o.status==='completed').length;
-  const totalInstalls = S.installs.length, doneInstalls = S.installs.filter(i=>i.status==='completed').length, postponedInstalls = S.installs.filter(i=>i.status==='postponed').length;
-  const totalChecklist = S.checklistInstances.length, doneChecklist = S.checklistInstances.filter(c=>c.status==='completed').length;
-  const attendanceTotal = S.attendance.reduce((sum,a)=> sum + a.site_manager_count+a.site_admin_count+a.senior_supervisor_count+a.supervisor_count+a.worker_count, 0);
-  return `<div class="stat-row">
-    <div class="stat mint"><div class="num">${doneDeliv}/${totalDeliv}</div><div class="lbl">وحدات تسليم منجزة (كل الفترة)</div></div>
-    <div class="stat blue"><div class="num">${doneOrders}/${totalOrders}</div><div class="lbl">أوردرات خدمة مدفوعة منجزة</div></div>
-    <div class="stat amber"><div class="num">${doneInstalls}/${totalInstalls}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
-    <div class="stat coral"><div class="num">${postponedInstalls}</div><div class="lbl">أعمال تأسيسات مؤجلة</div></div>
-    <div class="stat ink"><div class="num">${doneChecklist}/${totalChecklist}</div><div class="lbl">قوائم تحقق منجزة</div></div>
-    <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور المسجلين</div></div>
+  const from=S.reportFrom, to=S.reportTo, type=S.reportType;
+  const { deliv, orders, pest, facade, waste, installs, checklist, attendance } = getReportData();
+
+  const toolbar = `<div class="toolbar">
+    <div class="fgroup"><label>من تاريخ</label><input type="date" id="rp-from" value="${from}"></div>
+    <div class="fgroup"><label>إلى تاريخ</label><input type="date" id="rp-to" value="${to}"></div>
+    <div class="fgroup"><label>نوع الخدمة</label><select id="rp-type">
+      <option value="all" ${type==='all'?'selected':''}>كل الخدمات</option>
+      <option value="deliveries" ${type==='deliveries'?'selected':''}>وحدات التسليم</option>
+      <option value="orders" ${type==='orders'?'selected':''}>الخدمة المدفوعة</option>
+      <option value="pest" ${type==='pest'?'selected':''}>مكافحة الحشرات</option>
+      <option value="facade" ${type==='facade'?'selected':''}>نظافة الواجهات</option>
+      <option value="waste" ${type==='waste'?'selected':''}>رفع المخلفات</option>
+      <option value="installs" ${type==='installs'?'selected':''}>أعمال التأسيسات</option>
+      <option value="checklist" ${type==='checklist'?'selected':''}>قوائم التحقق اليومية</option>
+      <option value="attendance" ${type==='attendance'?'selected':''}>الحضور</option>
+    </select></div>
+    <button class="ghost-btn" id="rp-go">تحديث</button>
+    <button class="primary-btn" id="rp-export">📊 تصدير Excel</button>
+  </div>`;
+
+  if(type==='all'){
+    const attendanceTotal = attendance.reduce((s,a)=> s+a.site_manager_count+a.site_admin_count+a.senior_supervisor_count+a.supervisor_count+a.worker_count, 0);
+    return toolbar + `<div class="stat-row">
+      <div class="stat mint"><div class="num">${deliv.filter(d=>d.status==='completed').length}/${deliv.length}</div><div class="lbl">وحدات تسليم منجزة</div></div>
+      <div class="stat blue"><div class="num">${orders.filter(o=>o.status==='completed').length}/${orders.length}</div><div class="lbl">أوردرات خدمة مدفوعة منجزة</div></div>
+      <div class="stat coral"><div class="num">${pest.filter(p=>p.status==='completed').length}/${pest.length}</div><div class="lbl">مكافحة حشرات منجزة</div></div>
+      <div class="stat amber"><div class="num">${facade.filter(f=>f.status==='completed').length}/${facade.length}</div><div class="lbl">نظافة واجهات منجزة</div></div>
+      <div class="stat ink"><div class="num">${waste.filter(w=>w.status==='completed').length}/${waste.length}</div><div class="lbl">رفع مخلفات منجزة</div></div>
+      <div class="stat amber"><div class="num">${installs.filter(i=>i.status==='completed').length}/${installs.length}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
+      <div class="stat ink"><div class="num">${checklist.filter(c=>c.status==='completed').length}/${checklist.length}</div><div class="lbl">قوائم تحقق منجزة</div></div>
+      <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور</div></div>
+    </div>`;
+  }
+
+  const tables = {
+    deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة']] },
+    orders: { rows:orders, cols:[['order_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة']] },
+    pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة']] },
+    facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
+    waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
+    installs: { rows:installs, cols:[['description','الوصف'],['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
+    checklist: { rows:checklist, cols:[['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
+    attendance: { rows:attendance, cols:[['date','التاريخ'],['shift','الوردية'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة']] },
+  };
+  const t = tables[type];
+  const total = t.rows.length, done = t.rows.filter(r=>r.status==='completed').length;
+  return toolbar + `<div class="stat-row">
+    <div class="stat mint"><div class="num">${total}</div><div class="lbl">إجمالي السجلات في الفترة</div></div>
+    <div class="stat blue"><div class="num">${done}</div><div class="lbl">منجزة</div></div>
   </div>
-  <p style="color:var(--text-dim);font-size:12.5px;">البيانات دي تراكمية من كل السجلات المحمّلة في الجلسة الحالية. لتقرير فترة محددة، استخدم فلاتر التاريخ داخل كل شاشة (وحدات التسليم / الأوردرات / التأسيسات / الحضور).</p>`;
+  <div class="tbl-wrap"><table><thead><tr>${t.cols.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>
+  ${t.rows.length? t.rows.map(r=>`<tr>${t.cols.map(c=>{
+    let v=r[c[0]];
+    if(c[0]==='status') v = STATUS_LABEL[v]||v;
+    if(c[0]==='shift') v = SHIFT_LABEL[v]||v;
+    if(c[0]==='order_type') v = v==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning';
+    if(c[0]==='service_type') v = PEST_TYPE_LABEL[v]||v;
+    return `<td>${esc(v!=null?String(v):'-')}</td>`;
+  }).join('')}</tr>`).join('') : `<tr><td colspan="${t.cols.length}" style="text-align:center;padding:20px;color:var(--text-dim);">لا توجد سجلات في هذه الفترة</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindReports(){
+  document.getElementById('rp-go').onclick=()=>{
+    S.reportFrom=document.getElementById('rp-from').value;
+    S.reportTo=document.getElementById('rp-to').value;
+    S.reportType=document.getElementById('rp-type').value;
+    render();
+  };
+  document.getElementById('rp-export').onclick=exportReportExcel;
+}
+function exportReportExcel(){
+  if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل', false); return; }
+  const data = getReportData();
+  const wb = XLSX.utils.book_new();
+  const addSheet=(rows, name, colMap)=>{
+    if(!rows.length) return;
+    const mapped = rows.map(r=>{
+      const o={};
+      colMap.forEach(([key,label,fmt])=>{ o[label] = fmt? fmt(r[key]) : (r[key]!=null? r[key] : ''); });
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(mapped);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  const statusFmt = v => STATUS_LABEL[v]||v;
+  const shiftFmt = v => SHIFT_LABEL[v]||v;
+  addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة',statusFmt],['notes','ملاحظات']]);
+  addSheet(data.orders, 'الخدمة المدفوعة', [['order_type','النوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد'],['status','الحالة',statusFmt]]);
+  addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
+  addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
+  addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
+  addSheet(data.installs, 'أعمال التأسيسات', [['description','الوصف'],['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
+  addSheet(data.checklist, 'قوائم التحقق اليومية', [['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt]]);
+  addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
+  if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
+  XLSX.writeFile(wb, `تقرير_${S.reportFrom}_${S.reportTo}.xlsx`);
+  toast('تم تصدير الملف',true);
 }
 
 /* ============================= SUPERVISOR: TODAY ============================= */
 function renderSupervisorToday(){
   const uidMe = S.session.user.id;
+  const supType = S.profile.supervisor_type || 'housekeeping';
   const myDeliv = S.deliveries.filter(d=>d.date===S.today && d.assigned_supervisor_id===uidMe);
   const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && o.assigned_supervisor_id===uidMe);
   const allowedLocs = (S.profile.allowed_locations&&S.profile.allowed_locations.length)? S.profile.allowed_locations : S.locations.map(l=>l.id);
@@ -836,13 +1030,22 @@ function renderSupervisorToday(){
   const myFacade = S.facade.filter(f=>f.date===S.today && f.status==='scheduled' && (allowedLocs.includes(f.location_id)));
   const myWaste = S.waste.filter(w=>w.date===S.today && w.assigned_supervisor_id===uidMe && w.status==='scheduled');
 
-  return `
-  <div class="stat-row">
-    <div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
-    <div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
-    <div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>
-  </div>
+  const showHK = supType==='housekeeping';
+  const showPest = supType==='pest_control';
+  const showFacade = supType==='facade';
+  const showWaste = supType==='waste';
 
+  let stats = '';
+  if(showHK) stats += `<div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
+    <div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
+    <div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>`;
+  if(showPest) stats += `<div class="stat coral"><div class="num">${myPest.filter(p=>p.status==='completed').length}/${myPest.length}</div><div class="lbl">مكافحة حشرات</div></div>`;
+  if(showFacade) stats += `<div class="stat amber"><div class="num">${myFacade.filter(f=>f.status==='completed').length}/${myFacade.length}</div><div class="lbl">نظافة واجهات</div></div>`;
+  if(showWaste) stats += `<div class="stat ink"><div class="num">${myWaste.filter(w=>w.status==='completed').length}/${myWaste.length}</div><div class="lbl">رفع مخلفات</div></div>`;
+
+  let html = `<div class="stat-row">${stats}</div>`;
+
+  if(showPest) html += `
   <div class="section-title"><h2>مكافحة الحشرات</h2></div>
   ${myPest.length? myPest.map(p=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div><b>${esc(p.unit_code)}</b> — ${PEST_TYPE_LABEL[p.service_type]} ${esc(p.scheduled_time||'')}</div>
@@ -851,65 +1054,71 @@ function renderSupervisorToday(){
       <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
       <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
     </select>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد طلبات مكافحة حشرات لك اليوم</p>`}
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد طلبات مكافحة حشرات لك اليوم</p>`}`;
 
+  if(showFacade) html += `
   <div class="section-title"><h2>نظافة الواجهات</h2></div>
   ${myFacade.length? myFacade.map(f=>{ const loc=S.locations.find(l=>l.id===f.location_id); return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>${esc(loc?loc.name:'')} ${f.description?`<div style="font-size:12px;color:var(--text-dim);">${esc(f.description)}</div>`:''}</div>
     <button class="ghost-btn" data-my-facade="${f.id}">تم الانتهاء</button>
-  </div>`; }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال نظافة واجهات لك اليوم</p>`}
+  </div>`; }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال نظافة واجهات لك اليوم</p>`}`;
 
+  if(showWaste) html += `
   <div class="section-title"><h2>رفع المخلفات</h2></div>
   ${myWaste.length? myWaste.map(w=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>${esc(w.description)}</div>
     <span style="display:flex;gap:6px;"><button class="ghost-btn" data-my-waste-done="${w.id}">تم الانتهاء</button><button class="ghost-btn danger" data-my-waste-notdone="${w.id}">لم يتم</button></span>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}
+  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}`;
 
-  <div class="section-title"><h2>وحدات التسليم</h2></div>
-  ${myDeliv.length? myDeliv.map(d=>{
-    const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
-    return `<div class="card" style="margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
-      <select data-my-dv="${d.id}">
-        <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
-        <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
-        <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+  if(showHK){
+    html += `
+    <div class="section-title"><h2>وحدات التسليم</h2></div>
+    ${myDeliv.length? myDeliv.map(d=>{
+      const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
+      return `<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
+        <select data-my-dv="${d.id}">
+          <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
+          <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
+          <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+        </select>
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+        <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
+        ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
+      </div>
+    </div>`;
+    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
+
+    <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
+    ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div><b>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
+        ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
+      </div>
+      <select data-my-ord="${o.id}">
+        <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
       </select>
-    </div>
-    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-      <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
-      ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
-    </div>
-  </div>`;
-  }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
+    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
 
-  <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
-  ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div><b>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
-      ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
-    </div>
-    <select data-my-ord="${o.id}">
-      <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
-      <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
-      <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
-    </select>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
+    <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
+    ${myChecklist.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+      ${myChecklist.map(ci=>{
+        const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
+        const loc=S.locations.find(l=>l.id===ci.location_id);
+        const isDone=ci.status==='completed';
+        return `<div class="card">
+          <div style="display:flex;justify-content:space-between;"><b>${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
+          <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
+          <button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl="${ci.id}" ${isDone?'disabled':''}>${isDone?ICON.check(14)+' تم':ICON.qr(14)+' مسح QR'}</button>
+        </div>`;
+      }).join('')}
+    </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر قوائم تحقق لك اليوم</p>`}`;
+  }
 
-  <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
-  ${myChecklist.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
-    ${myChecklist.map(ci=>{
-      const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
-      const loc=S.locations.find(l=>l.id===ci.location_id);
-      const isDone=ci.status==='completed';
-      return `<div class="card">
-        <div style="display:flex;justify-content:space-between;"><b>${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
-        <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
-        <button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl="${ci.id}" ${isDone?'disabled':''}>${isDone?ICON.check(14)+' تم':ICON.qr(14)+' مسح QR'}</button>
-      </div>`;
-    }).join('')}
-  </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر قوائم تحقق لك اليوم</p>`}
-  `;
+  return html;
 }
 function bindSupervisorToday(){
   document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.myDv, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم التحديث',true); });
@@ -1234,15 +1443,7 @@ async function ensureTodayChecklistInstances(){
 }
 
 /* ============================= BOOT ============================= */
-async function bootApp(){
-  if(!S.profile){ render(); return; }
-  if(S.profile.active===false){
-    await sb.auth.signOut();
-    S.session=null; S.profile=null;
-    S.authError='تم تجميد هذا الحساب من قبل الإدارة. تواصل مع الإدارة لإعادة التفعيل.';
-    render();
-    return;
-  }
+async function loadRoleData(){
   const role=S.profile.role;
   S.locations = await dbSelect('locations');
   S.users = await dbSelect('profiles');
@@ -1267,13 +1468,86 @@ async function bootApp(){
     await ensureTodayChecklistInstances();
   }
   if(role==='admin') await ensureTodayChecklistInstances();
+}
+
+async function bootApp(){
+  if(!S.profile){ render(); return; }
+  if(S.profile.active===false){
+    await sb.auth.signOut();
+    S.session=null; S.profile=null;
+    S.authError='تم تجميد هذا الحساب من قبل الإدارة. تواصل مع الإدارة لإعادة التفعيل.';
+    render();
+    return;
+  }
+  await loadRoleData();
   render();
+  setupRealtime();
+}
+
+async function manualRefresh(){
+  toast('جارِ التحديث...', true);
+  await loadRoleData();
+  render();
+}
+
+/* ============================= REALTIME + NOTIFICATIONS ============================= */
+const NOTIFY_TABLES = {
+  delivery_units: { module:'وحدات التسليم', tab:'deliveries', field:'assigned_supervisor_id' },
+  paid_service_orders: { module:'الخدمة المدفوعة', tab:'orders', field:'assigned_supervisor_id' },
+  pest_control_requests: { module:'مكافحة الحشرات', tab:'pest', field:'assigned_supervisor_id' },
+  facade_works: { module:'نظافة الواجهات', tab:'facade', field:null },
+  waste_removal_jobs: { module:'رفع المخلفات', tab:'waste', field:'assigned_supervisor_id' },
+  installation_works: { module:'أعمال التأسيسات', tab:'installs', field:null },
+};
+let realtimeSetup = false;
+function setupRealtime(){
+  if(realtimeSetup || !sb) return;
+  realtimeSetup = true;
+  const channel = sb.channel('zw-live-updates');
+  Object.keys(NOTIFY_TABLES).forEach(table=>{
+    channel.on('postgres_changes', { event:'*', schema:'public', table }, (payload)=>{
+      handleRealtimeEvent(table, payload);
+    });
+  });
+  channel.subscribe();
+}
+async function handleRealtimeEvent(table, payload){
+  await loadRoleData();
+  if(payload.eventType==='INSERT'){
+    const info = NOTIFY_TABLES[table];
+    const row = payload.new;
+    const myRole = S.profile.role;
+    const isManagement = ['admin','opm','contractor_manager','contractor_admin'].includes(myRole);
+    const isAssignedToMe = info.field && row[info.field] && S.session && row[info.field]===S.session.user.id;
+    if(isManagement || isAssignedToMe){
+      pushNotification(`مهمة جديدة: ${info.module}`, info.tab);
+      playAlertSound();
+    }
+  }
+  render();
+}
+function pushNotification(text, tab){
+  S.notifications.unshift({ id: uid('ntf'), text, tab, time: new Date().toISOString(), read:false });
+  S.notifications = S.notifications.slice(0, 30);
+}
+function playAlertSound(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [0,0.18].forEach(delay=>{
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type='sine'; o.frequency.value=880;
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.35, ctx.currentTime+delay);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+delay+0.16);
+      o.start(ctx.currentTime+delay); o.stop(ctx.currentTime+delay+0.17);
+    });
+  }catch(e){}
 }
 
 (async function init(){
   if(configMissing()){ render(); return; }
   await refreshSession();
-  sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; render(); } });
+  sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; realtimeSetup=false; render(); } });
   if(S.session) await bootApp(); else render();
 })();
 
