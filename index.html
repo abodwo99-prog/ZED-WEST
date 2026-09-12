@@ -1013,7 +1013,16 @@ function exportReportExcel(){
   addSheet(data.checklist, 'قوائم التحقق اليومية', [['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt]]);
   addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
   if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
-  XLSX.writeFile(wb, `تقرير_${S.reportFrom}_${S.reportTo}.xlsx`);
+  const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const blob = new Blob([wbout], { type:'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `تقرير_${S.reportFrom}_${S.reportTo}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
   toast('تم تصدير الملف',true);
 }
 
