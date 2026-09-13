@@ -462,6 +462,7 @@ function renderHome(){
   </div>
   <div class="stat-row">${cardsHtml}${attendanceCard}</div>
   <div class="home-blocks">
+    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">توزيع شغل اليوم بين الخدمات</h3><canvas id="chartTodayDist" height="200"></canvas></div>` : ''}
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
@@ -516,13 +517,29 @@ function bindHome(){
   const qInput=document.getElementById('ai-question'); if(qInput) qInput.onkeydown=(e)=>{ if(e.key==='Enter') askAI(); };
 }
 function drawHomeCharts(){
-  const el=document.getElementById('chartHome'); if(!el || typeof Chart==='undefined') return;
-  const days=[]; const vals=[];
-  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().slice(0,10);
-    days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
-    vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
+  const el=document.getElementById('chartHome'); if(el && typeof Chart!=='undefined'){
+    const days=[]; const vals=[];
+    for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().slice(0,10);
+      days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
+      vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
+    }
+    new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
   }
-  new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+  const el2=document.getElementById('chartTodayDist'); if(el2 && typeof Chart!=='undefined'){
+    const today=S.today;
+    const labels=['تسليمات','خدمة مدفوعة','حشرات','واجهات','مخلفات','تأسيسات','قوائم تحقق'];
+    const counts=[
+      S.deliveries.filter(d=>d.date===today).length,
+      S.orders.filter(o=>o.scheduled_date===today).length,
+      (S.pest||[]).filter(p=>p.scheduled_date===today).length,
+      (S.facade||[]).filter(f=>f.date===today).length,
+      (S.waste||[]).filter(w=>w.date===today).length,
+      S.installs.filter(i=>i.date===today).length,
+      S.checklistInstances.filter(c=>c.date===today).length,
+    ];
+    const colors=['#1B8A6B','#2463C4','#D9483B','#DA8B1F','#0E2A2B','#DA8B1F','#1B8A6B'];
+    new Chart(el2, { type:'doughnut', data:{ labels, datasets:[{ data:counts, backgroundColor:colors }] }, options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:11,font:{size:10.5}}}} } });
+  }
 }
 function statusBadge(s){
   const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending' };
@@ -1712,10 +1729,10 @@ async function loadRoleData(){
   if(role==='admin'||role==='opm') S.deliveries = await dbSelect('delivery_units');
   if(role==='admin'||role==='opm') S.unitNotes = await dbSelect('unit_notes');
   if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
-  if(role==='admin') S.checklistDefs = await dbSelect('checklist_definitions');
+  if(role==='admin'||role==='opm') S.checklistDefs = await dbSelect('checklist_definitions');
   if(role==='hk_senior_supervisor'){ S.checklistDefs = await dbSelect('checklist_definitions'); S.checklistInstances = await dbSelect('checklist_instances'); }
   if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
-  if(role==='admin'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
+  if(role==='admin'||role==='opm'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
   if(role==='supervisor'){
     S.deliveries = await dbSelect('delivery_units');
     S.unitNotes = await dbSelect('unit_notes');
@@ -1726,7 +1743,7 @@ async function loadRoleData(){
     S.checklistDefs = await dbSelect('checklist_definitions');
     await ensureTodayChecklistInstances();
   }
-  if(role==='admin') await ensureTodayChecklistInstances();
+  if(role==='admin'||role==='opm') await ensureTodayChecklistInstances();
 }
 
 async function bootApp(){
