@@ -149,14 +149,14 @@ let S = {
   attendance:[], attendanceDate: todayStr(),
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
+  zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
   reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
   reportTo: todayStr(), reportType:'all',
   notifications:[], bellOpen:false,
   modal:null,
   scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
 };
-const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'FM Dispatcher', supervisor:'مشرف', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول' };
-const SUP_TYPE_LABEL = { housekeeping:'HK SV — تسليمات وخدمة مدفوعة', pest_control:'Pest Control SV — مكافحة حشرات', facade:'Facade Operations SV — نظافة واجهات', waste:'Waste MGT SV — رفع مخلفات' };
+const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين' };
 const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
 
@@ -249,16 +249,20 @@ const ICON = {
   list:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
   idcard:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>`,
 };
-const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
+const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', distribution:'users', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  if(role==='admin') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
-  if(role==='opm') return [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
+  if(role==='admin') return adminTabs;
+  if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['myname','بياناتي']];
   if(role==='contractor_manager') return [['home','الرئيسية'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
   if(role==='contractor_admin') return [['attendance','الحضور']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['checklist','قوائم التحقق اليومية'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['checklist','قوائم التحقق اليومية'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_senior_supervisor') return [['distribution','توزيع المواقع'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
   return [];
 }
 
@@ -382,6 +386,7 @@ function renderTabBody(){
     case 'checklist': return renderChecklistAdmin();
     case 'qrsheet': return renderQrSheet();
     case 'attendance': return renderAttendance();
+    case 'distribution': return renderDistribution();
     case 'locations': return renderLocations();
     case 'users': return renderUsers();
     case 'reports': return renderReports();
@@ -402,6 +407,7 @@ function bindTabEvents(){
     case 'checklist': bindChecklistAdmin(); break;
     case 'qrsheet': bindQrSheet(); break;
     case 'attendance': bindAttendance(); break;
+    case 'distribution': bindDistribution(); break;
     case 'locations': bindLocations(); break;
     case 'users': bindUsers(); break;
     case 'reports': bindReports(); break;
@@ -826,18 +832,178 @@ function bindAttendance(){
 }
 async function loadAttendance(){ S.attendance = await dbSelect('attendance_records'); }
 
+/* ============================= DAILY DISTRIBUTION WORKFLOW ============================= */
+async function loadDistData(){
+  S.zones = await dbSelect('zones');
+  const sessions = await dbSelect('distribution_sessions', { date: S.today });
+  S.distSession = sessions[0] || null;
+  S.presence = await dbSelect('daily_presence', { date: S.today });
+  S.zoneAssignments = await dbSelect('zone_assignments', { date: S.today });
+  S.locationAssignments = await dbSelect('location_assignments', { date: S.today });
+  S.auditVisits = await dbSelect('location_audit_visits');
+}
+function isPresent(userId){ const p=S.presence.find(x=>x.user_id===userId); return p? p.present : null; }
+
+function renderDistribution(){
+  const role=S.profile.role;
+  let html='';
+  if(role==='admin'||role==='opm'||role==='hk_manager') html += renderManagerSection();
+  if(role==='admin'||role==='opm'||role==='hk_admin') html += renderPresenceSection();
+  if(role==='admin'||role==='opm'||role==='hk_senior_supervisor') html += renderSeniorSection();
+  return html || `<p style="color:var(--text-dim);">لا توجد شاشة توزيع متاحة لدورك.</p>`;
+}
+function bindDistribution(){
+  const startBtn=document.getElementById('start-dist-btn');
+  if(startBtn) startBtn.onclick=async ()=>{
+    const row={ id:uid('sess'), date:S.today, status:'presence', started_by:S.session.user.id };
+    if(await dbInsert('distribution_sessions',[row])){ await loadDistData(); render(); toast('تم بدء التوزيع لليوم',true); }
+  };
+  document.querySelectorAll('[data-presence-toggle]').forEach(b=>b.onclick=()=>{
+    b.dataset.val = b.dataset.val==='1' ? '0' : '1';
+    b.textContent = b.dataset.val==='1' ? 'حاضر' : 'غائب';
+    b.className = 'ghost-btn' + (b.dataset.val==='1' ? '' : ' danger');
+  });
+  const savePresence=document.getElementById('save-presence-btn');
+  if(savePresence) savePresence.onclick=async ()=>{
+    const rows=[];
+    document.querySelectorAll('[data-presence-toggle]').forEach(b=>{
+      rows.push({ id:uid('pres'), date:S.today, user_id:b.dataset.presenceToggle, present:b.dataset.val==='1', marked_by:S.session.user.id });
+    });
+    // احذف القديم لليوم لنفس المستخدمين ثم أضف الجديد (أبسط من upsert يدوي)
+    for(const r of rows){
+      const existing = S.presence.find(p=>p.user_id===r.user_id);
+      if(existing) await dbDelete('daily_presence', existing.id);
+    }
+    if(await dbInsert('daily_presence', rows)){ await loadDistData(); render(); toast('تم حفظ الحضور',true); }
+  };
+  document.querySelectorAll('[data-assign-zone]').forEach(sel=>sel.onchange=async ()=>{
+    const supId=sel.dataset.assignZone;
+    if(!sel.value) return;
+    const row={ id:uid('za'), date:S.today, zone_id:sel.value, senior_supervisor_id:supId, assigned_by:S.session.user.id };
+    if(await dbInsert('zone_assignments',[row])){ await loadDistData(); render(); toast('تم تعيين الزون',true); }
+  });
+  document.querySelectorAll('[data-assign-location]').forEach(sel=>sel.onchange=async ()=>{
+    const locId=sel.dataset.assignLocation;
+    if(!sel.value) return;
+    const row={ id:uid('la'), date:S.today, location_id:locId, supervisor_id:sel.value, assigned_by:S.session.user.id };
+    if(await dbInsert('location_assignments',[row])){ await loadDistData(); render(); toast('تم التعيين',true); }
+  });
+  document.querySelectorAll('[data-scan-audit]').forEach(b=>b.onclick=()=>{ S.scanCtx={auditLocationId:b.dataset.scanAudit, mode:'audit'}; S.modal={type:'scanAudit'}; render(); });
+}
+
+function renderManagerSection(){
+  if(!S.distSession){
+    return `<div class="card" style="margin-bottom:16px;">
+      <h3 style="margin-top:0;">بدء التوزيع اليومي</h3>
+      <p style="font-size:13px;color:var(--text-dim);">لسه مفيش دورة توزيع اتبدأت النهاردة.</p>
+      <button class="primary-btn" id="start-dist-btn">🚀 بدء التوزيع</button>
+    </div>`;
+  }
+  const seniors = S.users.filter(u=>u.role==='hk_senior_supervisor' && u.active);
+  return `<div class="card" style="margin-bottom:16px;">
+    <h3 style="margin-top:0;">توزيع الزونات على المشرفين الأوائل</h3>
+    <p style="font-size:12.5px;color:var(--text-dim);">التوزيع بدأ اليوم. المشرفون الأوائل الحاضرون بس هيظهروا هنا بعد ما إداري HK يحدد الحضور.</p>
+    ${seniors.length? seniors.map(u=>{
+      const present = isPresent(u.id);
+      const currentZone = S.zoneAssignments.find(z=>z.senior_supervisor_id===u.id);
+      if(present!==true) return `<div style="padding:8px 0;border-bottom:1px solid var(--line);color:var(--text-dim);font-size:13px;">${esc(u.full_name)} — ${present===false?'غائب اليوم':'بانتظار تحديد الحضور'}</div>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
+        <b style="font-size:13px;">${esc(u.full_name)}</b>
+        <select data-assign-zone="${u.id}">
+          <option value="">${currentZone? 'الزون: '+esc((S.zones.find(z=>z.id===currentZone.zone_id)||{}).name||'') : 'اختر زون'}</option>
+          ${S.zones.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا يوجد مشرفون أوائل مسجلون بعد.</p>`}
+  </div>`;
+}
+
+function renderPresenceSection(){
+  const seniors = S.users.filter(u=>u.role==='hk_senior_supervisor' && u.active);
+  const supervisors = S.users.filter(u=>u.role==='supervisor' && u.active);
+  const row=(u)=>{
+    const cur = isPresent(u.id);
+    const val = cur===false? '0' : '1';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);">
+      <span style="font-size:13px;">${esc(u.full_name)}</span>
+      <button class="ghost-btn${val==='0'?' danger':''}" data-presence-toggle="${u.id}" data-val="${val}">${val==='1'?'حاضر':'غائب'}</button>
+    </div>`;
+  };
+  return `<div class="card" style="margin-bottom:16px;">
+    <h3 style="margin-top:0;">توزيع المسئولين — تحديد الحضور</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div><h4 style="font-size:13px;">المشرفون الأوائل</h4>${seniors.map(row).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
+      <div><h4 style="font-size:13px;">المشرفون</h4>${supervisors.map(row).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
+    </div>
+    <button class="primary-btn" id="save-presence-btn" style="margin-top:14px;">حفظ الحضور لليوم</button>
+  </div>`;
+}
+
+function renderSeniorSection(){
+  const uidMe = S.session.user.id;
+  const myZoneAssignments = S.zoneAssignments.filter(z=>z.senior_supervisor_id===uidMe);
+  const myZones = myZoneAssignments.map(za=>S.zones.find(z=>z.id===za.zone_id)).filter(Boolean);
+  const presentSupervisors = S.users.filter(u=>u.role==='supervisor' && isPresent(u.id)===true);
+  if(!myZones.length && (S.profile.role==='hk_senior_supervisor')){
+    return `<div class="card" style="margin-bottom:16px;"><p style="color:var(--text-dim);font-size:13px;">لسه مديرك ما وزّعش عليك زون النهاردة.</p></div>`;
+  }
+  return `<div class="card">
+    <h3 style="margin-top:0;">توزيع المواقع على المشرفين</h3>
+    ${myZones.map(zone=>{
+      const locIds = zone.location_ids||[];
+      return `<div style="margin-bottom:14px;">
+        <div style="font-weight:800;font-size:13px;color:var(--mint);margin-bottom:6px;">زون: ${esc(zone.name)}</div>
+        ${locIds.map(locId=>{
+          const loc=S.locations.find(l=>l.id===locId);
+          if(!loc) return '';
+          const currentAssign = S.locationAssignments.find(la=>la.location_id===locId);
+          const assignedSup = currentAssign? S.users.find(u=>u.id===currentAssign.supervisor_id) : null;
+          const auditCount = S.auditVisits.filter(v=>v.location_id===locId).length;
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;">
+            <span style="font-size:13px;">${esc(loc.name)}</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select data-assign-location="${locId}">
+                <option value="">${assignedSup?'معيّن: '+esc(assignedSup.full_name):'اختر مشرف'}</option>
+                ${presentSupervisors.map(u=>`<option value="${u.id}">${esc(u.full_name)}</option>`).join('')}
+              </select>
+              <button class="ghost-btn" data-scan-audit="${locId}">${ICON.qr(12)} تدقيق${auditCount?' ('+auditCount+')':''}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 /* ============================= LOCATIONS (admin) ============================= */
 function renderLocations(){
-  return `<div class="card">
+  return `<div class="card" style="margin-bottom:16px;">
     <h3 style="margin-top:0;">المواقع</h3>
-    ${S.locations.map(l=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);">
+    ${S.locations.map(l=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);align-items:center;">
       <div><b>${esc(l.name)}</b> <span style="color:var(--text-dim);font-size:12px;">${esc(l.building||'')}</span></div>
-      <button class="ghost-btn danger" data-loc-del="${l.id}">${ICON.trash()}</button>
+      <div style="display:flex;gap:6px;">
+        <button class="ghost-btn" data-loc-audit-qr="${l.id}">${ICON.qr(12)} كود تدقيق</button>
+        <button class="ghost-btn danger" data-loc-del="${l.id}">${ICON.trash()}</button>
+      </div>
     </div>`).join('') || '<p style="color:var(--text-dim);">لا توجد مواقع</p>'}
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
       <input id="new-loc-name" placeholder="اسم الموقع" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
       <input id="new-loc-building" placeholder="القطاع (اختياري)" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
       <button class="primary-btn" id="add-loc">${ICON.plus()} إضافة</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0;">الزونات (تجميعة مواقع)</h3>
+    ${S.zones.map(z=>`<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+      <div><b>${esc(z.name)}</b> <span style="color:var(--text-dim);font-size:12px;">(${(z.location_ids||[]).length} موقع)</span></div>
+      <button class="ghost-btn danger" data-zone-del="${z.id}">${ICON.trash()}</button>
+    </div>`).join('') || '<p style="color:var(--text-dim);">لا توجد زونات بعد</p>'}
+    <div style="margin-top:12px;">
+      <div class="form-row"><label>اسم الزون</label><input id="new-zone-name" placeholder="مثال: زون شمال"></div>
+      <div class="form-row"><label>المواقع</label><select multiple class="multi-sel" id="new-zone-locs">
+        ${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}
+      </select></div>
+      <button class="primary-btn" id="add-zone">${ICON.plus()} إضافة زون</button>
     </div>
   </div>`;
 }
@@ -849,13 +1015,32 @@ function bindLocations(){
     const ok = await dbInsert('locations', [{id:uid('loc'), name, building}]);
     if(ok){ await loadLocations(); render(); }
   };
+  document.querySelectorAll('[data-loc-audit-qr]').forEach(b=>b.onclick=()=>{
+    const loc=S.locations.find(l=>l.id===b.dataset.locAuditQr);
+    S.qrTarget={code:'ZEDWEST|LOC|'+loc.id, label:'كود تدقيق: '+loc.name};
+    S.modal={type:'qr'}; render();
+  });
+  document.getElementById('add-zone').onclick=async ()=>{
+    const name=document.getElementById('new-zone-name').value.trim();
+    const sel=document.getElementById('new-zone-locs');
+    const location_ids=Array.from(sel.selectedOptions).map(o=>o.value);
+    if(!name||!location_ids.length){ toast('اكتب اسم الزون واختر مواقع له',false); return; }
+    const ok = await dbInsert('zones', [{id:uid('zone'), name, location_ids, created_by:S.session.user.id}]);
+    if(ok){ S.zones = await dbSelect('zones'); render(); toast('تمت إضافة الزون',true); }
+  };
+  document.querySelectorAll('[data-zone-del]').forEach(b=>b.onclick=async ()=>{
+    await dbDelete('zones', b.dataset.zoneDel);
+    S.zones = await dbSelect('zones'); render();
+  });
   document.querySelectorAll('[data-loc-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('locations', b.dataset.locDel); await loadLocations(); render(); });
 }
 async function loadLocations(){ S.locations = await dbSelect('locations'); }
 
 /* ============================= USERS (admin) ============================= */
 function renderUsers(){
-  return `<div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>التخصص</th><th>الوردية</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
+  return `
+  <div class="toolbar"><button class="primary-btn" id="add-user-btn">${ICON.plus()} إضافة مستخدم جديد</button></div>
+  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{
     const isSelf = u.id===S.session.user.id;
     return `<tr>
@@ -864,14 +1049,6 @@ function renderUsers(){
       <td><select data-u-role="${u.id}" ${isSelf?'disabled':''}>
         ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
       </select></td>
-      <td><select data-u-suptype="${u.id}">
-        ${Object.keys(SUP_TYPE_LABEL).map(k=>`<option value="${k}" ${(u.supervisor_type||'housekeeping')===k?'selected':''}>${SUP_TYPE_LABEL[k]}</option>`).join('')}
-      </select></td>
-      <td><select data-u-shift="${u.id}">
-        <option value="both" ${u.shift==='both'?'selected':''}>الاثنين</option>
-        <option value="morning" ${u.shift==='morning'?'selected':''}>صباحي</option>
-        <option value="evening" ${u.shift==='evening'?'selected':''}>مسائي</option>
-      </select></td>
       <td><select data-u-active="${u.id}" ${isSelf?'disabled':''}>
         <option value="1" ${u.active?'selected':''}>مفعّل</option>
         <option value="0" ${!u.active?'selected':''}>موقوف</option>
@@ -879,27 +1056,39 @@ function renderUsers(){
       <td><select multiple class="multi-sel" data-u-locs="${u.id}">
         ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
       </select></td>
-      <td><button class="ghost-btn" data-save-user="${u.id}">حفظ</button></td>
+      <td>
+        <button class="ghost-btn" data-save-user="${u.id}">حفظ</button>
+        ${!isSelf?`<button class="ghost-btn danger" data-delete-user="${u.id}">${ICON.trash()} حذف نهائي</button>`:''}
+      </td>
     </tr>`;
   }).join('')}
   </tbody></table></div>`;
 }
 function bindUsers(){
+  document.getElementById('add-user-btn').onclick=()=>{ S.modal={type:'addUser'}; render(); };
   document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=async ()=>{
     const id=b.dataset.saveUser;
     const full_name=document.querySelector(`[data-u-name="${id}"]`).value.trim();
     const role=document.querySelector(`[data-u-role="${id}"]`).value;
-    const shift=document.querySelector(`[data-u-shift="${id}"]`).value;
     const active=document.querySelector(`[data-u-active="${id}"]`).value==='1';
-    const supervisor_type=document.querySelector(`[data-u-suptype="${id}"]`).value;
     const locsSel=document.querySelector(`[data-u-locs="${id}"]`);
     const allowed_locations=Array.from(locsSel.selectedOptions).map(o=>o.value);
     if(!full_name){ toast('اكتب اسم صحيح',false); return; }
-    await dbUpdate('profiles', id, {full_name, role, shift, active, allowed_locations, supervisor_type});
+    await dbUpdate('profiles', id, {full_name, role, active, allowed_locations});
     await loadUsers(); render(); toast('تم حفظ بيانات المستخدم', true);
   });
+  document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteUser', id:b.dataset.deleteUser}; render(); });
 }
 async function loadUsers(){ S.users = await dbSelect('profiles'); }
+
+async function callAdminUsersFn(body){
+  const res = await fetch(SUPABASE_URL + '/functions/v1/admin-users', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+S.session.access_token },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
 
 /* ============================= REPORTS (admin) ============================= */
 function getReportData(){
@@ -1029,20 +1218,23 @@ function exportReportExcel(){
 /* ============================= SUPERVISOR: TODAY ============================= */
 function renderSupervisorToday(){
   const uidMe = S.session.user.id;
-  const supType = S.profile.supervisor_type || 'housekeeping';
   const myDeliv = S.deliveries.filter(d=>d.date===S.today && d.assigned_supervisor_id===uidMe);
   const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && o.assigned_supervisor_id===uidMe);
-  const allowedLocs = (S.profile.allowed_locations&&S.profile.allowed_locations.length)? S.profile.allowed_locations : S.locations.map(l=>l.id);
-  const myShift = S.profile.shift||'both';
-  const myChecklist = S.checklistInstances.filter(ci=> ci.date===S.today && allowedLocs.includes(ci.location_id) && (ci.shift==='both'||ci.shift===myShift));
+  const myGeneralLocs = (S.locationAssignments||[]).filter(la=>la.supervisor_id===uidMe).map(la=>la.location_id);
+  const allowedLocs = Array.from(new Set([
+    ...((S.profile.allowed_locations&&S.profile.allowed_locations.length)? S.profile.allowed_locations : []),
+    ...myGeneralLocs,
+  ]));
+  const effectiveLocs = allowedLocs.length? allowedLocs : S.locations.map(l=>l.id);
+  const myChecklist = S.checklistInstances.filter(ci=> ci.date===S.today && effectiveLocs.includes(ci.location_id));
   const myPest = S.pest.filter(p=>p.scheduled_date===S.today && p.assigned_supervisor_id===uidMe);
-  const myFacade = S.facade.filter(f=>f.date===S.today && f.status==='scheduled' && (allowedLocs.includes(f.location_id)));
+  const myFacade = S.facade.filter(f=>f.date===S.today && f.status==='scheduled' && (effectiveLocs.includes(f.location_id)));
   const myWaste = S.waste.filter(w=>w.date===S.today && w.assigned_supervisor_id===uidMe && w.status==='scheduled');
 
-  const showHK = supType==='housekeeping';
-  const showPest = supType==='pest_control';
-  const showFacade = supType==='facade';
-  const showWaste = supType==='waste';
+  const showHK = true;
+  const showPest = myPest.length>0;
+  const showFacade = myFacade.length>0;
+  const showWaste = myWaste.length>0;
 
   let stats = '';
   if(showHK) stats += `<div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
@@ -1220,6 +1412,20 @@ function renderModal(){
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-wr-date" value="${S.today}"></div>
     <div class="form-row"><label>المشرف</label><select id="m-wr-sup">${supervisorOptions()}</select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='addUser') return modalWrap('إضافة مستخدم جديد', `
+    <div class="form-row"><label>الاسم الكامل</label><input id="m-nu-name"></div>
+    <div class="form-row"><label>الإيميل</label><input id="m-nu-email" type="email"></div>
+    <div class="form-row"><label>الباسورد المبدئي</label><input id="m-nu-password" type="text" placeholder="6 حروف على الأقل"></div>
+    <div class="form-row"><label>الدور</label><select id="m-nu-role">
+      ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join('')}
+    </select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الحساب</button>`);
+  if(m.type==='confirmDeleteUser'){
+    const u = S.users.find(x=>x.id===m.id);
+    return modalWrap('تأكيد الحذف النهائي', `
+    <p style="font-size:13.5px;">هتحذف حساب <b>${esc(u?u.full_name:'')}</b> نهائيًا ومش هيقدر يدخل تاني. الإجراء ده لا يمكن التراجع عنه.</p>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
+  }
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
@@ -1239,7 +1445,7 @@ function renderModal(){
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtTime(n.created_at)} · ${n.created_at?n.created_at.slice(0,10):''}</div>
       </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد ملاحظات على هذه الوحدة</p>`);
   }
-  if(m.type==='scan') return modalWrap('مسح رمز QR', `
+  if(m.type==='scan'||m.type==='scanAudit') return modalWrap('مسح رمز QR', `
     <div class="scan-stage" id="scan-stage"><div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div></div>
     <div style="margin-top:12px;">
       <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.upload()} أو ارفع صورة لرمز QR<input type="file" accept="image/*" id="qr-file-input" capture="environment"></label>
@@ -1268,7 +1474,7 @@ function bindModalEvents(){
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
   if(S.modal && S.modal.type==='qr') renderQrCanvas();
-  if(S.modal && S.modal.type==='scan') startScanner();
+  if(S.modal && (S.modal.type==='scan'||S.modal.type==='scanAudit')) startScanner();
   const qf=document.getElementById('qr-file-input'); if(qf) qf.onchange=e=>decodeFromFile(e.target.files[0]);
   const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
 }
@@ -1344,6 +1550,22 @@ async function handleModalSave(){
     if(!reason){ toast('لازم تكتب السبب',false); return; }
     if(await dbUpdate('waste_removal_jobs', m.id, {status:'not_done', reason, updated_at:new Date().toISOString()})){ await loadWaste(); S.modal=null; render(); toast('تم التسجيل',true); }
   }
+  else if(m.type==='addUser'){
+    const full_name=document.getElementById('m-nu-name').value.trim();
+    const email=document.getElementById('m-nu-email').value.trim();
+    const password=document.getElementById('m-nu-password').value;
+    const role=document.getElementById('m-nu-role').value;
+    if(!full_name||!email||!password){ toast('استكمل كل الحقول',false); return; }
+    if(password.length<6){ toast('الباسورد لازم يكون 6 حروف على الأقل',false); return; }
+    const res = await callAdminUsersFn({ action:'create', full_name, email, password, role });
+    if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
+    await loadUsers(); S.modal=null; render(); toast('تم إنشاء الحساب بنجاح',true);
+  }
+  else if(m.type==='confirmDeleteUser'){
+    const res = await callAdminUsersFn({ action:'delete', user_id:m.id });
+    if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
+    await loadUsers(); S.modal=null; render(); toast('تم حذف الحساب',true);
+  }
   else if(m.type==='addUnitNote'){
     const note=document.getElementById('m-note-text').value.trim();
     if(!note){ toast('اكتب وصف الملاحظة',false); return; }
@@ -1398,6 +1620,13 @@ function decodeFromFile(file){
 }
 function handleScannedCode(code){
   const clean=(code||'').trim();
+  if(S.scanCtx && S.scanCtx.mode==='audit'){
+    const locId = clean.startsWith('ZEDWEST|LOC|') ? clean.split('|')[2] : clean;
+    if(locId !== S.scanCtx.auditLocationId){ toast('هذا الكود يخص موقع مختلف',false); return; }
+    stopScanner();
+    submitAuditVisit(locId);
+    return;
+  }
   const defId = clean.startsWith('ZEDWEST|CL|') ? clean.split('|')[2] : clean;
   const inst = S.checklistInstances.find(ci=>ci.id===S.scanCtx.instanceId);
   if(!inst){ toast('تعذر إيجاد المهمة',false); return; }
@@ -1410,6 +1639,16 @@ function handleScannedCode(code){
   stopScanner();
   S.modal={type:'confirmChecklist'};
   render();
+}
+async function submitAuditVisit(locId){
+  const loc = S.locations.find(l=>l.id===locId);
+  const todayChecklist = (S.checklistInstances||[]).filter(ci=>ci.location_id===locId && ci.date===S.today);
+  const doneCount = todayChecklist.filter(ci=>ci.status==='completed').length;
+  const row = { id:uid('av'), location_id:locId, senior_supervisor_id:S.session.user.id, note:`عند التدقيق: ${doneCount}/${todayChecklist.length} من قوائم التحقق منجزة` };
+  await dbInsert('location_audit_visits',[row]);
+  await loadDistData();
+  S.modal=null; S.scanCtx=null; render();
+  toast(`تم تسجيل زيارة تدقيق ${loc?loc.name:''} — ${doneCount}/${todayChecklist.length} منجزة`, true);
 }
 let pendingPhoto=null;
 function handlePhotoSelect(file){
@@ -1456,6 +1695,16 @@ async function loadRoleData(){
   const role=S.profile.role;
   S.locations = await dbSelect('locations');
   S.users = await dbSelect('profiles');
+  const distRoles = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor'];
+  if(distRoles.includes(role)){
+    S.zones = await dbSelect('zones');
+    const sessions = await dbSelect('distribution_sessions', { date: S.today });
+    S.distSession = sessions[0] || null;
+    S.presence = await dbSelect('daily_presence', { date: S.today });
+    S.zoneAssignments = await dbSelect('zone_assignments', { date: S.today });
+    S.locationAssignments = await dbSelect('location_assignments', { date: S.today });
+    S.auditVisits = await dbSelect('location_audit_visits');
+  }
   if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.orders = await dbSelect('paid_service_orders');
   if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.pest = await dbSelect('pest_control_requests');
   if(role==='admin'||role==='opm') S.facade = await dbSelect('facade_works');
@@ -1464,6 +1713,7 @@ async function loadRoleData(){
   if(role==='admin'||role==='opm') S.unitNotes = await dbSelect('unit_notes');
   if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
   if(role==='admin') S.checklistDefs = await dbSelect('checklist_definitions');
+  if(role==='hk_senior_supervisor'){ S.checklistDefs = await dbSelect('checklist_definitions'); S.checklistInstances = await dbSelect('checklist_instances'); }
   if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
   if(role==='admin'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
   if(role==='supervisor'){
