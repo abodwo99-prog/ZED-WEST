@@ -461,8 +461,8 @@ function renderHome(){
     <div id="ai-answer" style="margin-top:12px;font-size:13.5px;line-height:1.8;"></div>
   </div>
   <div class="stat-row">${cardsHtml}${attendanceCard}</div>
+  ${(role==='admin'||role==='opm')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
   <div class="home-blocks">
-    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">توزيع شغل اليوم بين الخدمات</h3><canvas id="chartTodayDist" height="200"></canvas></div>` : ''}
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
@@ -525,21 +525,46 @@ function drawHomeCharts(){
     }
     new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
   }
-  const el2=document.getElementById('chartTodayDist'); if(el2 && typeof Chart!=='undefined'){
-    const today=S.today;
-    const labels=['تسليمات','خدمة مدفوعة','حشرات','واجهات','مخلفات','تأسيسات','قوائم تحقق'];
-    const counts=[
-      S.deliveries.filter(d=>d.date===today).length,
-      S.orders.filter(o=>o.scheduled_date===today).length,
-      (S.pest||[]).filter(p=>p.scheduled_date===today).length,
-      (S.facade||[]).filter(f=>f.date===today).length,
-      (S.waste||[]).filter(w=>w.date===today).length,
-      S.installs.filter(i=>i.date===today).length,
-      S.checklistInstances.filter(c=>c.date===today).length,
-    ];
-    const colors=['#1B8A6B','#2463C4','#D9483B','#DA8B1F','#0E2A2B','#DA8B1F','#1B8A6B'];
-    new Chart(el2, { type:'doughnut', data:{ labels, datasets:[{ data:counts, backgroundColor:colors }] }, options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:11,font:{size:10.5}}}} } });
+  renderOrgChart();
+}
+function renderOrgChart(){
+  const el = document.getElementById('orgChart'); if(!el) return;
+  const today = S.today;
+  const nameOf = id => { const u=S.users.find(x=>x.id===id); return u? u.full_name : '—'; };
+  const zoneAssignsToday = (S.zoneAssignments||[]).filter(z=>z.date===today);
+
+  const boxCss = 'display:inline-flex;flex-direction:column;align-items:center;justify-content:center;background:var(--paper);border:2px solid var(--mint);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;color:var(--ink);min-width:110px;text-align:center;';
+  const subBoxCss = 'display:inline-flex;flex-direction:column;align-items:center;justify-content:center;background:var(--sand);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;color:var(--text);min-width:90px;text-align:center;margin:4px;';
+
+  if(!zoneAssignsToday.length){
+    el.innerHTML = `<div class="empty-state" style="padding:20px;"><span class="em">🗂️</span>لسه مفيش توزيع اتعمل النهاردة (لا زونات ولا مواقع اتوزعت)</div>`;
+    return;
   }
+
+  let html = `<div style="display:flex;flex-direction:column;align-items:center;gap:0;min-width:600px;">`;
+  html += `<div style="${boxCss}background:var(--ink);color:#fff;border-color:var(--ink);">🏢 التوزيع اليومي<br><span style="font-weight:500;font-size:10px;">${today}</span></div>`;
+  html += `<div style="width:2px;height:18px;background:var(--line);"></div>`;
+  html += `<div style="display:flex;gap:26px;flex-wrap:wrap;justify-content:center;position:relative;">`;
+
+  zoneAssignsToday.forEach(za=>{
+    const zone = S.zones.find(z=>z.id===za.zone_id);
+    const zoneLocIds = zone? (zone.location_ids||[]) : [];
+    const locAssigns = (S.locationAssignments||[]).filter(la=>la.date===today && zoneLocIds.includes(la.location_id));
+    html += `<div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="width:2px;height:14px;background:var(--line);"></div>
+      <div style="${boxCss}">👤 ${esc(nameOf(za.senior_supervisor_id))}<br><span style="font-weight:500;font-size:10px;color:var(--mint);">${esc(zone?zone.name:'بدون زون')}</span></div>
+      <div style="width:2px;height:14px;background:var(--line);"></div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;max-width:260px;border-top:1px solid var(--line);padding-top:6px;">
+        ${locAssigns.length? locAssigns.map(la=>{
+          const loc=S.locations.find(l=>l.id===la.location_id);
+          return `<div style="${subBoxCss}">🧹 ${esc(nameOf(la.supervisor_id))}<br><span style="font-weight:500;color:var(--text-dim);">${esc(loc?loc.name:'')}</span></div>`;
+        }).join('') : `<div style="font-size:10.5px;color:var(--text-dim);padding:6px;">لسه مفيش مواقع اتوزعت</div>`}
+      </div>
+    </div>`;
+  });
+
+  html += `</div></div>`;
+  el.innerHTML = html;
 }
 function statusBadge(s){
   const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending' };
