@@ -150,6 +150,7 @@ let S = {
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
   zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
+  complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all',
   reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
   reportTo: todayStr(), reportType:'all',
   notifications:[], bellOpen:false,
@@ -159,6 +160,9 @@ let S = {
 const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين' };
 const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
+const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
+const SUPPLIER_CAT_LABEL = { housekeeping:'Housekeeping', pest_control:'Pest Control', waste_mgt:'Waste MGT', facade_cleaning:'Facade Cleaning', scent_diffusers:'Scent Diffusers', yd_operator:'YD Operator' };
+const INVOICE_STATUS_LABEL = { pending:'معلّقة', submitted:'تم رفعها للحسابات', paid:'تم الدفع' };
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
@@ -249,11 +253,11 @@ const ICON = {
   list:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
   idcard:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>`,
 };
-const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', distribution:'users', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
+const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات']];
@@ -387,6 +391,8 @@ function renderTabBody(){
     case 'qrsheet': return renderQrSheet();
     case 'attendance': return renderAttendance();
     case 'distribution': return renderDistribution();
+    case 'complaints': return renderComplaints();
+    case 'suppliers': return renderSuppliers();
     case 'locations': return renderLocations();
     case 'users': return renderUsers();
     case 'reports': return renderReports();
@@ -408,6 +414,8 @@ function bindTabEvents(){
     case 'qrsheet': bindQrSheet(); break;
     case 'attendance': bindAttendance(); break;
     case 'distribution': bindDistribution(); break;
+    case 'complaints': bindComplaints(); break;
+    case 'suppliers': bindSuppliers(); break;
     case 'locations': bindLocations(); break;
     case 'users': bindUsers(); break;
     case 'reports': bindReports(); break;
@@ -873,6 +881,92 @@ function bindAttendance(){
   document.querySelectorAll('[data-at-reject]').forEach(b=>b.onclick=async ()=>{ await dbDelete('attendance_records', b.dataset.atReject); await loadAttendance(); render(); });
 }
 async function loadAttendance(){ S.attendance = await dbSelect('attendance_records'); }
+
+/* ============================= COMPLAINTS ============================= */
+function renderComplaints(){
+  const list = S.complaints.slice().sort((a,b)=> a.date<b.date?1:-1);
+  const pending = list.filter(c=>c.status==='pending');
+  return `
+  <div class="toolbar"><button class="primary-btn" id="cx-add">${ICON.plus()} تسجيل شكوى جديدة</button></div>
+  <div class="stat-row">
+    <div class="stat coral"><div class="num">${pending.length}</div><div class="lbl">شكاوى قيد المتابعة</div></div>
+    <div class="stat mint"><div class="num">${list.length-pending.length}</div><div class="lbl">شكاوى تم حلها</div></div>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>الشرح</th><th>التاريخ</th><th>طريقة الاستلام</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(c=>`<tr>
+    <td>${esc(c.unit_code)}</td>
+    <td style="white-space:normal;max-width:260px;">${esc(c.description)}</td>
+    <td>${c.date}</td>
+    <td>${CHANNEL_LABEL[c.channel]||c.channel}</td>
+    <td>${c.status==='resolved'?'<span class="badge done"><span class="dot"></span>تم الحل</span>':'<span class="badge pending"><span class="dot"></span>قيد المتابعة</span>'}</td>
+    <td>${c.status==='pending'?`<button class="ghost-btn" data-resolve-complaint="${c.id}">تسجيل الحل</button>`:`<span style="font-size:11px;color:var(--text-dim);">${esc(c.resolution_notes||'')}</span>`}</td>
+  </tr>`).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد شكاوى مسجلة</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindComplaints(){
+  document.getElementById('cx-add').onclick=()=>{ S.modal={type:'addComplaint'}; render(); };
+  document.querySelectorAll('[data-resolve-complaint]').forEach(b=>b.onclick=()=>{ S.modal={type:'resolveComplaint', id:b.dataset.resolveComplaint}; render(); });
+}
+async function loadComplaints(){ S.complaints = await dbSelect('complaints'); }
+
+/* ============================= SUPPLIERS ============================= */
+function supplierStats(supId){
+  const invoices = S.supplierInvoices.filter(i=>i.supplier_id===supId);
+  const totalInvoiced = invoices.reduce((s,i)=>s+Number(i.amount||0),0);
+  const paidInvoices = invoices.filter(i=>i.status==='paid');
+  const totalPaid = paidInvoices.reduce((s,i)=>s+(Number(i.amount||0)-Number(i.discount||0)),0);
+  const totalSaved = paidInvoices.reduce((s,i)=>s+Number(i.discount||0),0);
+  return { totalInvoiced, totalPaid, totalSaved, count:invoices.length };
+}
+function renderSuppliers(){
+  const filter = S.supplierFilter;
+  const list = filter==='all'? S.suppliers : S.suppliers.filter(s=>s.category===filter);
+
+  // القطاع الخامس: الوضع المالي الإجمالي
+  let grandBudget=0, grandInvoiced=0, grandPaid=0, grandSaved=0;
+  S.suppliers.forEach(s=>{
+    grandBudget += Number(s.budget||0);
+    const st = supplierStats(s.id);
+    grandInvoiced += st.totalInvoiced; grandPaid += st.totalPaid; grandSaved += st.totalSaved;
+  });
+
+  return `
+  <div class="stat-row">
+    <div class="stat ink"><div class="num">${grandBudget.toLocaleString()}</div><div class="lbl">إجمالي البدجت (كل الموردين)</div></div>
+    <div class="stat blue"><div class="num">${grandInvoiced.toLocaleString()}</div><div class="lbl">إجمالي الفواتير</div></div>
+    <div class="stat coral"><div class="num">${grandPaid.toLocaleString()}</div><div class="lbl">إجمالي المدفوع</div></div>
+    <div class="stat mint"><div class="num">${grandSaved.toLocaleString()}</div><div class="lbl">إجمالي التوفير من الخصومات</div></div>
+    <div class="stat amber"><div class="num">${(grandBudget-grandPaid).toLocaleString()}</div><div class="lbl">المتبقي من البدجت</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="pill-group">
+      <button class="pill ${filter==='all'?'active':''}" data-sup-filter="all">الكل</button>
+      ${Object.keys(SUPPLIER_CAT_LABEL).map(k=>`<button class="pill ${filter===k?'active':''}" data-sup-filter="${k}">${SUPPLIER_CAT_LABEL[k]}</button>`).join('')}
+    </div>
+    <button class="primary-btn" id="add-supplier-btn">${ICON.plus()} إضافة مورد</button>
+  </div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    ${list.length? list.map(s=>{
+      const st = supplierStats(s.id);
+      const remaining = Number(s.budget||0) - st.totalPaid;
+      return `<div class="card service-card" data-open-supplier="${s.id}">
+        <div style="display:flex;justify-content:space-between;"><b style="font-size:14px;">${esc(s.name)}</b><span class="badge pending"><span class="dot"></span>${SUPPLIER_CAT_LABEL[s.category]}</span></div>
+        <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(s.service_description||'')}</div>
+        <div style="font-size:12.5px;">البدجت: <b>${Number(s.budget||0).toLocaleString()}</b> — المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></div>
+      </div>`;
+    }).join('') : `<div class="empty-state"><span class="em">🏢</span>لا يوجد موردون في هذا القطاع</div>`}
+  </div>`;
+}
+function bindSuppliers(){
+  document.querySelectorAll('[data-sup-filter]').forEach(b=>b.onclick=()=>{ S.supplierFilter=b.dataset.supFilter; render(); });
+  document.getElementById('add-supplier-btn').onclick=()=>{ S.modal={type:'addSupplier'}; render(); };
+  document.querySelectorAll('[data-open-supplier]').forEach(c=>c.onclick=()=>{ S.modal={type:'supplierDetail', id:c.dataset.openSupplier}; render(); });
+}
+async function loadSuppliers(){
+  S.suppliers = await dbSelect('suppliers');
+  S.supplierKpi = await dbSelect('supplier_kpi');
+  S.supplierInvoices = await dbSelect('supplier_invoices');
+}
 
 /* ============================= DAILY DISTRIBUTION WORKFLOW ============================= */
 async function loadDistData(){
@@ -1471,6 +1565,69 @@ function renderModal(){
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
+  if(m.type==='addComplaint') return modalWrap('تسجيل شكوى جديدة', `
+    <div class="form-row"><label>رقم الوحدة</label><input id="m-cx-unit"></div>
+    <div class="form-row"><label>شرح الشكوى</label><textarea id="m-cx-desc"></textarea></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-cx-date" value="${S.today}"></div>
+    <div class="form-row"><label>طريقة استلام الشكوى</label><select id="m-cx-channel">
+      ${Object.keys(CHANNEL_LABEL).map(k=>`<option value="${k}">${CHANNEL_LABEL[k]}</option>`).join('')}
+    </select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تسجيل الشكوى</button>`);
+  if(m.type==='resolveComplaint') return modalWrap('تسجيل حل الشكوى', `
+    <div class="form-row"><label>ملاحظات الحل</label><textarea id="m-cx-resolution" placeholder="اكتب إيه اللي اتعمل لحل الشكوى"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} تأكيد الحل</button>`);
+  if(m.type==='addSupplier') return modalWrap('إضافة مورد جديد', `
+    <div class="form-row"><label>اسم المورد</label><input id="m-sup-name"></div>
+    <div class="form-row"><label>القطاع</label><select id="m-sup-cat">
+      ${Object.keys(SUPPLIER_CAT_LABEL).map(k=>`<option value="${k}">${SUPPLIER_CAT_LABEL[k]}</option>`).join('')}
+    </select></div>
+    <div class="form-row"><label>شرح الخدمة</label><textarea id="m-sup-desc"></textarea></div>
+    <div class="form-row"><label>البدجت السنوي/الإجمالي</label><input type="number" id="m-sup-budget" value="0"></div>
+    <div class="form-row"><label>صورة العقد (اختياري)</label>
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} رفع صورة العقد<input type="file" accept="image/*" id="cf-photo"></label>
+      <img id="cf-photo-preview" class="photo-preview" style="display:none;">
+    </div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إضافة المورد</button>`);
+  if(m.type==='supplierDetail'){
+    const s = S.suppliers.find(x=>x.id===m.id);
+    const kpis = S.supplierKpi.filter(k=>k.supplier_id===m.id).sort((a,b)=>b.month.localeCompare(a.month));
+    const invoices = S.supplierInvoices.filter(i=>i.supplier_id===m.id).sort((a,b)=>b.invoice_date.localeCompare(a.invoice_date));
+    const st = supplierStats(m.id);
+    const remaining = Number(s.budget||0) - st.totalPaid;
+    return modalWrap('ملف المورد: '+esc(s.name), `
+      <div style="background:var(--sand);border-radius:10px;padding:10px;margin-bottom:12px;font-size:12.5px;">
+        <div>القطاع: <b>${SUPPLIER_CAT_LABEL[s.category]}</b></div>
+        <div>${esc(s.service_description||'')}</div>
+        ${s.contract_photo?`<img src="${s.contract_photo}" class="photo-preview" style="max-height:120px;margin-top:6px;">`:''}
+        <div style="margin-top:8px;display:flex;justify-content:space-between;"><span>البدجت: <b>${Number(s.budget||0).toLocaleString()}</b></span><span>المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-top:4px;"><span>إجمالي الفواتير: ${st.totalInvoiced.toLocaleString()}</span><span>موفّر من الخصومات: ${st.totalSaved.toLocaleString()}</span></div>
+      </div>
+
+      <h4 style="font-size:13px;margin:14px 0 6px;">تقييم الأداء الشهري (KPI)</h4>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input type="month" id="m-kpi-month" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:7px;">
+        <input type="number" id="m-kpi-score" placeholder="الدرجة" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:7px;">
+        <button class="ghost-btn" id="add-kpi-btn">إضافة</button>
+      </div>
+      ${kpis.length? kpis.map(k=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line);"><span>${k.month}</span><b>${k.score}</b></div>`).join('') : `<p style="font-size:11.5px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`}
+
+      <h4 style="font-size:13px;margin:14px 0 6px;">الفواتير</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+        <input type="number" id="m-inv-amount" placeholder="المبلغ" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
+        <input type="number" id="m-inv-discount" placeholder="الخصم (اختياري)" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
+        <input type="date" id="m-inv-date" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
+        <select id="m-inv-status" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
+          ${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}">${INVOICE_STATUS_LABEL[k]}</option>`).join('')}
+        </select>
+      </div>
+      <button class="ghost-btn" id="add-invoice-btn" style="width:100%;margin-bottom:10px;">إضافة فاتورة</button>
+      ${invoices.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>
+        ${invoices.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
+          <select data-inv-status="${i.id}">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select>
+        </td></tr>`).join('')}
+      </tbody></table></div>` : `<p style="font-size:11.5px;color:var(--text-dim);">لا توجد فواتير بعد</p>`}
+    `, true);
+  }
   if(m.type==='addUnitNote') return modalWrap('إضافة ملاحظة عن الوحدة', `
     <div class="form-row"><label>وصف العطل أو التلفية</label><textarea id="m-note-text" placeholder="مثال: الباب الزجاجي مكسور"></textarea></div>
     <div class="form-row"><label>صورة (اختياري لكن يُفضّل)</label>
@@ -1501,8 +1658,8 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} تم التنفيذ</button>`);
   return '';
 }
-function modalWrap(title, body){
-  return `<div class="modal-bg" data-close-modal="1"><div class="modal" onclick="event.stopPropagation()">
+function modalWrap(title, body, wide){
+  return `<div class="modal-bg" data-close-modal="1"><div class="modal${wide?' wide':''}" onclick="event.stopPropagation()">
     <div class="modal-head"><h3>${esc(title)}</h3><button class="close" data-close-modal="1">${ICON.x()}</button></div>
     <div class="modal-body">${body}</div>
   </div></div>`;
@@ -1519,6 +1676,28 @@ function bindModalEvents(){
   if(S.modal && (S.modal.type==='scan'||S.modal.type==='scanAudit')) startScanner();
   const qf=document.getElementById('qr-file-input'); if(qf) qf.onchange=e=>decodeFromFile(e.target.files[0]);
   const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
+  const addKpiBtn=document.getElementById('add-kpi-btn');
+  if(addKpiBtn) addKpiBtn.onclick=async ()=>{
+    const month=document.getElementById('m-kpi-month').value;
+    const score=document.getElementById('m-kpi-score').value;
+    if(!month||score===''){ toast('حدد الشهر والدرجة',false); return; }
+    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, score:+score, created_by:S.session.user.id }]);
+    await loadSuppliers(); render(); toast('تم إضافة التقييم',true);
+  };
+  const addInvBtn=document.getElementById('add-invoice-btn');
+  if(addInvBtn) addInvBtn.onclick=async ()=>{
+    const amount=document.getElementById('m-inv-amount').value;
+    const discount=document.getElementById('m-inv-discount').value||0;
+    const invoice_date=document.getElementById('m-inv-date').value;
+    const status=document.getElementById('m-inv-status').value;
+    if(!amount||!invoice_date){ toast('استكمل مبلغ وتاريخ الفاتورة',false); return; }
+    await dbInsert('supplier_invoices',[{ id:uid('inv'), supplier_id:S.modal.id, amount:+amount, discount:+discount, invoice_date, status, created_by:S.session.user.id, paid_at: status==='paid'? new Date().toISOString():null }]);
+    await loadSuppliers(); render(); toast('تم إضافة الفاتورة',true);
+  };
+  document.querySelectorAll('[data-inv-status]').forEach(sel=>sel.onchange=async ()=>{
+    await dbUpdate('supplier_invoices', sel.dataset.invStatus, { status:sel.value, paid_at: sel.value==='paid'? new Date().toISOString():null });
+    await loadSuppliers(); render(); toast('تم تحديث حالة الفاتورة',true);
+  });
 }
 
 async function handleModalSave(){
@@ -1607,6 +1786,24 @@ async function handleModalSave(){
     const res = await callAdminUsersFn({ action:'delete', user_id:m.id });
     if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
     await loadUsers(); S.modal=null; render(); toast('تم حذف الحساب',true);
+  }
+  else if(m.type==='addComplaint'){
+    const unit_code=document.getElementById('m-cx-unit').value.trim();
+    const description=document.getElementById('m-cx-desc').value.trim();
+    if(!unit_code||!description){ toast('استكمل رقم الوحدة والشرح',false); return; }
+    const row={ id:uid('cx'), unit_code, description, date:document.getElementById('m-cx-date').value, channel:document.getElementById('m-cx-channel').value, status:'pending', created_by:S.session.user.id };
+    if(await dbInsert('complaints',[row])){ await loadComplaints(); S.modal=null; render(); toast('تم تسجيل الشكوى',true); }
+  }
+  else if(m.type==='resolveComplaint'){
+    const resolution_notes=document.getElementById('m-cx-resolution').value.trim();
+    if(!resolution_notes){ toast('اكتب ملاحظات الحل',false); return; }
+    if(await dbUpdate('complaints', m.id, {status:'resolved', resolution_notes, resolved_at:new Date().toISOString()})){ await loadComplaints(); S.modal=null; render(); toast('تم تسجيل حل الشكوى',true); }
+  }
+  else if(m.type==='addSupplier'){
+    const name=document.getElementById('m-sup-name').value.trim();
+    if(!name){ toast('اكتب اسم المورد',false); return; }
+    const row={ id:uid('sup'), name, category:document.getElementById('m-sup-cat').value, service_description:document.getElementById('m-sup-desc').value.trim(), budget:+document.getElementById('m-sup-budget').value||0, contract_photo:pendingPhoto, created_by:S.session.user.id };
+    if(await dbInsert('suppliers',[row])){ await loadSuppliers(); pendingPhoto=null; S.modal=null; render(); toast('تمت إضافة المورد',true); }
   }
   else if(m.type==='addUnitNote'){
     const note=document.getElementById('m-note-text').value.trim();
@@ -1755,6 +1952,12 @@ async function loadRoleData(){
   if(role==='admin'||role==='opm') S.unitNotes = await dbSelect('unit_notes');
   if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
   if(role==='admin'||role==='opm') S.checklistDefs = await dbSelect('checklist_definitions');
+  if(role==='admin'||role==='opm'){
+    S.complaints = await dbSelect('complaints');
+    S.suppliers = await dbSelect('suppliers');
+    S.supplierKpi = await dbSelect('supplier_kpi');
+    S.supplierInvoices = await dbSelect('supplier_invoices');
+  }
   if(role==='hk_senior_supervisor'){ S.checklistDefs = await dbSelect('checklist_definitions'); S.checklistInstances = await dbSelect('checklist_instances'); }
   if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
   if(role==='admin'||role==='opm'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
