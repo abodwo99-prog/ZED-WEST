@@ -150,7 +150,7 @@ let S = {
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
   zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
-  complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all',
+  complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all', clShowInactive:false,
   reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
   reportTo: todayStr(), reportType:'all',
   notifications:[], bellOpen:false,
@@ -630,11 +630,12 @@ function renderOrders(){
     <button class="ghost-btn" id="ord-clear">مسح الفلتر</button>
     ${canCreate?`<button class="primary-btn" id="ord-add">${ICON.plus()} أوردر جديد</button>`:''}
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>النوع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(o=>{
     const sup = S.users.find(u=>u.id===o.assigned_supervisor_id);
     const canChangeStatus = role==='admin'||role==='opm'||o.assigned_supervisor_id===S.session.user.id;
     return `<tr>
+      <td>${esc(o.unit_code||'-')}</td>
       <td>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</td>
       <td>${o.scheduled_date}</td>
       <td>${esc(o.scheduled_time||'-')}</td>
@@ -647,7 +648,7 @@ function renderOrders(){
       </select>`:statusBadge(o.status)}</td>
       <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
+  }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
   </tbody></table></div>`;
 }
 function bindOrders(){
@@ -777,10 +778,15 @@ async function loadInstalls(){ S.installs = await dbSelect('installation_works')
 
 /* ============================= CHECKLIST DEFINITIONS (admin) ============================= */
 function renderChecklistAdmin(){
+  const showInactive = S.clShowInactive;
+  const list = showInactive? S.checklistDefs : S.checklistDefs.filter(c=>c.active);
   return `
-  <div class="toolbar"><button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر قوائم تحقق يومية</button></div>
+  <div class="toolbar">
+    <button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر قوائم تحقق يومية</button>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" id="cl-show-inactive" ${showInactive?'checked':''}> إظهار الموقوفة</label>
+  </div>
   <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الموقع</th><th>الوردية</th><th>وقت السماح</th><th>الحالة</th><th></th></tr></thead><tbody>
-  ${S.checklistDefs.length? S.checklistDefs.map(c=>{
+  ${list.length? list.map(c=>{
     const loc=S.locations.find(l=>l.id===c.location_id);
     return `<tr>
       <td>${esc(c.name)}</td>
@@ -788,15 +794,25 @@ function renderChecklistAdmin(){
       <td><span class="tag-shift ${c.shift}">${SHIFT_LABEL[c.shift]}</span></td>
       <td>${c.valid_from&&c.valid_to? esc(c.valid_from)+' - '+esc(c.valid_to) : 'بدون قيد'}</td>
       <td>${c.active?'<span class="badge done"><span class="dot"></span>مفعّل</span>':'<span class="badge pending"><span class="dot"></span>موقوف</span>'}</td>
-      <td><button class="ghost-btn" data-cl-qr="${c.id}">${ICON.qr(13)}</button> <button class="ghost-btn danger" data-cl-del="${c.id}">${ICON.trash()}</button></td>
+      <td>
+        <button class="ghost-btn" data-cl-qr="${c.id}">${ICON.qr(13)}</button>
+        <button class="ghost-btn" data-cl-toggle="${c.id}" data-active="${c.active}">${c.active?'إيقاف':'تفعيل'}</button>
+        <button class="ghost-btn danger" data-cl-hard-del="${c.id}">${ICON.trash(13)} حذف نهائي</button>
+      </td>
     </tr>`;
-  }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد عناصر بعد</td></tr>`}
+  }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد عناصر</td></tr>`}
   </tbody></table></div>`;
 }
 function bindChecklistAdmin(){
   document.getElementById('cl-add').onclick=()=>{ S.modal={type:'addChecklistDef'}; render(); };
+  document.getElementById('cl-show-inactive').onchange=e=>{ S.clShowInactive=e.target.checked; render(); };
   document.querySelectorAll('[data-cl-qr]').forEach(b=>b.onclick=()=>{ const c=S.checklistDefs.find(x=>x.id===b.dataset.clQr); S.qrTarget={code:'ZEDWEST|CL|'+c.id, label:c.name}; S.modal={type:'qr'}; render(); });
-  document.querySelectorAll('[data-cl-del]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('checklist_definitions', b.dataset.clDel, {active:false}); await loadChecklistDefs(); render(); });
+  document.querySelectorAll('[data-cl-toggle]').forEach(b=>b.onclick=async ()=>{
+    const nowActive = b.dataset.active==='true';
+    await dbUpdate('checklist_definitions', b.dataset.clToggle, {active: !nowActive});
+    await loadChecklistDefs(); render();
+  });
+  document.querySelectorAll('[data-cl-hard-del]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteChecklistDef', id:b.dataset.clHardDel}; render(); });
 }
 async function loadChecklistDefs(){ S.checklistDefs = await dbSelect('checklist_definitions'); }
 
@@ -825,16 +841,13 @@ function buildPrintPreview(){
 
 /* ============================= ATTENDANCE ============================= */
 function renderAttendance(){
-  const role=S.profile.role;
-  const needsApproval = role==='contractor_manager'||role==='contractor_admin';
-  const canApprove = role==='admin'||role==='opm';
   const list = S.attendance.filter(a=>a.date===S.attendanceDate);
-  const pending = S.attendance.filter(a=>a.status==='pending');
   return `
   <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;font-size:14px;">تسجيل حضور جديد</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
       <div class="form-row"><label>التاريخ</label><input type="date" id="at-date" value="${S.today}"></div>
+      <div class="form-row"><label>مرحلة المشروع</label><input id="at-phase" value="المرحلة 1" placeholder="مثال: المرحلة 1"></div>
       <div class="form-row"><label>الوردية</label><select id="at-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
       <div class="form-row"><label>مدير موقع</label><input type="number" min="0" id="at-sm" value="0"></div>
       <div class="form-row"><label>إداري موقع</label><input type="number" min="0" id="at-sa" value="0"></div>
@@ -843,42 +856,28 @@ function renderAttendance(){
       <div class="form-row"><label>عامل</label><input type="number" min="0" id="at-w" value="0"></div>
     </div>
     <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="at-notes"></textarea></div>
-    <button class="primary-btn" id="at-save">${needsApproval? 'إرسال للموافقة':'حفظ'}</button>
+    <button class="primary-btn" id="at-save">حفظ</button>
   </div>
-  ${canApprove && pending.length ? `<div class="card" style="margin-bottom:18px;border-color:var(--amber);">
-    <h3 style="margin-top:0;font-size:14px;color:var(--amber);">بانتظار الموافقة (${pending.length})</h3>
-    ${pending.map(a=>renderAttendanceRow(a,true)).join('')}
-  </div>`:''}
   <div class="toolbar"><div class="fgroup"><label>عرض تاريخ</label><input type="date" id="at-filter-date" value="${S.attendanceDate}"></div></div>
-  <div class="tbl-wrap"><table><thead><tr><th>الوردية</th><th>مدير موقع</th><th>إداري موقع</th><th>مشرف أول</th><th>مشرف</th><th>عامل</th><th>الحالة</th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>المرحلة</th><th>الوردية</th><th>مدير موقع</th><th>إداري موقع</th><th>مشرف أول</th><th>مشرف</th><th>عامل</th></tr></thead><tbody>
   ${list.length? list.map(a=>`<tr>
-    <td>${SHIFT_LABEL[a.shift]}</td><td>${a.site_manager_count}</td><td>${a.site_admin_count}</td><td>${a.senior_supervisor_count}</td><td>${a.supervisor_count}</td><td>${a.worker_count}</td>
-    <td>${a.status==='approved'?'<span class="badge done"><span class="dot"></span>معتمد</span>':'<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'}</td>
+    <td>${esc(a.phase||'-')}</td><td>${SHIFT_LABEL[a.shift]}</td><td>${a.site_manager_count}</td><td>${a.site_admin_count}</td><td>${a.senior_supervisor_count}</td><td>${a.supervisor_count}</td><td>${a.worker_count}</td>
   </tr>`).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد سجلات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
-}
-function renderAttendanceRow(a,withActions){
-  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;">
-    <span>${a.date} · ${SHIFT_LABEL[a.shift]} — مدير:${a.site_manager_count} إداري:${a.site_admin_count} مشرف أول:${a.senior_supervisor_count} مشرف:${a.supervisor_count} عامل:${a.worker_count}</span>
-    ${withActions?`<span style="display:flex;gap:6px;"><button class="ghost-btn" data-at-approve="${a.id}">قبول</button><button class="ghost-btn danger" data-at-reject="${a.id}">رفض</button></span>`:''}
-  </div>`;
 }
 function bindAttendance(){
   document.getElementById('at-filter-date').onchange=e=>{ S.attendanceDate=e.target.value; render(); };
   document.getElementById('at-save').onclick=async ()=>{
-    const role=S.profile.role;
     const row = {
-      id: uid('att'), date: document.getElementById('at-date').value, shift: document.getElementById('at-shift').value,
+      id: uid('att'), date: document.getElementById('at-date').value, phase: document.getElementById('at-phase').value.trim()||'المرحلة 1', shift: document.getElementById('at-shift').value,
       site_manager_count: +document.getElementById('at-sm').value||0, site_admin_count: +document.getElementById('at-sa').value||0,
       senior_supervisor_count: +document.getElementById('at-ss').value||0, supervisor_count: +document.getElementById('at-sv').value||0,
       worker_count: +document.getElementById('at-w').value||0, notes: document.getElementById('at-notes').value.trim(),
-      entered_by: S.session.user.id, status: (role==='contractor_manager'||role==='contractor_admin') ? 'pending':'approved'
+      entered_by: S.session.user.id, status: 'approved'
     };
     const ok = await dbInsert('attendance_records', [row]);
-    if(ok){ await loadAttendance(); render(); toast(row.status==='pending'?'تم الإرسال للموافقة':'تم حفظ الحضور', true); }
+    if(ok){ await loadAttendance(); render(); toast('تم حفظ الحضور', true); }
   };
-  document.querySelectorAll('[data-at-approve]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('attendance_records', b.dataset.atApprove, {status:'approved', approved_by:S.session.user.id, approved_at:new Date().toISOString()}); await loadAttendance(); render(); toast('تم اعتماد الحضور',true); });
-  document.querySelectorAll('[data-at-reject]').forEach(b=>b.onclick=async ()=>{ await dbDelete('attendance_records', b.dataset.atReject); await loadAttendance(); render(); });
 }
 async function loadAttendance(){ S.attendance = await dbSelect('attendance_records'); }
 
@@ -1430,7 +1429,7 @@ function renderSupervisorToday(){
 
     <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><b>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
+      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
         ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
       </div>
       <select data-my-ord="${o.id}">
@@ -1498,6 +1497,7 @@ function renderModal(){
     <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
   if(m.type==='addOrder') return modalWrap('أوردر خدمة مدفوعة جديد', `
+    <div class="form-row"><label>رقم الوحدة</label><input id="m-ord-unit"></div>
     <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option></select></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
     <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
@@ -1556,6 +1556,12 @@ function renderModal(){
       ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join('')}
     </select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الحساب</button>`);
+  if(m.type==='confirmDeleteChecklistDef'){
+    const c = S.checklistDefs.find(x=>x.id===m.id);
+    return modalWrap('تأكيد الحذف النهائي', `
+    <p style="font-size:13.5px;">هتحذف عنصر <b>${esc(c?c.name:'')}</b> نهائيًا وكل سجلات تنفيذه القديمة. لا يمكن التراجع.</p>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
+  }
   if(m.type==='confirmDeleteUser'){
     const u = S.users.find(x=>x.id===m.id);
     return modalWrap('تأكيد الحذف النهائي', `
@@ -1713,7 +1719,7 @@ async function handleModalSave(){
     if(await dbUpdate('delivery_units', m.id, {assigned_supervisor_id:sup})){ await loadDeliveries(); S.modal=null; render(); toast('تم التعيين',true); }
   }
   else if(m.type==='addOrder'){
-    const row={ id:uid('ord'), order_type:document.getElementById('m-ord-type').value, scheduled_date:document.getElementById('m-ord-date').value, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    const row={ id:uid('ord'), unit_code:document.getElementById('m-ord-unit').value.trim(), order_type:document.getElementById('m-ord-type').value, scheduled_date:document.getElementById('m-ord-date').value, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('paid_service_orders',[row])){ await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
   }
   else if(m.type==='assignOrder'){
@@ -1781,6 +1787,10 @@ async function handleModalSave(){
     const res = await callAdminUsersFn({ action:'create', full_name, email, password, role });
     if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
     await loadUsers(); S.modal=null; render(); toast('تم إنشاء الحساب بنجاح',true);
+  }
+  else if(m.type==='confirmDeleteChecklistDef'){
+    await dbDelete('checklist_definitions', m.id);
+    await loadChecklistDefs(); S.checklistInstances = await dbSelect('checklist_instances'); S.modal=null; render(); toast('تم الحذف النهائي',true);
   }
   else if(m.type==='confirmDeleteUser'){
     const res = await callAdminUsersFn({ action:'delete', user_id:m.id });
@@ -1925,53 +1935,86 @@ async function ensureTodayChecklistInstances(){
       missing.push({ id:uid('cli'), date, checklist_definition_id:def.id, location_id:def.location_id, shift:def.shift, status:'incomplete', supervisor_id:null, completed_at:null, notes:'', photo:null, scanned:false });
     }
   });
-  if(missing.length){ await dbInsert('checklist_instances', missing); }
+  if(missing.length){
+    // upsert مع تجاهل التكرار: لو صف تاني (من طلب متزامن) سبقنا بنفس (التعريف+التاريخ)، تجاهله بهدوء بدل ما يفشل الإدخال كله
+    const { error } = await sb.from('checklist_instances').upsert(missing, { onConflict:'checklist_definition_id,date', ignoreDuplicates:true });
+    if(error) console.error('checklist_instances upsert', error);
+  }
   S.checklistInstances = await dbSelect('checklist_instances');
 }
 
 /* ============================= BOOT ============================= */
 async function loadRoleData(){
   const role=S.profile.role;
-  S.locations = await dbSelect('locations');
-  S.users = await dbSelect('profiles');
+  const isMgmt = role==='admin'||role==='opm';
   const distRoles = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor'];
+  const wantsChecklist = isMgmt || role==='hk_senior_supervisor' || role==='supervisor';
+  const wantsOpsData = isMgmt || role==='supervisor';
+
+  // كل الجلبات المستقلة عن بعضها بتتنفذ في نفس الوقت بدل ما تستنى بعضها
+  const jobs = {
+    locations: dbSelect('locations'),
+    users: dbSelect('profiles'),
+  };
   if(distRoles.includes(role)){
-    S.zones = await dbSelect('zones');
-    const sessions = await dbSelect('distribution_sessions', { date: S.today });
-    S.distSession = sessions[0] || null;
-    S.presence = await dbSelect('daily_presence', { date: S.today });
-    S.zoneAssignments = await dbSelect('zone_assignments', { date: S.today });
-    S.locationAssignments = await dbSelect('location_assignments', { date: S.today });
-    S.auditVisits = await dbSelect('location_audit_visits');
+    jobs.zones = dbSelect('zones');
+    jobs.sessions = dbSelect('distribution_sessions', { date: S.today });
+    jobs.presence = dbSelect('daily_presence', { date: S.today });
+    jobs.zoneAssignments = dbSelect('zone_assignments', { date: S.today });
+    jobs.locationAssignments = dbSelect('location_assignments', { date: S.today });
+    jobs.auditVisits = dbSelect('location_audit_visits');
   }
-  if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.orders = await dbSelect('paid_service_orders');
-  if(role==='admin'||role==='opm'||role==='fm_dispatcher') S.pest = await dbSelect('pest_control_requests');
-  if(role==='admin'||role==='opm') S.facade = await dbSelect('facade_works');
-  if(role==='admin'||role==='opm') S.waste = await dbSelect('waste_removal_jobs');
-  if(role==='admin'||role==='opm') S.deliveries = await dbSelect('delivery_units');
-  if(role==='admin'||role==='opm') S.unitNotes = await dbSelect('unit_notes');
-  if(role==='admin'||role==='opm'||role==='contractor_manager') S.installs = await dbSelect('installation_works');
-  if(role==='admin'||role==='opm') S.checklistDefs = await dbSelect('checklist_definitions');
-  if(role==='admin'||role==='opm'){
-    S.complaints = await dbSelect('complaints');
-    S.suppliers = await dbSelect('suppliers');
-    S.supplierKpi = await dbSelect('supplier_kpi');
-    S.supplierInvoices = await dbSelect('supplier_invoices');
+  if(isMgmt || role==='fm_dispatcher'){
+    jobs.orders = dbSelect('paid_service_orders');
+    jobs.pest = dbSelect('pest_control_requests');
   }
-  if(role==='hk_senior_supervisor'){ S.checklistDefs = await dbSelect('checklist_definitions'); S.checklistInstances = await dbSelect('checklist_instances'); }
-  if(role==='admin'||role==='opm'||role==='contractor_manager'||role==='contractor_admin') S.attendance = await dbSelect('attendance_records');
-  if(role==='admin'||role==='opm'){ S.orders=await dbSelect('paid_service_orders'); S.deliveries=await dbSelect('delivery_units'); S.installs=await dbSelect('installation_works'); S.checklistInstances=await dbSelect('checklist_instances'); S.pest=await dbSelect('pest_control_requests'); S.facade=await dbSelect('facade_works'); S.waste=await dbSelect('waste_removal_jobs'); S.unitNotes=await dbSelect('unit_notes'); }
-  if(role==='supervisor'){
-    S.deliveries = await dbSelect('delivery_units');
-    S.unitNotes = await dbSelect('unit_notes');
-    S.orders = await dbSelect('paid_service_orders');
-    S.pest = await dbSelect('pest_control_requests');
-    S.facade = await dbSelect('facade_works');
-    S.waste = await dbSelect('waste_removal_jobs');
-    S.checklistDefs = await dbSelect('checklist_definitions');
-    await ensureTodayChecklistInstances();
+  if(wantsOpsData){
+    jobs.orders = dbSelect('paid_service_orders');
+    jobs.pest = dbSelect('pest_control_requests');
+    jobs.facade = dbSelect('facade_works');
+    jobs.waste = dbSelect('waste_removal_jobs');
+    jobs.deliveries = dbSelect('delivery_units');
+    jobs.unitNotes = dbSelect('unit_notes');
   }
-  if(role==='admin'||role==='opm') await ensureTodayChecklistInstances();
+  if(isMgmt || role==='contractor_manager') jobs.installs = dbSelect('installation_works');
+  if(wantsChecklist) jobs.checklistDefs = dbSelect('checklist_definitions');
+  if(isMgmt || role==='hk_senior_supervisor' || role==='supervisor') jobs.checklistInstances = dbSelect('checklist_instances');
+  if(isMgmt){
+    jobs.complaints = dbSelect('complaints');
+    jobs.suppliers = dbSelect('suppliers');
+    jobs.supplierKpi = dbSelect('supplier_kpi');
+    jobs.supplierInvoices = dbSelect('supplier_invoices');
+  }
+  if(isMgmt || role==='contractor_manager' || role==='contractor_admin' || role==='hk_admin') jobs.attendance = dbSelect('attendance_records');
+
+  const keys = Object.keys(jobs);
+  const results = await Promise.all(keys.map(k=>jobs[k]));
+  const data = {}; keys.forEach((k,i)=>data[k]=results[i]);
+
+  S.locations = data.locations || S.locations;
+  S.users = data.users || S.users;
+  if(data.zones) S.zones = data.zones;
+  if(data.sessions) S.distSession = data.sessions[0] || null;
+  if(data.presence) S.presence = data.presence;
+  if(data.zoneAssignments) S.zoneAssignments = data.zoneAssignments;
+  if(data.locationAssignments) S.locationAssignments = data.locationAssignments;
+  if(data.auditVisits) S.auditVisits = data.auditVisits;
+  if(data.orders) S.orders = data.orders;
+  if(data.pest) S.pest = data.pest;
+  if(data.facade) S.facade = data.facade;
+  if(data.waste) S.waste = data.waste;
+  if(data.deliveries) S.deliveries = data.deliveries;
+  if(data.unitNotes) S.unitNotes = data.unitNotes;
+  if(data.installs) S.installs = data.installs;
+  if(data.checklistDefs) S.checklistDefs = data.checklistDefs;
+  if(data.checklistInstances) S.checklistInstances = data.checklistInstances;
+  if(data.complaints) S.complaints = data.complaints;
+  if(data.suppliers) S.suppliers = data.suppliers;
+  if(data.supplierKpi) S.supplierKpi = data.supplierKpi;
+  if(data.supplierInvoices) S.supplierInvoices = data.supplierInvoices;
+  if(data.attendance) S.attendance = data.attendance;
+
+  if(wantsChecklist) await ensureTodayChecklistInstances();
 }
 
 async function bootApp(){
@@ -2002,7 +2045,11 @@ const NOTIFY_TABLES = {
   facade_works: { module:'نظافة الواجهات', tab:'facade', field:null },
   waste_removal_jobs: { module:'رفع المخلفات', tab:'waste', field:'assigned_supervisor_id' },
   installation_works: { module:'أعمال التأسيسات', tab:'installs', field:null },
+  complaints: { module:'شكوى جديدة', tab:'complaints', field:null },
 };
+// جداول بتتغير كتير وبنعمل لها تحديث صامت (بدون صوت/تنبيه) لكل المتصلين، عشان أي حد يشوف أحدث حالة أول بأول
+const SILENT_REFRESH_TABLES = ['daily_presence','zone_assignments','location_assignments','distribution_sessions','checklist_instances','attendance_records','supplier_invoices'];
+const MGMT_ROLES = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','fm_dispatcher','contractor_manager','contractor_admin'];
 let realtimeSetup = false;
 function setupRealtime(){
   if(realtimeSetup || !sb) return;
@@ -2013,6 +2060,11 @@ function setupRealtime(){
       handleRealtimeEvent(table, payload);
     });
   });
+  SILENT_REFRESH_TABLES.forEach(table=>{
+    channel.on('postgres_changes', { event:'*', schema:'public', table }, ()=>{
+      loadRoleData().then(render);
+    });
+  });
   channel.subscribe();
 }
 async function handleRealtimeEvent(table, payload){
@@ -2021,7 +2073,7 @@ async function handleRealtimeEvent(table, payload){
     const info = NOTIFY_TABLES[table];
     const row = payload.new;
     const myRole = S.profile.role;
-    const isManagement = ['admin','opm','contractor_manager','contractor_admin'].includes(myRole);
+    const isManagement = MGMT_ROLES.includes(myRole);
     const isAssignedToMe = info.field && row[info.field] && S.session && row[info.field]===S.session.user.id;
     if(isManagement || isAssignedToMe){
       pushNotification(`مهمة جديدة: ${info.module}`, info.tab);
