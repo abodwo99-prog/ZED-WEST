@@ -2050,35 +2050,49 @@ const NOTIFY_TABLES = {
 // جداول بتتغير كتير وبنعمل لها تحديث صامت (بدون صوت/تنبيه) لكل المتصلين، عشان أي حد يشوف أحدث حالة أول بأول
 const SILENT_REFRESH_TABLES = ['daily_presence','zone_assignments','location_assignments','distribution_sessions','checklist_instances','attendance_records','supplier_invoices'];
 const MGMT_ROLES = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','fm_dispatcher','contractor_manager','contractor_admin'];
+// كل جدول عليه تغيير في السيستم — الإدارة و OPM بس بيشوفوا إشعار بأي تغيير هنا يحصل فيه أيًا كان نوعه
+const ALL_WATCHED_TABLES = {
+  ...NOTIFY_TABLES,
+  daily_presence:{module:'الحضور الفردي', tab:'distribution'}, zone_assignments:{module:'توزيع زون', tab:'distribution'},
+  location_assignments:{module:'توزيع موقع', tab:'distribution'}, distribution_sessions:{module:'بدء توزيع', tab:'distribution'},
+  checklist_instances:{module:'قوائم التحقق اليومية', tab:'checklist'}, checklist_definitions:{module:'عنصر قوائم تحقق', tab:'checklist'},
+  attendance_records:{module:'الحضور', tab:'attendance'}, zones:{module:'زون', tab:'locations'}, locations:{module:'موقع', tab:'locations'},
+  suppliers:{module:'مورد', tab:'suppliers'}, supplier_invoices:{module:'فاتورة مورد', tab:'suppliers'}, supplier_kpi:{module:'تقييم مورد', tab:'suppliers'},
+  profiles:{module:'مستخدم', tab:'users'},
+};
+const EVENT_LABEL = { INSERT:'إضافة', UPDATE:'تعديل', DELETE:'حذف' };
 let realtimeSetup = false;
 function setupRealtime(){
   if(realtimeSetup || !sb) return;
   realtimeSetup = true;
   const channel = sb.channel('zw-live-updates');
-  Object.keys(NOTIFY_TABLES).forEach(table=>{
+  const allTables = Array.from(new Set([...Object.keys(NOTIFY_TABLES), ...SILENT_REFRESH_TABLES, ...Object.keys(ALL_WATCHED_TABLES)]));
+  allTables.forEach(table=>{
     channel.on('postgres_changes', { event:'*', schema:'public', table }, (payload)=>{
       handleRealtimeEvent(table, payload);
-    });
-  });
-  SILENT_REFRESH_TABLES.forEach(table=>{
-    channel.on('postgres_changes', { event:'*', schema:'public', table }, ()=>{
-      loadRoleData().then(render);
     });
   });
   channel.subscribe();
 }
 async function handleRealtimeEvent(table, payload){
   await loadRoleData();
-  if(payload.eventType==='INSERT'){
+  const myRole = S.profile.role;
+
+  // 1) صوت + إشعار للمهام الجديدة المخصصة لدور/شخص معين (زي ما كان)
+  if(payload.eventType==='INSERT' && NOTIFY_TABLES[table]){
     const info = NOTIFY_TABLES[table];
     const row = payload.new;
-    const myRole = S.profile.role;
     const isManagement = MGMT_ROLES.includes(myRole);
     const isAssignedToMe = info.field && row[info.field] && S.session && row[info.field]===S.session.user.id;
     if(isManagement || isAssignedToMe){
       pushNotification(`مهمة جديدة: ${info.module}`, info.tab);
       playAlertSound();
     }
+  }
+  // 2) الإدارة و OPM بس: إشعار بأي تغيير (إضافة/تعديل/حذف) على أي جدول في السيستم، حتى لو مش مهمة جديدة
+  else if((myRole==='admin'||myRole==='opm') && ALL_WATCHED_TABLES[table]){
+    const info = ALL_WATCHED_TABLES[table];
+    pushNotification(`${EVENT_LABEL[payload.eventType]||'تغيير'}: ${info.module}`, info.tab);
   }
   render();
 }
