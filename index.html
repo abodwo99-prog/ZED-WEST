@@ -2062,17 +2062,35 @@ const ALL_WATCHED_TABLES = {
 };
 const EVENT_LABEL = { INSERT:'إضافة', UPDATE:'تعديل', DELETE:'حذف' };
 let realtimeSetup = false;
+let pollingStarted = false;
 function setupRealtime(){
-  if(realtimeSetup || !sb) return;
-  realtimeSetup = true;
-  const channel = sb.channel('zw-live-updates');
-  const allTables = Array.from(new Set([...Object.keys(NOTIFY_TABLES), ...SILENT_REFRESH_TABLES, ...Object.keys(ALL_WATCHED_TABLES)]));
-  allTables.forEach(table=>{
-    channel.on('postgres_changes', { event:'*', schema:'public', table }, (payload)=>{
-      handleRealtimeEvent(table, payload);
+  if(!sb) return;
+  if(!realtimeSetup){
+    realtimeSetup = true;
+    const channel = sb.channel('zw-live-updates');
+    const allTables = Array.from(new Set([...Object.keys(NOTIFY_TABLES), ...SILENT_REFRESH_TABLES, ...Object.keys(ALL_WATCHED_TABLES)]));
+    allTables.forEach(table=>{
+      channel.on('postgres_changes', { event:'*', schema:'public', table }, (payload)=>{
+        handleRealtimeEvent(table, payload);
+      });
     });
-  });
-  channel.subscribe();
+    channel.subscribe((status)=>{
+      if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED'){
+        // الاتصال قفل لأي سبب (شبكة، مهلة، إلخ) — نحاول نعيد الاتصال بعد شوية
+        try{ sb.removeChannel(channel); }catch(e){}
+        realtimeSetup = false;
+        setTimeout(setupRealtime, 4000);
+      }
+    });
+  }
+  // شبكة أمان: تحديث دوري كل 25 ثانية حتى لو الاتصال اللحظي فشل تمامًا (بدون ما يقاطع أي مودال مفتوح)
+  if(!pollingStarted){
+    pollingStarted = true;
+    setInterval(()=>{
+      if(!S.session || S.modal) return;
+      loadRoleData().then(render).catch(()=>{});
+    }, 25000);
+  }
 }
 async function handleRealtimeEvent(table, payload){
   await loadRoleData();
