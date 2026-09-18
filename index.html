@@ -52,9 +52,10 @@ input,textarea,select{font-family:inherit;}
 .content{flex:1;min-width:0;}
 @media(max-width:820px){
   .shell{flex-direction:column;padding:12px;gap:12px;}
-  .sidebar{width:100%;flex-direction:row;overflow-x:auto;position:static;-webkit-overflow-scrolling:touch;}
-  .sidebar button{width:auto;white-space:nowrap;flex-shrink:0;}
+  .sidebar{display:none;}
+  .mobile-tab-select{display:block !important;}
 }
+.mobile-tab-select{display:none;width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);font-weight:800;font-size:14px;background:var(--paper);color:var(--ink);margin-bottom:2px;}
 .service-card{cursor:pointer;transition:.15s;}
 .service-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(14,42,43,.12);}
 .tabs button{border:1px solid var(--line);background:var(--paper);color:var(--text-dim);padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;transition:.15s;}
@@ -284,6 +285,11 @@ function render(){
   if(!S.tab || !tabs.find(t=>t[0]===S.tab)) S.tab = tabs.length?tabs[0][0]:null;
   app.innerHTML = `
     ${renderTopbar()}
+    <div class="wrap" style="padding-bottom:0;">
+      <select class="mobile-tab-select" id="mobile-tab-select">
+        ${tabs.map(([id,label])=>`<option value="${id}" ${S.tab===id?'selected':''}>${esc(label)}</option>`).join('')}
+      </select>
+    </div>
     <div class="shell">
       <div class="sidebar">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](16):''}<span>${esc(label)}</span></button>`).join('')}</div>
       <div class="content" id="tab-body">${renderTabBody()}</div>
@@ -357,6 +363,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
+  const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
   const bb=document.getElementById('bell-btn'); if(bb) bb.onclick=(e)=>{
@@ -472,6 +479,7 @@ function renderHome(){
   ${(role==='admin'||role==='opm')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
   <div class="home-blocks">
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
+    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">خطط التأسيسات وقوائم التحقق على مدار الشهر</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
       ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
@@ -532,6 +540,21 @@ function drawHomeCharts(){
       vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
     }
     new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+  }
+  const elm=document.getElementById('chartMonthly'); if(elm && typeof Chart!=='undefined'){
+    const now=new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const labels=[]; const installVals=[]; const checklistVals=[];
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      labels.push(String(d));
+      installVals.push(S.installs.filter(i=>i.date===ds).length);
+      checklistVals.push(S.checklistInstances.filter(c=>c.date===ds).length);
+    }
+    new Chart(elm, { type:'bar', data:{ labels, datasets:[
+      { label:'أعمال تأسيسات', data:installVals, backgroundColor:'#DA8B1F' },
+      { label:'قوائم تحقق', data:checklistVals, backgroundColor:'#1B8A6B' },
+    ]}, options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:11,font:{size:10.5}}}}, scales:{ x:{ stacked:false, ticks:{font:{size:9}} }, y:{ beginAtZero:true, ticks:{stepSize:1} } } } });
   }
   renderOrgChart();
 }
@@ -646,7 +669,7 @@ function renderOrders(){
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
       </select>`:statusBadge(o.status)}</td>
-      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}</td>
+      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
   }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
   </tbody></table></div>`;
@@ -657,6 +680,7 @@ function bindOrders(){
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadOrders(); render(); toast('تم تحديث الحالة',true); });
   document.querySelectorAll('[data-ord-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignOrder', id:b.dataset.ordAssign}; render(); });
+  document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
 }
 async function loadOrders(){ S.orders = await dbSelect('paid_service_orders'); }
 
@@ -681,7 +705,7 @@ function renderPest(){
         <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
       </select>`:statusBadge(p.status)}</td>
-      <td>${canAssign?`<button class="ghost-btn" data-pest-assign="${p.id}">تعيين مشرف</button>`:''}</td>
+      <td>${canAssign?`<button class="ghost-btn" data-pest-assign="${p.id}">تعيين مشرف</button>`:''}${canAssign?` <button class="ghost-btn danger" data-pest-del="${p.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
   }).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
   </tbody></table></div>`;
@@ -690,6 +714,7 @@ function bindPest(){
   const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
   document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-pest-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignPest', id:b.dataset.pestAssign}; render(); });
+  document.querySelectorAll('[data-pest-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('pest_control_requests', b.dataset.pestDel); await loadPest(); render(); toast('تم الحذف',true); });
 }
 async function loadPest(){ S.pest = await dbSelect('pest_control_requests'); }
 
@@ -736,7 +761,7 @@ function renderWaste(){
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${w.status==='not_done'?'<span class="badge postponed"><span class="dot"></span>لم يتم العمل</span>':statusBadge(w.status)}</td>
       <td>${esc(w.reason||'-')}</td>
-      <td>${canAct?`<button class="ghost-btn" data-wr-done="${w.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-wr-notdone="${w.id}">لم يتم</button>`:''}</td>
+      <td>${canAct?`<button class="ghost-btn" data-wr-done="${w.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-wr-notdone="${w.id}">لم يتم</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-wr-del="${w.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
   }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال</td></tr>`}
   </tbody></table></div>`;
@@ -745,6 +770,7 @@ function bindWaste(){
   const add=document.getElementById('wr-add'); if(add) add.onclick=()=>{ S.modal={type:'addWaste'}; render(); };
   document.querySelectorAll('[data-wr-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.wrDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم تسجيل الانتهاء',true); });
   document.querySelectorAll('[data-wr-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.wrNotdone}; render(); });
+  document.querySelectorAll('[data-wr-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('waste_removal_jobs', b.dataset.wrDel); await loadWaste(); render(); toast('تم الحذف',true); });
 }
 async function loadWaste(){ S.waste = await dbSelect('waste_removal_jobs'); }
 
@@ -752,11 +778,11 @@ async function loadWaste(){ S.waste = await dbSelect('waste_removal_jobs'); }
 function renderInstalls(){
   const role=S.profile.role;
   const list = S.installs.filter(i=>i.date===S.installsDate);
-  const canUpdate = role==='admin'||role==='opm'||role==='contractor_manager';
+  const canUpdate = role==='admin'||role==='opm'||role==='contractor_manager'||role==='hk_senior_supervisor';
   return `
   <div class="toolbar">
     <div class="fgroup"><label>التاريخ</label><input type="date" id="in-date" value="${S.installsDate}"></div>
-    ${role==='admin'?`<button class="primary-btn" id="in-add">${ICON.plus()} جدولة عمل جديد</button>`:''}
+    ${(role==='admin'||role==='opm')?`<button class="primary-btn" id="in-add">${ICON.plus()} جدولة عمل جديد</button>`:''}
   </div>
   <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th><th>سبب التأجيل</th><th></th></tr></thead><tbody>
   ${list.length? list.map(i=>`<tr>
@@ -764,13 +790,14 @@ function renderInstalls(){
       <td><span class="tag-shift ${i.shift}">${SHIFT_LABEL[i.shift]}</span></td>
       <td>${statusBadge(i.status)}</td>
       <td>${esc(i.postpone_reason||'-')}</td>
-      <td>${canUpdate && i.status==='scheduled' ? `<button class="ghost-btn" data-in-done="${i.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-in-postpone="${i.id}">تأجيل</button>`:''}</td>
+      <td>${canUpdate && i.status==='scheduled' ? `<button class="ghost-btn" data-in-done="${i.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-in-postpone="${i.id}">تأجيل</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-in-del="${i.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`).join(''): `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
 function bindInstalls(){
   document.getElementById('in-date').onchange=e=>{ S.installsDate=e.target.value; render(); };
   const add=document.getElementById('in-add'); if(add) add.onclick=()=>{ S.modal={type:'addInstall'}; render(); };
+  document.querySelectorAll('[data-in-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('installation_works', b.dataset.inDel); await loadInstalls(); render(); toast('تم الحذف',true); });
   document.querySelectorAll('[data-in-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('installation_works', b.dataset.inDone, {status:'completed', updated_by:S.session.user.id, updated_at:new Date().toISOString()}); await loadInstalls(); render(); toast('تم تسجيل الانتهاء',true); });
   document.querySelectorAll('[data-in-postpone]').forEach(b=>b.onclick=()=>{ S.modal={type:'postponeInstall', id:b.dataset.inPostpone}; render(); });
 }
@@ -1556,6 +1583,12 @@ function renderModal(){
       ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join('')}
     </select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الحساب</button>`);
+  if(m.type==='confirmDeleteSupplier'){
+    const s = S.suppliers.find(x=>x.id===m.id);
+    return modalWrap('تأكيد حذف المورد', `
+    <p style="font-size:13.5px;">هتحذف مورد <b>${esc(s?s.name:'')}</b> وكل تقييماته وفواتيره نهائيًا. لا يمكن التراجع.</p>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
+  }
   if(m.type==='confirmDeleteChecklistDef'){
     const c = S.checklistDefs.find(x=>x.id===m.id);
     return modalWrap('تأكيد الحذف النهائي', `
@@ -1607,6 +1640,7 @@ function renderModal(){
         ${s.contract_photo?`<img src="${s.contract_photo}" class="photo-preview" style="max-height:120px;margin-top:6px;">`:''}
         <div style="margin-top:8px;display:flex;justify-content:space-between;"><span>البدجت: <b>${Number(s.budget||0).toLocaleString()}</b></span><span>المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></span></div>
         <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-top:4px;"><span>إجمالي الفواتير: ${st.totalInvoiced.toLocaleString()}</span><span>موفّر من الخصومات: ${st.totalSaved.toLocaleString()}</span></div>
+        <button class="ghost-btn danger" id="del-supplier-btn" style="width:100%;margin-top:8px;">${ICON.trash(12)} حذف المورد نهائيًا</button>
       </div>
 
       <h4 style="font-size:13px;margin:14px 0 6px;">تقييم الأداء الشهري (KPI)</h4>
@@ -1626,11 +1660,13 @@ function renderModal(){
           ${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}">${INVOICE_STATUS_LABEL[k]}</option>`).join('')}
         </select>
       </div>
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إضافة صورة الفاتورة (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
+      <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
       <button class="ghost-btn" id="add-invoice-btn" style="width:100%;margin-bottom:10px;">إضافة فاتورة</button>
-      ${invoices.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>
+      ${invoices.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th><th>الفاتورة</th></tr></thead><tbody>
         ${invoices.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
           <select data-inv-status="${i.id}">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select>
-        </td></tr>`).join('')}
+        </td><td>${i.photo?`<img src="${i.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" data-view-inv-photo="${i.id}">`:'-'}</td></tr>`).join('')}
       </tbody></table></div>` : `<p style="font-size:11.5px;color:var(--text-dim);">لا توجد فواتير بعد</p>`}
     `, true);
   }
@@ -1697,13 +1733,20 @@ function bindModalEvents(){
     const invoice_date=document.getElementById('m-inv-date').value;
     const status=document.getElementById('m-inv-status').value;
     if(!amount||!invoice_date){ toast('استكمل مبلغ وتاريخ الفاتورة',false); return; }
-    await dbInsert('supplier_invoices',[{ id:uid('inv'), supplier_id:S.modal.id, amount:+amount, discount:+discount, invoice_date, status, created_by:S.session.user.id, paid_at: status==='paid'? new Date().toISOString():null }]);
+    await dbInsert('supplier_invoices',[{ id:uid('inv'), supplier_id:S.modal.id, amount:+amount, discount:+discount, invoice_date, status, photo:pendingPhoto, created_by:S.session.user.id, paid_at: status==='paid'? new Date().toISOString():null }]);
+    pendingPhoto=null;
     await loadSuppliers(); render(); toast('تم إضافة الفاتورة',true);
   };
+  document.querySelectorAll('[data-view-inv-photo]').forEach(img=>img.onclick=()=>{
+    const inv = S.supplierInvoices.find(x=>x.id===img.dataset.viewInvPhoto);
+    if(inv && inv.photo) window.open(inv.photo, '_blank');
+  });
   document.querySelectorAll('[data-inv-status]').forEach(sel=>sel.onchange=async ()=>{
     await dbUpdate('supplier_invoices', sel.dataset.invStatus, { status:sel.value, paid_at: sel.value==='paid'? new Date().toISOString():null });
     await loadSuppliers(); render(); toast('تم تحديث حالة الفاتورة',true);
   });
+  const delSupBtn=document.getElementById('del-supplier-btn');
+  if(delSupBtn) delSupBtn.onclick=()=>{ S.modal={type:'confirmDeleteSupplier', id:S.modal.id}; render(); };
 }
 
 async function handleModalSave(){
@@ -1787,6 +1830,10 @@ async function handleModalSave(){
     const res = await callAdminUsersFn({ action:'create', full_name, email, password, role });
     if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
     await loadUsers(); S.modal=null; render(); toast('تم إنشاء الحساب بنجاح',true);
+  }
+  else if(m.type==='confirmDeleteSupplier'){
+    await dbDelete('suppliers', m.id);
+    await loadSuppliers(); S.modal=null; render(); toast('تم حذف المورد',true);
   }
   else if(m.type==='confirmDeleteChecklistDef'){
     await dbDelete('checklist_definitions', m.id);
@@ -1985,7 +2032,7 @@ async function loadRoleData(){
     jobs.supplierKpi = dbSelect('supplier_kpi');
     jobs.supplierInvoices = dbSelect('supplier_invoices');
   }
-  if(isMgmt || role==='contractor_manager' || role==='contractor_admin' || role==='hk_admin') jobs.attendance = dbSelect('attendance_records');
+  if(isMgmt || role==='contractor_manager' || role==='contractor_admin' || role==='hk_admin' || role==='hk_manager') jobs.attendance = dbSelect('attendance_records');
 
   const keys = Object.keys(jobs);
   const results = await Promise.all(keys.map(k=>jobs[k]));
