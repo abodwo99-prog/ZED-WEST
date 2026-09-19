@@ -1016,6 +1016,14 @@ function bindSuppliers(){
   document.getElementById('add-supplier-btn').onclick=()=>{ S.modal={type:'addSupplier'}; render(); };
   document.querySelectorAll('[data-open-supplier]').forEach(c=>c.onclick=()=>{ S.modal={type:'supplierDetail', id:c.dataset.openSupplier}; render(); });
 }
+function kpiScore(k){
+  if(k.overall_score!=null && k.overall_score!=='') return k.overall_score;
+  try{
+    const items = typeof k.items==='string'? JSON.parse(k.items) : (k.items||[]);
+    if(items && items.length) return items.reduce((s,i)=>s+(+i.actual||0),0);
+  }catch(e){}
+  return k.score!=null? k.score : 0;
+}
 async function loadSuppliers(){
   S.suppliers = await dbSelect('suppliers');
   S.supplierKpi = await dbSelect('supplier_kpi');
@@ -1027,7 +1035,8 @@ function printKpiReport(kpiId){
   if(!kpi) return;
   const items = typeof kpi.items==='string' ? JSON.parse(kpi.items) : (kpi.items||[]);
   const monthLabel = (()=>{ const [y,m]=(kpi.month||'').split('-'); const names=['January','February','March','April','May','June','July','August','September','October','November','December']; return m? `${names[+m-1]} – ${y}` : kpi.month; })();
-  const scoreBand = KPI_SCORING_CRITERIA.find(c=>kpi.overall_score>=c.min) || KPI_SCORING_CRITERIA[KPI_SCORING_CRITERIA.length-1];
+  const finalScore = kpiScore(kpi);
+  const scoreBand = KPI_SCORING_CRITERIA.find(c=>finalScore>=c.min) || KPI_SCORING_CRITERIA[KPI_SCORING_CRITERIA.length-1];
 
   const html = `
   <div style="font-family:Arial,sans-serif;color:#000;padding:30px;direction:ltr;text-align:left;">
@@ -1037,7 +1046,7 @@ function printKpiReport(kpiId){
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
       <tr style="background:#ccc;"><th style="border:1px solid #000;padding:6px;">KPI Category</th><th style="border:1px solid #000;padding:6px;">KPI Name</th><th style="border:1px solid #000;padding:6px;">Weight (%)</th><th style="border:1px solid #000;padding:6px;">Actual (%)</th><th style="border:1px solid #000;padding:6px;">Status</th></tr>
       ${items.map(i=>`<tr><td style="border:1px solid #000;padding:6px;">${esc(i.category)}</td><td style="border:1px solid #000;padding:6px;">${esc(i.name)}</td><td style="border:1px solid #000;padding:6px;text-align:center;">${i.weight}</td><td style="border:1px solid #000;padding:6px;text-align:center;">${i.actual}</td><td style="border:1px solid #000;padding:6px;">${esc(i.status||'')}</td></tr>`).join('')}
-      <tr><td style="border:1px solid #000;padding:6px;font-weight:bold;">Overall Performance Score</td><td style="border:1px solid #000;padding:6px;text-align:center;" colspan="4">${kpi.overall_score}</td></tr>
+      <tr><td style="border:1px solid #000;padding:6px;font-weight:bold;">Overall Performance Score</td><td style="border:1px solid #000;padding:6px;text-align:center;" colspan="4">${finalScore}</td></tr>
     </table>
 
     <div style="text-align:center;font-weight:bold;font-size:15px;text-decoration:underline;margin-bottom:10px;">KPI Scoring Criteria &amp; Adjustment Percentage</div>
@@ -1719,7 +1728,7 @@ function renderModal(){
       </tbody></table></div>
       <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:10px;">حفظ تقييم الشهر</button>
       ${kpis.length? kpis.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);">
-        <span>${esc(k.month)} — النتيجة: <b>${k.overall_score}%</b></span>
+        <span>${esc(k.month)} — النتيجة: <b>${kpiScore(k)}%</b></span>
         <button class="ghost-btn" data-kpi-pdf="${k.id}">${ICON.printer(12)} PDF</button>
       </div>`).join('') : `<p style="font-size:11.5px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`}
 
