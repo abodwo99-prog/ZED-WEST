@@ -119,7 +119,8 @@ tr:last-child td{border-bottom:none;}
 .print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px;}
 .print-tile{border:2px dashed #999;border-radius:10px;text-align:center;padding:12px;}
 .print-tile .pn{font-family:'Cairo';font-weight:800;font-size:12px;margin-top:6px;}
-@media print{ body *{visibility:hidden;} .print-sheet,.print-sheet *{visibility:visible;} .print-sheet{display:block;position:absolute;top:0;right:0;left:0;} }
+.print-sheet{display:none;}
+@media print{ body *{visibility:hidden;} #print-preview,#print-preview *,.print-sheet,.print-sheet *{visibility:visible;} .print-sheet{display:block;position:absolute;top:0;right:0;left:0;} #print-preview{position:absolute;top:0;right:0;left:0;} }
 .home-blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px;}
 .pill-group{display:flex;gap:6px;flex-wrap:wrap;}
 .pill{border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;background:var(--paper);cursor:pointer;}
@@ -159,11 +160,27 @@ let S = {
   scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
 };
 const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK' };
-const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين' };
+const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين', emergency:'طوارئ' };
 const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
 const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
 const SUPPLIER_CAT_LABEL = { housekeeping:'Housekeeping', pest_control:'Pest Control', waste_mgt:'Waste MGT', facade_cleaning:'Facade Cleaning', scent_diffusers:'Scent Diffusers', yd_operator:'YD Operator' };
 const INVOICE_STATUS_LABEL = { pending:'معلّقة', submitted:'تم رفعها للحسابات', paid:'تم الدفع' };
+const KPI_TEMPLATE = [
+  { category:'Management', name:'Reporting & Communication', weight:10 },
+  { category:'Management', name:'Training & Competency', weight:10 },
+  { category:'Management', name:'Financial Compliance', weight:10 },
+  { category:'Technical', name:'Cleaning Performance', weight:25 },
+  { category:'Technical', name:'HSE Compliance', weight:20 },
+  { category:'Technical', name:'Requests Response', weight:25 },
+];
+const KPI_SCORING_CRITERIA = [
+  { range:'95% and above', level:'satisfactory Performance', adj:'0% of monthly invoice', min:95 },
+  { range:'91% – 94%', level:'Meet standards - needs improvement', adj:'5% of monthly invoice', min:91 },
+  { range:'86% to 90%', level:'Acceptable Performance', adj:'10% of monthly invoice', min:86 },
+  { range:'76% to 85%', level:'Poor Performance', adj:'15% of monthly invoice', min:76 },
+  { range:'71% to 75%', level:'Extremely Poor performance - Warning Letter', adj:'20% of monthly invoice', min:71 },
+  { range:'0% to 70%', level:'Service Termination', adj:'25% of monthly invoice', min:0 },
+];
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
@@ -622,7 +639,8 @@ function renderDeliveries(){
         <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
-      </select>` : statusBadge(d.status)}</td>
+        <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
+      </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
       <td>${esc(d.notes||'-')}</td>
       <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
       <td>${(S.profile.role==='admin'||S.profile.role==='opm')?`<button class="ghost-btn" data-dv-assign="${d.id}">تعيين</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
@@ -630,10 +648,19 @@ function renderDeliveries(){
   }).join('') : `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
+async function handleStatusSelectChange(table, id, value, reload){
+  if(value==='postponed'){
+    S.modal={type:'postponeReason', table, id};
+    render();
+    return;
+  }
+  await dbUpdate(table, id, {status:value, updated_at:new Date().toISOString()});
+  await reload(); render(); toast('تم تحديث الحالة',true);
+}
 function bindDeliveries(){
   document.getElementById('dv-date').onchange=e=>{ S.deliveryDate=e.target.value; loadDeliveries().then(render); };
   document.getElementById('dv-add').onclick=()=>{ S.modal={type:'addDelivery'}; render(); };
-  document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.dvStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم تحديث الحالة',true); });
+  document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.dvStatus, sel.value, loadDeliveries));
   document.querySelectorAll('[data-dv-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignDelivery', id:b.dataset.dvAssign}; render(); });
   document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
   document.querySelectorAll('[data-view-notes]').forEach(b=>b.onclick=()=>{ S.modal={type:'viewUnitNotes', id:b.dataset.viewNotes}; render(); });
@@ -668,7 +695,8 @@ function renderOrders(){
         <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
-      </select>`:statusBadge(o.status)}</td>
+        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
+      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}`:statusBadge(o.status)}</td>
       <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
   }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
@@ -678,7 +706,7 @@ function bindOrders(){
   document.getElementById('ord-date').onchange=e=>{ S.ordersDate=e.target.value; render(); };
   document.getElementById('ord-clear').onclick=()=>{ S.ordersDate=''; render(); };
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
-  document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadOrders(); render(); toast('تم تحديث الحالة',true); });
+  document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
   document.querySelectorAll('[data-ord-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignOrder', id:b.dataset.ordAssign}; render(); });
   document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
 }
@@ -875,7 +903,7 @@ function renderAttendance(){
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
       <div class="form-row"><label>التاريخ</label><input type="date" id="at-date" value="${S.today}"></div>
       <div class="form-row"><label>مرحلة المشروع</label><input id="at-phase" value="المرحلة 1" placeholder="مثال: المرحلة 1"></div>
-      <div class="form-row"><label>الوردية</label><select id="at-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+      <div class="form-row"><label>الوردية</label><select id="at-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="emergency">طوارئ</option></select></div>
       <div class="form-row"><label>مدير موقع</label><input type="number" min="0" id="at-sm" value="0"></div>
       <div class="form-row"><label>إداري موقع</label><input type="number" min="0" id="at-sa" value="0"></div>
       <div class="form-row"><label>مشرف أول</label><input type="number" min="0" id="at-ss" value="0"></div>
@@ -992,6 +1020,42 @@ async function loadSuppliers(){
   S.suppliers = await dbSelect('suppliers');
   S.supplierKpi = await dbSelect('supplier_kpi');
   S.supplierInvoices = await dbSelect('supplier_invoices');
+}
+
+function printKpiReport(kpiId){
+  const kpi = S.supplierKpi.find(k=>k.id===kpiId);
+  if(!kpi) return;
+  const items = typeof kpi.items==='string' ? JSON.parse(kpi.items) : (kpi.items||[]);
+  const monthLabel = (()=>{ const [y,m]=(kpi.month||'').split('-'); const names=['January','February','March','April','May','June','July','August','September','October','November','December']; return m? `${names[+m-1]} – ${y}` : kpi.month; })();
+  const scoreBand = KPI_SCORING_CRITERIA.find(c=>kpi.overall_score>=c.min) || KPI_SCORING_CRITERIA[KPI_SCORING_CRITERIA.length-1];
+
+  const html = `
+  <div style="font-family:Arial,sans-serif;color:#000;padding:30px;direction:ltr;text-align:left;">
+    <div style="text-align:center;font-weight:bold;font-size:16px;text-decoration:underline;">Ora Property Management</div>
+    <div style="text-align:center;font-size:13px;margin:4px 0;">Zed West Project</div>
+    <div style="text-align:center;font-weight:bold;font-size:14px;text-decoration:underline;margin-bottom:18px;">Monthly KPI (${esc(kpi.company_name||'')}) ${monthLabel}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
+      <tr style="background:#ccc;"><th style="border:1px solid #000;padding:6px;">KPI Category</th><th style="border:1px solid #000;padding:6px;">KPI Name</th><th style="border:1px solid #000;padding:6px;">Weight (%)</th><th style="border:1px solid #000;padding:6px;">Actual (%)</th><th style="border:1px solid #000;padding:6px;">Status</th></tr>
+      ${items.map(i=>`<tr><td style="border:1px solid #000;padding:6px;">${esc(i.category)}</td><td style="border:1px solid #000;padding:6px;">${esc(i.name)}</td><td style="border:1px solid #000;padding:6px;text-align:center;">${i.weight}</td><td style="border:1px solid #000;padding:6px;text-align:center;">${i.actual}</td><td style="border:1px solid #000;padding:6px;">${esc(i.status||'')}</td></tr>`).join('')}
+      <tr><td style="border:1px solid #000;padding:6px;font-weight:bold;">Overall Performance Score</td><td style="border:1px solid #000;padding:6px;text-align:center;" colspan="4">${kpi.overall_score}</td></tr>
+    </table>
+
+    <div style="text-align:center;font-weight:bold;font-size:15px;text-decoration:underline;margin-bottom:10px;">KPI Scoring Criteria &amp; Adjustment Percentage</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:30px;">
+      <tr style="background:#ccc;"><th style="border:1px solid #000;padding:6px;">% Performance</th><th style="border:1px solid #000;padding:6px;">Level of Performance</th><th style="border:1px solid #000;padding:6px;">Percentage Adjustment</th></tr>
+      ${KPI_SCORING_CRITERIA.map(c=>`<tr style="${c===scoreBand?'background:#e4f3ec;':''}"><td style="border:1px solid #000;padding:6px;background:#eee;">${c.range}</td><td style="border:1px solid #000;padding:6px;">${c.level}</td><td style="border:1px solid #000;padding:6px;text-align:center;">${c.adj}</td></tr>`).join('')}
+    </table>
+
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:40px;">
+      <div>OPM Soft Service Manager:<br><br>....................................</div>
+      <div>Provider Rep:<br><br>....................................</div>
+    </div>
+  </div>`;
+
+  let holder = document.getElementById('kpi-print-area');
+  if(!holder){ holder = document.createElement('div'); holder.id='kpi-print-area'; holder.className='print-sheet'; document.body.appendChild(holder); }
+  holder.innerHTML = html;
+  window.print();
 }
 
 /* ============================= DAILY DISTRIBUTION WORKFLOW ============================= */
@@ -1304,8 +1368,8 @@ function renderReports(){
   }
 
   const tables = {
-    deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة']] },
-    orders: { rows:orders, cols:[['order_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة']] },
+    deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
+    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
     pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
@@ -1445,6 +1509,7 @@ function renderSupervisorToday(){
           <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
           <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
           <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+          <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
         </select>
       </div>
       <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
@@ -1463,6 +1528,7 @@ function renderSupervisorToday(){
         <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
+        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
       </select>
     </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
 
@@ -1484,8 +1550,8 @@ function renderSupervisorToday(){
   return html;
 }
 function bindSupervisorToday(){
-  document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('delivery_units', sel.dataset.myDv, {status:sel.value, updated_at:new Date().toISOString()}); await loadDeliveries(); render(); toast('تم التحديث',true); });
-  document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.myOrd, {status:sel.value, updated_at:new Date().toISOString()}); await loadOrders(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.myDv, sel.value, loadDeliveries));
+  document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.myOrd, sel.value, loadOrders));
   document.querySelectorAll('[data-my-pest]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.myPest, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-my-facade]').forEach(b=>b.onclick=()=>{ S.modal={type:'completeFacade', id:b.dataset.myFacade}; render(); });
   document.querySelectorAll('[data-my-waste-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.myWasteDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم التحديث',true); });
@@ -1536,7 +1602,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
   if(m.type==='addInstall') return modalWrap('جدولة عمل تأسيسات', `
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-in-date" value="${S.installsDate}"></div>
-    <div class="form-row"><label>الوردية</label><select id="m-in-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+    <div class="form-row"><label>الوردية</label><select id="m-in-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="emergency">طوارئ</option></select></div>
     <div class="form-row"><label>وصف العمل</label><textarea id="m-in-desc"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
   if(m.type==='postponeInstall') return modalWrap('تأجيل العمل', `
@@ -1545,14 +1611,14 @@ function renderModal(){
   if(m.type==='addChecklistDef') return modalWrap('عنصر قوائم تحقق يومية جديد', `
     <div class="form-row"><label>الاسم</label><input id="m-cl-name" placeholder="مثال: تنظيف مدخل عمارة A"></div>
     <div class="form-row"><label>الموقع</label><select id="m-cl-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
-    <div class="form-row"><label>الوردية</label><select id="m-cl-shift"><option value="both">الاثنين</option><option value="morning">صباحي</option><option value="evening">مسائي</option></select></div>
+    <div class="form-row"><label>الوردية</label><select id="m-cl-shift"><option value="both">الاثنين</option><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="emergency">طوارئ</option></select></div>
     <div class="form-row"><label>وقت السماح من (اختياري)</label><input type="time" id="m-cl-from"></div>
     <div class="form-row"><label>وقت السماح إلى (اختياري)</label><input type="time" id="m-cl-to"></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
   if(m.type==='qr') return modalWrap('رمز QR', `<div style="text-align:center;"><div id="qr-render-target"></div><div style="font-family:'Cairo';font-weight:800;">${esc(S.qrTarget.label)}</div></div>`);
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit"></div>
-    <div class="form-row"><label>نوع الخدمة</label><select id="m-pest-type">${Object.keys(PEST_TYPE_LABEL).map(k=>`<option value="${k}">${PEST_TYPE_LABEL[k]}</option>`).join('')}</select></div>
+    <div class="form-row"><label>نوع الخدمة</label><select id="m-pest-type">${Object.keys(PEST_TYPE_LABEL).filter(k=>k!=='inspection').map(k=>`<option value="${k}">${PEST_TYPE_LABEL[k]}</option>`).join('')}</select></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-pest-date" value="${S.today}"></div>
     <div class="form-row"><label>الميعاد</label><input type="time" id="m-pest-time"></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الطلب</button>`);
@@ -1601,6 +1667,9 @@ function renderModal(){
     <p style="font-size:13.5px;">هتحذف حساب <b>${esc(u?u.full_name:'')}</b> نهائيًا ومش هيقدر يدخل تاني. الإجراء ده لا يمكن التراجع عنه.</p>
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
+  if(m.type==='postponeReason') return modalWrap('سبب التأجيل', `
+    <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-postpone-generic-reason" placeholder="اكتب سبب التأجيل"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
@@ -1644,12 +1713,15 @@ function renderModal(){
       </div>
 
       <h4 style="font-size:13px;margin:14px 0 6px;">تقييم الأداء الشهري (KPI)</h4>
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="month" id="m-kpi-month" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:7px;">
-        <input type="number" id="m-kpi-score" placeholder="الدرجة" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:7px;">
-        <button class="ghost-btn" id="add-kpi-btn">إضافة</button>
-      </div>
-      ${kpis.length? kpis.map(k=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line);"><span>${k.month}</span><b>${k.score}</b></div>`).join('') : `<p style="font-size:11.5px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`}
+      <div class="form-row"><label>الشهر</label><input type="month" id="m-kpi-month" style="max-width:180px;"></div>
+      <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
+        ${KPI_TEMPLATE.map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
+      </tbody></table></div>
+      <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:10px;">حفظ تقييم الشهر</button>
+      ${kpis.length? kpis.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);">
+        <span>${esc(k.month)} — النتيجة: <b>${k.overall_score}%</b></span>
+        <button class="ghost-btn" data-kpi-pdf="${k.id}">${ICON.printer(12)} PDF</button>
+      </div>`).join('') : `<p style="font-size:11.5px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`}
 
       <h4 style="font-size:13px;margin:14px 0 6px;">الفواتير</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
@@ -1721,11 +1793,17 @@ function bindModalEvents(){
   const addKpiBtn=document.getElementById('add-kpi-btn');
   if(addKpiBtn) addKpiBtn.onclick=async ()=>{
     const month=document.getElementById('m-kpi-month').value;
-    const score=document.getElementById('m-kpi-score').value;
-    if(!month||score===''){ toast('حدد الشهر والدرجة',false); return; }
-    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, score:+score, created_by:S.session.user.id }]);
-    await loadSuppliers(); render(); toast('تم إضافة التقييم',true);
+    if(!month){ toast('حدد الشهر',false); return; }
+    const items = KPI_TEMPLATE.map((k,idx)=>{
+      const actual = +document.getElementById(`kpi-actual-${idx}`).value || 0;
+      return { category:k.category, name:k.name, weight:k.weight, actual, status: actual<k.weight? 'Needs Attention':'' };
+    });
+    const overall_score = items.reduce((s,i)=>s+i.actual, 0);
+    const supplier = S.suppliers.find(x=>x.id===S.modal.id);
+    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, items:JSON.stringify(items), overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
+    await loadSuppliers(); render(); toast('تم حفظ تقييم الشهر',true);
   };
+  document.querySelectorAll('[data-kpi-pdf]').forEach(b=>b.onclick=()=>printKpiReport(b.dataset.kpiPdf));
   const addInvBtn=document.getElementById('add-invoice-btn');
   if(addInvBtn) addInvBtn.onclick=async ()=>{
     const amount=document.getElementById('m-inv-amount').value;
@@ -1814,6 +1892,14 @@ async function handleModalSave(){
     if(!description){ toast('اكتب وصف العمل',false); return; }
     const row={ id:uid('wr'), description, date:document.getElementById('m-wr-date').value, assigned_supervisor_id:document.getElementById('m-wr-sup').value, status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('waste_removal_jobs',[row])){ await loadWaste(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='postponeReason'){
+    const reason=document.getElementById('m-postpone-generic-reason').value.trim();
+    if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
+    await dbUpdate(m.table, m.id, {status:'postponed', postpone_reason:reason, updated_at:new Date().toISOString()});
+    const reloadMap = { delivery_units: loadDeliveries, paid_service_orders: loadOrders };
+    if(reloadMap[m.table]) await reloadMap[m.table]();
+    S.modal=null; render(); toast('تم تسجيل التأجيل',true);
   }
   else if(m.type==='markWaste'){
     const reason=document.getElementById('m-wr-reason').value.trim();
