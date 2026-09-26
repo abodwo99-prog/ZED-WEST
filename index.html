@@ -150,7 +150,7 @@ let S = {
   checklistDefs:[], checklistInstances:[],
   attendance:[], attendanceDate: todayStr(),
   availability:[],
-  pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[],
+  pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[],
   zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
   complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all', clShowInactive:false,
   reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
@@ -680,13 +680,19 @@ function renderOrders(){
     <button class="ghost-btn" id="ord-clear">مسح الفلتر</button>
     ${canCreate?`<button class="primary-btn" id="ord-add">${ICON.plus()} أوردر جديد</button>`:''}
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(o=>{
     const sup = S.users.find(u=>u.id===o.assigned_supervisor_id);
     const canChangeStatus = role==='admin'||role==='opm'||o.assigned_supervisor_id===S.session.user.id;
+    const canManage = role==='admin'||role==='opm';
     return `<tr>
       <td>${esc(o.unit_code||'-')}</td>
-      <td>${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</td>
+      <td>${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</td>
+      <td>${o.price!=null? (+o.price).toLocaleString('en-US')+' ج.م' : '-'}</td>
+      <td>${canManage? `<select data-ord-payment="${o.id}">
+        <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
+        <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
+      </select>${o.payment_photo?`<div><img src="${o.payment_photo}" data-view-payment-photo="${o.id}" style="width:24px;height:24px;border-radius:4px;object-fit:cover;cursor:pointer;margin-top:3px;"></div>`:''}` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>
       <td>${o.scheduled_date}</td>
       <td>${esc(o.scheduled_time||'-')}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
@@ -697,9 +703,9 @@ function renderOrders(){
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
       </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}`:statusBadge(o.status)}</td>
-      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
+      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}${canManage?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
+  }).join(''): `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
   </tbody></table></div>`;
 }
 function bindOrders(){
@@ -709,8 +715,51 @@ function bindOrders(){
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
   document.querySelectorAll('[data-ord-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignOrder', id:b.dataset.ordAssign}; render(); });
   document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
+  document.querySelectorAll('[data-ord-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordPayment, {payment_status:sel.value}); await loadOrders(); render(); toast('تم تحديث حالة الدفع',true); });
+  document.querySelectorAll('[data-view-payment-photo]').forEach(img=>img.onclick=()=>{ window.open(img.src, '_blank'); });
 }
 async function loadOrders(){ S.orders = await dbSelect('paid_service_orders'); }
+async function loadUnits(){ S.units = await dbSelect('units_master'); }
+const ORDER_TYPE_LABEL = { soft_cleaning:'Soft Cleaning', deep_cleaning:'Deep Cleaning', facade_cleaning:'Early Façade Cleaning' };
+const PAYMENT_STATUS_LABEL = { paid:'مدفوع', unpaid:'غير مدفوع' };
+const FACADE_FLAT_PRICE = 1000;
+const PRICE_BANDS = [
+  { from:54,  to:100, deep_cleaning:880,  soft_cleaning:660 },
+  { from:101, to:150, deep_cleaning:1200, soft_cleaning:900 },
+  { from:151, to:180, deep_cleaning:1440, soft_cleaning:1080 },
+  { from:181, to:200, deep_cleaning:1600, soft_cleaning:1200 },
+  { from:201, to:230, deep_cleaning:1840, soft_cleaning:1380 },
+  { from:231, to:250, deep_cleaning:2000, soft_cleaning:1500 },
+  { from:251, to:269, deep_cleaning:2152, soft_cleaning:1614 },
+];
+const PEST_PRICE_BANDS = [
+  { from:54,  to:100, full_service:1000, flying_spray:500,  crawling_spray:500,  rodent_control:500,  specialized_spray:null },
+  { from:101, to:150, full_service:1500, flying_spray:750,  crawling_spray:750,  rodent_control:750,  specialized_spray:null },
+  { from:151, to:180, full_service:1800, flying_spray:900,  crawling_spray:900,  rodent_control:900,  specialized_spray:null },
+  { from:181, to:200, full_service:2000, flying_spray:1000, crawling_spray:1000, rodent_control:1000, specialized_spray:null },
+  { from:201, to:230, full_service:2300, flying_spray:1150, crawling_spray:1150, rodent_control:1150, specialized_spray:null },
+  { from:231, to:250, full_service:2500, flying_spray:1250, crawling_spray:1250, rodent_control:1250, specialized_spray:null },
+  { from:251, to:269, full_service:2690, flying_spray:1345, crawling_spray:1345, rodent_control:1345, specialized_spray:null },
+];
+function getUnitInfo(unit_code){ return S.units.find(x=>x.unit_code===(unit_code||'').trim()) || null; }
+function findBand(bands, bua){ return bands.find(b=> bua>=b.from && bua<=b.to) || null; }
+function calcOrderPrice(order_type, unit_code){
+  if(order_type==='facade_cleaning') return FACADE_FLAT_PRICE;
+  const u = getUnitInfo(unit_code); if(!u) return null;
+  const band = findBand(PRICE_BANDS, +u.bua);
+  return band ? band[order_type] : null;
+}
+function calcPestPrice(service_type, unit_code){
+  if(service_type==='specialized_spray') return null; // After Inspection — priced manually
+  const u = getUnitInfo(unit_code); if(!u) return null;
+  const band = findBand(PEST_PRICE_BANDS, +u.bua);
+  return band ? band[service_type] : null;
+}
+function priceDisplayHtml(price, isSpecialized){
+  if(isSpecialized) return `<span style="color:var(--text-dim);font-weight:700;">يُسعّر بعد المعاينة</span>`;
+  if(price==null) return `<span style="color:var(--text-dim);">اكتب كود وحدة موجود في units_master عشان يتحسب السعر</span>`;
+  return `<span style="color:var(--mint);font-weight:700;">السعر: ${price.toLocaleString('en-US')} ج.م</span>`;
+}
 const MAX_ORDERS_PER_DAY = 2;
 function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && o.status!=='postponed').length; }
 function findNextAvailableOrderDate(fromDate){
@@ -744,12 +793,19 @@ function renderPest(){
   const list = S.pest.slice().sort((a,b)=> a.scheduled_date < b.scheduled_date ? 1 : -1);
   return `
   <div class="toolbar">${canCreate?`<button class="primary-btn" id="pest-add">${ICON.plus()} طلب جديد</button>`:''}</div>
-  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(p=>{
     const sup=S.users.find(u=>u.id===p.assigned_supervisor_id);
     const canChangeStatus = role==='admin'||role==='opm'||p.assigned_supervisor_id===S.session.user.id;
+    const canManage = role==='admin'||role==='opm';
     return `<tr>
-      <td>${esc(p.unit_code)}</td><td>${PEST_TYPE_LABEL[p.service_type]||p.service_type}</td><td>${p.scheduled_date}</td><td>${esc(p.scheduled_time||'-')}</td>
+      <td>${esc(p.unit_code)}</td><td>${PEST_TYPE_LABEL[p.service_type]||p.service_type}</td>
+      <td>${p.price!=null? (+p.price).toLocaleString('en-US')+' ج.م' : (p.service_type==='specialized_spray'?'بعد المعاينة':'-')}</td>
+      <td>${canManage? `<select data-pest-payment="${p.id}">
+        <option value="unpaid" ${p.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
+        <option value="paid" ${p.payment_status==='paid'?'selected':''}>مدفوع</option>
+      </select>${p.payment_photo?`<div><img src="${p.payment_photo}" data-view-pest-payment-photo="${p.id}" style="width:24px;height:24px;border-radius:4px;object-fit:cover;cursor:pointer;margin-top:3px;"></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
+      <td>${p.scheduled_date}</td><td>${esc(p.scheduled_time||'-')}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${canChangeStatus? `<select data-pest-status="${p.id}">
         <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
@@ -758,12 +814,14 @@ function renderPest(){
       </select>`:statusBadge(p.status)}</td>
       <td>${canAssign?`<button class="ghost-btn" data-pest-assign="${p.id}">تعيين مشرف</button>`:''}${canAssign?` <button class="ghost-btn danger" data-pest-del="${p.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
+  }).join(''): `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
   </tbody></table></div>`;
 }
 function bindPest(){
   const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
   document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-pest-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestPayment, {payment_status:sel.value}); await loadPest(); render(); toast('تم تحديث حالة الدفع',true); });
+  document.querySelectorAll('[data-view-pest-payment-photo]').forEach(img=>img.onclick=()=>{ window.open(img.src, '_blank'); });
   document.querySelectorAll('[data-pest-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignPest', id:b.dataset.pestAssign}; render(); });
   document.querySelectorAll('[data-pest-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('pest_control_requests', b.dataset.pestDel); await loadPest(); render(); toast('تم الحذف',true); });
 }
@@ -1409,8 +1467,8 @@ function renderReports(){
 
   const tables = {
     deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
-    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
-    pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['scheduled_date','التاريخ'],['status','الحالة']] },
+    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
+    pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     installs: { rows:installs, cols:[['description','الوصف'],['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
@@ -1428,8 +1486,10 @@ function renderReports(){
     let v=r[c[0]];
     if(c[0]==='status') v = STATUS_LABEL[v]||v;
     if(c[0]==='shift') v = SHIFT_LABEL[v]||v;
-    if(c[0]==='order_type') v = v==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning';
+    if(c[0]==='order_type') v = ORDER_TYPE_LABEL[v]||v;
     if(c[0]==='service_type') v = PEST_TYPE_LABEL[v]||v;
+    if(c[0]==='payment_status') v = PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
+    if(c[0]==='price' && v!=null) v = (+v).toLocaleString('en-US')+' ج.م';
     return `<td>${esc(v!=null?String(v):'-')}</td>`;
   }).join('')}</tr>`).join('') : `<tr><td colspan="${t.cols.length}" style="text-align:center;padding:20px;color:var(--text-dim);">لا توجد سجلات في هذه الفترة</td></tr>`}
   </tbody></table></div>`;
@@ -1460,8 +1520,8 @@ function exportReportExcel(){
   const statusFmt = v => STATUS_LABEL[v]||v;
   const shiftFmt = v => SHIFT_LABEL[v]||v;
   addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة',statusFmt],['notes','ملاحظات']]);
-  addSheet(data.orders, 'الخدمة المدفوعة', [['order_type','النوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد'],['status','الحالة',statusFmt]]);
-  addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
+  addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد'],['status','الحالة',statusFmt]]);
+  addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   addSheet(data.installs, 'أعمال التأسيسات', [['description','الوصف'],['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
@@ -1563,7 +1623,7 @@ function renderSupervisorToday(){
 
     <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${o.order_type==='deep_cleaning'?'Deep Cleaning':'Soft Cleaning'}</b> — ${esc(o.scheduled_time||'')}
+      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${esc(o.scheduled_time||'')}
         ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
       </div>
       <select data-my-ord="${o.id}">
@@ -1633,12 +1693,17 @@ function renderModal(){
     <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
   if(m.type==='addOrder') return modalWrap('أوردر خدمة مدفوعة جديد', `
-    <div class="form-row"><label>رقم الوحدة</label><input id="m-ord-unit"></div>
-    <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option></select></div>
+    <div class="form-row"><label>رقم الوحدة</label><input id="m-ord-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
+    <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
+    <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="facade_cleaning">Early Façade Cleaning</option></select></div>
+    <div id="ord-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
     <div id="ord-availability-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
     <div class="form-row"><label>بيانات العميل (اختياري)</label><input id="m-ord-client"></div>
+    <div class="form-row"><label>حالة الدفع</label><select id="m-ord-payment"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع</option></select></div>
+    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إثبات الدفع (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
+    <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الأوردر</button>`);
   if(m.type==='assignOrder') return modalWrap('تعيين مشرف للأوردر', `
     <div class="form-row"><label>المشرف المتاح</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
@@ -1661,10 +1726,15 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
   if(m.type==='qr') return modalWrap('رمز QR', `<div style="text-align:center;"><div id="qr-render-target"></div><div style="font-family:'Cairo';font-weight:800;">${esc(S.qrTarget.label)}</div></div>`);
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
-    <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit"></div>
+    <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
+    <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
     <div class="form-row"><label>نوع الخدمة</label><select id="m-pest-type">${Object.keys(PEST_TYPE_LABEL).filter(k=>k!=='inspection').map(k=>`<option value="${k}">${PEST_TYPE_LABEL[k]}</option>`).join('')}</select></div>
+    <div id="pest-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-pest-date" value="${S.today}"></div>
     <div class="form-row"><label>الميعاد</label><input type="time" id="m-pest-time"></div>
+    <div class="form-row"><label>حالة الدفع</label><select id="m-pest-payment"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع</option></select></div>
+    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إثبات الدفع (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
+    <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الطلب</button>`);
   if(m.type==='assignPest') return modalWrap('تعيين مشرف', `
     <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
@@ -1836,6 +1906,16 @@ function bindModalEvents(){
   const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
   const ordDateInput=document.getElementById('m-ord-date');
   if(ordDateInput){ updateOrderAvailabilityMsg(ordDateInput.value); ordDateInput.onchange=()=>updateOrderAvailabilityMsg(ordDateInput.value); }
+  const ordUnitInput=document.getElementById('m-ord-unit'), ordTypeSel=document.getElementById('m-ord-type');
+  if(ordUnitInput && ordTypeSel){
+    const updateOrdPrice=()=>{ const p=calcOrderPrice(ordTypeSel.value, ordUnitInput.value); document.getElementById('ord-price-msg').innerHTML = priceDisplayHtml(p, false); };
+    ordUnitInput.oninput=updateOrdPrice; ordTypeSel.onchange=updateOrdPrice; updateOrdPrice();
+  }
+  const pestUnitInput=document.getElementById('m-pest-unit'), pestTypeSel=document.getElementById('m-pest-type');
+  if(pestUnitInput && pestTypeSel){
+    const updatePestPrice=()=>{ const isSpec = pestTypeSel.value==='specialized_spray'; const p=calcPestPrice(pestTypeSel.value, pestUnitInput.value); document.getElementById('pest-price-msg').innerHTML = priceDisplayHtml(p, isSpec); };
+    pestUnitInput.oninput=updatePestPrice; pestTypeSel.onchange=updatePestPrice; updatePestPrice();
+  }
   const addKpiBtn=document.getElementById('add-kpi-btn');
   if(addKpiBtn) addKpiBtn.onclick=async ()=>{
     const month=document.getElementById('m-kpi-month').value;
@@ -1892,8 +1972,10 @@ async function handleModalSave(){
       toast(`اليوم ده مكتمل${next?' — أقرب موعد متاح: '+next:''}`, false);
       return;
     }
-    const row={ id:uid('ord'), unit_code:document.getElementById('m-ord-unit').value.trim(), order_type:document.getElementById('m-ord-type').value, scheduled_date, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', created_by:S.session.user.id };
-    if(await dbInsert('paid_service_orders',[row])){ await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
+    const ord_unit_code = document.getElementById('m-ord-unit').value.trim();
+    const ord_type = document.getElementById('m-ord-type').value;
+    const row={ id:uid('ord'), unit_code:ord_unit_code, order_type:ord_type, scheduled_date, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', price:calcOrderPrice(ord_type, ord_unit_code), payment_status:document.getElementById('m-ord-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
+    if(await dbInsert('paid_service_orders',[row])){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
   }
   else if(m.type==='assignOrder'){
     const sup=document.getElementById('m-assign-sup').value;
@@ -1923,8 +2005,9 @@ async function handleModalSave(){
   else if(m.type==='addPest'){
     const unit_code=document.getElementById('m-pest-unit').value.trim();
     if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
-    const row={ id:uid('pest'), unit_code, service_type:document.getElementById('m-pest-type').value, scheduled_date:document.getElementById('m-pest-date').value, scheduled_time:document.getElementById('m-pest-time').value, status:'scheduled', created_by:S.session.user.id };
-    if(await dbInsert('pest_control_requests',[row])){ await loadPest(); S.modal=null; render(); toast('تم إنشاء الطلب',true); }
+    const pest_service_type = document.getElementById('m-pest-type').value;
+    const row={ id:uid('pest'), unit_code, service_type:pest_service_type, scheduled_date:document.getElementById('m-pest-date').value, scheduled_time:document.getElementById('m-pest-time').value, status:'scheduled', price:calcPestPrice(pest_service_type, unit_code), payment_status:document.getElementById('m-pest-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
+    if(await dbInsert('pest_control_requests',[row])){ pendingPhoto=null; await loadPest(); S.modal=null; render(); toast('تم إنشاء الطلب',true); }
   }
   else if(m.type==='assignPest'){
     const sup=document.getElementById('m-assign-sup').value;
@@ -2154,6 +2237,7 @@ async function loadRoleData(){
   if(isMgmt || role==='fm_dispatcher'){
     jobs.orders = dbSelect('paid_service_orders');
     jobs.pest = dbSelect('pest_control_requests');
+    jobs.units = dbSelect('units_master');
   }
   if(wantsOpsData){
     jobs.orders = dbSelect('paid_service_orders');
@@ -2162,6 +2246,7 @@ async function loadRoleData(){
     jobs.waste = dbSelect('waste_removal_jobs');
     jobs.deliveries = dbSelect('delivery_units');
     jobs.unitNotes = dbSelect('unit_notes');
+    jobs.units = dbSelect('units_master');
   }
   if(isMgmt || role==='contractor_manager') jobs.installs = dbSelect('installation_works');
   if(wantsChecklist) jobs.checklistDefs = dbSelect('checklist_definitions');
@@ -2188,6 +2273,7 @@ async function loadRoleData(){
   if(data.auditVisits) S.auditVisits = data.auditVisits;
   if(data.orders) S.orders = data.orders;
   if(data.pest) S.pest = data.pest;
+  if(data.units) S.units = data.units;
   if(data.facade) S.facade = data.facade;
   if(data.waste) S.waste = data.waste;
   if(data.deliveries) S.deliveries = data.deliveries;
