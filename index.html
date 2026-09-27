@@ -1957,7 +1957,7 @@ function bindModalEvents(){
     });
     const overall_score = items.reduce((s,i)=>s+i.actual, 0);
     const supplier = S.suppliers.find(x=>x.id===S.modal.id);
-    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, items:JSON.stringify(items), overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
+    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, items:JSON.stringify(items), overall_score, score:overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
     await loadSuppliers(); render(); toast('تم حفظ تقييم الشهر',true);
   };
   document.querySelectorAll('[data-kpi-pdf]').forEach(b=>b.onclick=()=>printKpiReport(b.dataset.kpiPdf));
