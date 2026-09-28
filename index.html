@@ -142,6 +142,11 @@ tbody tr:hover td{background:#FAF9F4;}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--mint) !important;box-shadow:0 0 0 3px rgba(27,138,107,.15);}
 .modal{border-radius:16px;}
 .tbl-wrap,.card,.stat,.toolbar,.sidebar{border-color:#E6E2D6;}
+
+/* ===== Ora background (inside the app only, after login) ===== */
+body.in-app{background:#1b1b1b;}
+body.in-app::before{content:'';position:fixed;inset:0;z-index:-1;background:#1b1b1b url('ora-bg.jpg') center center/cover no-repeat;}
+body.in-app .section-title h2,body.in-app .empty-state,body.in-app .content>p,body.in-app .wrap>p{color:#fff;}
 </style>
 </head>
 <body>
@@ -311,6 +316,7 @@ function render(){
       <h2>التطبيق يحتاج إعداد</h2><p>ضع مفاتيح Supabase في أعلى الكود.</p></div>`;
     return;
   }
+  document.body.classList.toggle('in-app', !!(S.session && S.profile));
   if(!S.session){ app.innerHTML = renderAuthScreen(); bindAuthEvents(); return; }
   if(!S.profile){ app.innerHTML = `<div style="padding:60px;text-align:center;">جارِ التحميل...</div>`; return; }
   const tabs = tabsForRole(S.profile.role);
