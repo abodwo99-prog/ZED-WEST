@@ -94,6 +94,7 @@ tr:last-child td{border-bottom:none;}
 .modal-bg{position:fixed;inset:0;background:rgba(14,42,43,.55);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
 .modal{background:var(--paper);border-radius:18px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
 .modal.wide{max-width:640px;}
+.modal.full{max-width:1180px;max-height:96vh;}
 .modal-head{padding:18px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;}
 .modal-head h3{margin:0;font-size:16px;}
 .modal-head .close{border:none;background:var(--sand);width:30px;height:30px;border-radius:50%;color:var(--text-dim);flex-shrink:0;font-size:14px;}
@@ -142,6 +143,11 @@ tbody tr:hover td{background:#FAF9F4;}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--mint) !important;box-shadow:0 0 0 3px rgba(27,138,107,.15);}
 .modal{border-radius:16px;}
 .tbl-wrap,.card,.stat,.toolbar,.sidebar{border-color:#E6E2D6;}
+
+/* ===== Ora background (inside the app only, after login) ===== */
+body.in-app{background:#1b1b1b;}
+body.in-app::before{content:'';position:fixed;inset:0;z-index:-1;background:#1b1b1b url('ora-bg.jpg') center center/cover no-repeat;}
+body.in-app .section-title h2,body.in-app .empty-state,body.in-app .content>p,body.in-app .wrap>p{color:#fff;}
 </style>
 </head>
 <body>
@@ -165,7 +171,7 @@ let S = {
   checklistDefs:[], checklistInstances:[],
   attendance:[], attendanceDate: todayStr(),
   availability:[],
-  pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[],
+  pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[], supplierDetailTab:'overview',
   zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
   complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all', clShowInactive:false,
   reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
@@ -311,6 +317,7 @@ function render(){
       <h2>التطبيق يحتاج إعداد</h2><p>ضع مفاتيح Supabase في أعلى الكود.</p></div>`;
     return;
   }
+  document.body.classList.toggle('in-app', !!(S.session && S.profile));
   if(!S.session){ app.innerHTML = renderAuthScreen(); bindAuthEvents(); return; }
   if(!S.profile){ app.innerHTML = `<div style="padding:60px;text-align:center;">جارِ التحميل...</div>`; return; }
   const tabs = tabsForRole(S.profile.role);
@@ -1065,6 +1072,7 @@ function bindComplaints(){
 async function loadComplaints(){ S.complaints = await dbSelect('complaints'); }
 
 /* ============================= SUPPLIERS ============================= */
+const PHASE_OPTIONS = ['Phase 1','Phase 2','عام'];
 function supplierStats(supId){
   const invoices = S.supplierInvoices.filter(i=>i.supplier_id===supId);
   const totalInvoiced = invoices.reduce((s,i)=>s+Number(i.amount||0),0);
@@ -1072,6 +1080,20 @@ function supplierStats(supId){
   const totalPaid = paidInvoices.reduce((s,i)=>s+(Number(i.amount||0)-Number(i.discount||0)),0);
   const totalSaved = paidInvoices.reduce((s,i)=>s+Number(i.discount||0),0);
   return { totalInvoiced, totalPaid, totalSaved, count:invoices.length };
+}
+function supplierMonthlyTotals(supId){
+  const invoices = S.supplierInvoices.filter(i=>i.supplier_id===supId);
+  const byMonth = {};
+  invoices.forEach(i=>{
+    const month = (i.invoice_date||'').slice(0,7);
+    if(!month) return;
+    if(!byMonth[month]) byMonth[month] = { invoiced:0, paid:0, discount:0, phases:new Set() };
+    byMonth[month].invoiced += Number(i.amount||0);
+    byMonth[month].discount += Number(i.discount||0);
+    if(i.status==='paid') byMonth[month].paid += Number(i.amount||0)-Number(i.discount||0);
+    byMonth[month].phases.add(i.phase||'عام');
+  });
+  return Object.keys(byMonth).sort((a,b)=>b.localeCompare(a)).map(month=>({ month, ...byMonth[month], phases:Array.from(byMonth[month].phases) }));
 }
 function renderSuppliers(){
   const filter = S.supplierFilter;
@@ -1115,7 +1137,7 @@ function renderSuppliers(){
 function bindSuppliers(){
   document.querySelectorAll('[data-sup-filter]').forEach(b=>b.onclick=()=>{ S.supplierFilter=b.dataset.supFilter; render(); });
   document.getElementById('add-supplier-btn').onclick=()=>{ S.modal={type:'addSupplier'}; render(); };
-  document.querySelectorAll('[data-open-supplier]').forEach(c=>c.onclick=()=>{ S.modal={type:'supplierDetail', id:c.dataset.openSupplier}; render(); });
+  document.querySelectorAll('[data-open-supplier]').forEach(c=>c.onclick=()=>{ S.supplierDetailTab='overview'; S.modal={type:'supplierDetail', id:c.dataset.openSupplier}; render(); });
 }
 function kpiScore(k){
   if(k.overall_score!=null && k.overall_score!=='') return k.overall_score;
@@ -1143,7 +1165,7 @@ function printKpiReport(kpiId){
   const html = `
   <div style="font-family:Arial,sans-serif;color:#000;padding:30px;direction:ltr;text-align:left;">
     <div style="text-align:center;font-weight:bold;font-size:16px;text-decoration:underline;">Ora Property Management</div>
-    <div style="text-align:center;font-size:13px;margin:4px 0;">Zed West Project</div>
+    <div style="text-align:center;font-size:13px;margin:4px 0;">Zed West Project${kpi.phase?' — '+esc(kpi.phase):''}</div>
     <div style="text-align:center;font-weight:bold;font-size:14px;text-decoration:underline;margin-bottom:18px;">Monthly KPI (${esc(supplierName)}) ${monthLabel}</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
       <tr style="background:#ccc;"><th style="border:1px solid #000;padding:6px;">KPI Category</th><th style="border:1px solid #000;padding:6px;">KPI Name</th><th style="border:1px solid #000;padding:6px;">Weight (%)</th><th style="border:1px solid #000;padding:6px;">Actual (%)</th><th style="border:1px solid #000;padding:6px;">Status</th></tr>
@@ -1883,57 +1905,103 @@ function renderModal(){
     const kpis = S.supplierKpi.filter(k=>k.supplier_id===m.id).sort((a,b)=> String(b.month||'').localeCompare(String(a.month||'')));
     const invoices = S.supplierInvoices.filter(i=>i.supplier_id===m.id).sort((a,b)=>b.invoice_date.localeCompare(a.invoice_date));
     const st = supplierStats(m.id);
+    const monthly = supplierMonthlyTotals(m.id);
     const remaining = Number(s.budget||0) - st.totalPaid;
-    return modalWrap('ملف المورد: '+esc(s.name), `
-      <div style="background:var(--sand);border-radius:10px;padding:10px;margin-bottom:12px;font-size:12.5px;">
-        <div>القطاع: <b>${SUPPLIER_CAT_LABEL[s.category]}</b></div>
-        <div>${esc(s.service_description||'')}</div>
-        ${s.contract_photo?`<img src="${s.contract_photo}" class="photo-preview" style="max-height:120px;margin-top:6px;">`:''}
-        <div style="margin-top:8px;display:flex;justify-content:space-between;"><span>البدجت: <b>${Number(s.budget||0).toLocaleString()}</b></span><span>المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></span></div>
-        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-top:4px;"><span>إجمالي الفواتير: ${st.totalInvoiced.toLocaleString()}</span><span>موفّر من الخصومات: ${st.totalSaved.toLocaleString()}</span></div>
-        <button class="ghost-btn danger" id="del-supplier-btn" style="width:100%;margin-top:8px;">${ICON.trash(12)} حذف المورد نهائيًا</button>
-      </div>
+    const activeTab = S.supplierDetailTab || 'overview';
+    const groupByPhase = (arr)=>{
+      const g = {}; PHASE_OPTIONS.forEach(p=>g[p]=[]);
+      arr.forEach(x=>{ const ph = x.phase||'عام'; if(!g[ph]) g[ph]=[]; g[ph].push(x); });
+      return g;
+    };
+    const kpiByPhase = groupByPhase(kpis);
+    const invByPhase = groupByPhase(invoices);
 
-      <h4 style="font-size:13px;margin:14px 0 6px;">تقييم الأداء الشهري (KPI)</h4>
-      <div class="form-row"><label>الشهر</label><input type="month" id="m-kpi-month" style="max-width:180px;"></div>
+    const tabBtn=(key,label)=>`<button data-sup-tab="${key}" class="ghost-btn${activeTab===key?' active-tab':''}" style="${activeTab===key?'background:var(--ink);color:#fff;':''}">${label}</button>`;
+
+    const overviewHtml = `
+      <div style="background:var(--sand);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+        <div>القطاع: <b>${SUPPLIER_CAT_LABEL[s.category]}</b></div>
+        <div style="margin-top:4px;">${esc(s.service_description||'')}</div>
+        ${s.contract_photo?`<img src="${s.contract_photo}" class="photo-preview" style="max-height:140px;margin-top:8px;">`:''}
+        <div style="margin-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;"><span>البدجت: <b>${Number(s.budget||0).toLocaleString()}</b></span><span>المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);margin-top:4px;flex-wrap:wrap;gap:6px;"><span>إجمالي الفواتير: ${st.totalInvoiced.toLocaleString()}</span><span>موفّر من الخصومات: ${st.totalSaved.toLocaleString()}</span></div>
+        <button class="ghost-btn danger" id="del-supplier-btn" style="width:100%;margin-top:10px;">${ICON.trash(12)} حذف المورد نهائيًا</button>
+      </div>
+      <h4 style="font-size:14px;margin:16px 0 8px;">الحساب المجمّع شهريًا (كل الفيزات مع بعض)</h4>
+      ${monthly.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>الشهر</th><th>إجمالي الفواتير</th><th>المدفوع فعليًا</th><th>الخصومات</th><th>الفيزات</th></tr></thead><tbody>
+        ${monthly.map(mo=>`<tr><td>${mo.month}</td><td>${mo.invoiced.toLocaleString()}</td><td>${mo.paid.toLocaleString()}</td><td>${mo.discount.toLocaleString()}</td><td style="font-size:11.5px;color:var(--text-dim);">${mo.phases.join(' / ')}</td></tr>`).join('')}
+      </tbody></table></div>` : `<p style="font-size:12px;color:var(--text-dim);">لا توجد فواتير بعد</p>`}
+    `;
+
+    const kpiFormHtml = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <div class="form-row" style="flex:1;min-width:140px;"><label>الشهر</label><input type="month" id="m-kpi-month"></div>
+        <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
+      </div>
       <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
         ${KPI_TEMPLATE.map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
       </tbody></table></div>
-      <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:10px;">حفظ تقييم الشهر</button>
-      ${kpis.length? kpis.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);gap:6px;flex-wrap:wrap;">
+      <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:14px;">حفظ تقييم الشهر</button>
+    `;
+    const kpiListHtml = PHASE_OPTIONS.map(ph=>{
+      const list = kpiByPhase[ph]||[];
+      if(!list.length) return '';
+      return `<h4 style="font-size:13px;margin:14px 0 6px;color:var(--mint);">${ph}</h4>
+      ${list.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 0;border-bottom:1px dashed var(--line);gap:6px;flex-wrap:wrap;">
         <span>${esc(k.month)} — النتيجة: <b>${kpiScore(k)}%</b></span>
         <div style="display:flex;gap:4px;">
           <button class="ghost-btn" data-kpi-edit="${k.id}">تعديل</button>
           <button class="ghost-btn" data-kpi-pdf="${k.id}">${ICON.printer(12)} PDF</button>
           <button class="ghost-btn danger" data-kpi-del="${k.id}">${ICON.trash(12)}</button>
         </div>
-      </div>`).join('') : `<p style="font-size:11.5px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`}
+      </div>`).join('')}`;
+    }).join('') || `<p style="font-size:12px;color:var(--text-dim);">لا يوجد تقييم بعد</p>`;
 
-      <h4 style="font-size:13px;margin:14px 0 6px;">الفواتير</h4>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
-        <input type="number" id="m-inv-amount" placeholder="المبلغ" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
-        <input type="number" id="m-inv-discount" placeholder="الخصم (اختياري)" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
-        <input type="date" id="m-inv-date" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
-        <select id="m-inv-status" style="border:1px solid var(--line);border-radius:8px;padding:7px;">
+    const invFormHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
+        <input type="number" id="m-inv-amount" placeholder="المبلغ" style="border:1px solid var(--line);border-radius:8px;padding:8px;">
+        <input type="number" id="m-inv-discount" placeholder="الخصم (اختياري)" style="border:1px solid var(--line);border-radius:8px;padding:8px;">
+        <input type="date" id="m-inv-date" style="border:1px solid var(--line);border-radius:8px;padding:8px;">
+        <select id="m-inv-phase" style="border:1px solid var(--line);border-radius:8px;padding:8px;">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>
+        <select id="m-inv-status" style="border:1px solid var(--line);border-radius:8px;padding:8px;grid-column:1/-1;">
           ${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}">${INVOICE_STATUS_LABEL[k]}</option>`).join('')}
         </select>
       </div>
       <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إضافة صورة الفاتورة (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
       <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
-      <button class="ghost-btn" id="add-invoice-btn" style="width:100%;margin-bottom:10px;">إضافة فاتورة</button>
-      ${invoices.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th><th>الفاتورة</th><th></th></tr></thead><tbody>
-        ${invoices.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
+      <button class="ghost-btn" id="add-invoice-btn" style="width:100%;margin-bottom:14px;">إضافة فاتورة</button>
+    `;
+    const invListHtml = PHASE_OPTIONS.map(ph=>{
+      const list = invByPhase[ph]||[];
+      if(!list.length) return '';
+      return `<h4 style="font-size:13px;margin:14px 0 6px;color:var(--mint);">${ph}</h4>
+      <div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th><th>الفاتورة</th><th></th></tr></thead><tbody>
+        ${list.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
           <select data-inv-status="${i.id}">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select>
         </td><td>${i.photo?`<img src="${i.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" data-view-inv-photo="${i.id}">`:'-'}</td>
         <td><button class="ghost-btn" data-inv-edit="${i.id}">تعديل</button> <button class="ghost-btn danger" data-inv-del="${i.id}">${ICON.trash(12)}</button></td></tr>`).join('')}
-      </tbody></table></div>` : `<p style="font-size:11.5px;color:var(--text-dim);">لا توجد فواتير بعد</p>`}
-    `, true);
+      </tbody></table></div>`;
+    }).join('') || `<p style="font-size:12px;color:var(--text-dim);">لا توجد فواتير بعد</p>`;
+
+    return modalWrap('ملف المورد: '+esc(s.name), `
+      <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
+        ${tabBtn('overview','نظرة عامة')}
+        ${tabBtn('kpi','تقييم الأداء (KPI)')}
+        ${tabBtn('invoices','الفواتير')}
+      </div>
+      ${activeTab==='overview'? overviewHtml : ''}
+      ${activeTab==='kpi'? kpiFormHtml + kpiListHtml : ''}
+      ${activeTab==='invoices'? invFormHtml + invListHtml : ''}
+    `, 'full');
   }
   if(m.type==='editKpi'){
     const k = S.supplierKpi.find(x=>x.id===m.id);
     let items=[]; try{ items = typeof k.items==='string'? JSON.parse(k.items) : (k.items||[]); }catch(e){}
     return modalWrap('تعديل تقييم '+esc(k.month), `
-    <div class="form-row"><label>الشهر</label><input type="month" id="m-kpi-month" value="${k.month||''}" style="max-width:180px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="form-row" style="flex:1;min-width:140px;"><label>الشهر</label><input type="month" id="m-kpi-month" value="${k.month||''}"></div>
+      <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((k.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
+    </div>
     <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
       ${KPI_TEMPLATE.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
     </tbody></table></div>
@@ -1945,6 +2013,7 @@ function renderModal(){
     <div class="form-row"><label>المبلغ</label><input type="number" id="m-inv-amount" value="${i.amount||0}"></div>
     <div class="form-row"><label>الخصم (اختياري)</label><input type="number" id="m-inv-discount" value="${i.discount||0}"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-inv-date" value="${i.invoice_date||''}"></div>
+    <div class="form-row"><label>الفيز</label><select id="m-inv-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((i.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="form-row"><label>الحالة</label><select id="m-inv-status">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
@@ -1979,7 +2048,8 @@ function renderModal(){
   return '';
 }
 function modalWrap(title, body, wide){
-  return `<div class="modal-bg" data-close-modal="1"><div class="modal${wide?' wide':''}" onclick="event.stopPropagation()">
+  const sizeClass = wide==='full' ? ' full' : (wide? ' wide' : '');
+  return `<div class="modal-bg" data-close-modal="1"><div class="modal${sizeClass}" onclick="event.stopPropagation()">
     <div class="modal-head"><h3>${esc(title)}</h3><button class="close" data-close-modal="1">${ICON.x()}</button></div>
     <div class="modal-body">${body}</div>
   </div></div>`;
@@ -2012,13 +2082,14 @@ function bindModalEvents(){
   if(addKpiBtn) addKpiBtn.onclick=async ()=>{
     const month=document.getElementById('m-kpi-month').value;
     if(!month){ toast('حدد الشهر',false); return; }
+    const phase=document.getElementById('m-kpi-phase').value;
     const items = KPI_TEMPLATE.map((k,idx)=>{
       const actual = +document.getElementById(`kpi-actual-${idx}`).value || 0;
       return { category:k.category, name:k.name, weight:k.weight, actual, status: actual<k.weight? 'Needs Attention':'' };
     });
     const overall_score = items.reduce((s,i)=>s+i.actual, 0);
     const supplier = S.suppliers.find(x=>x.id===S.modal.id);
-    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, items:JSON.stringify(items), overall_score, score:overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
+    await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, phase, items:JSON.stringify(items), overall_score, score:overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
     await loadSuppliers(); render(); toast('تم حفظ تقييم الشهر',true);
   };
   document.querySelectorAll('[data-kpi-pdf]').forEach(b=>b.onclick=()=>printKpiReport(b.dataset.kpiPdf));
@@ -2030,8 +2101,9 @@ function bindModalEvents(){
     const discount=document.getElementById('m-inv-discount').value||0;
     const invoice_date=document.getElementById('m-inv-date').value;
     const status=document.getElementById('m-inv-status').value;
+    const phase=document.getElementById('m-inv-phase').value;
     if(!amount||!invoice_date){ toast('استكمل مبلغ وتاريخ الفاتورة',false); return; }
-    await dbInsert('supplier_invoices',[{ id:uid('inv'), supplier_id:S.modal.id, amount:+amount, discount:+discount, invoice_date, status, photo:pendingPhoto, created_by:S.session.user.id, paid_at: status==='paid'? new Date().toISOString():null }]);
+    await dbInsert('supplier_invoices',[{ id:uid('inv'), supplier_id:S.modal.id, amount:+amount, discount:+discount, invoice_date, phase, status, photo:pendingPhoto, created_by:S.session.user.id, paid_at: status==='paid'? new Date().toISOString():null }]);
     pendingPhoto=null;
     await loadSuppliers(); render(); toast('تم إضافة الفاتورة',true);
   };
@@ -2045,6 +2117,7 @@ function bindModalEvents(){
   });
   document.querySelectorAll('[data-inv-edit]').forEach(b=>b.onclick=()=>{ const supplierId=S.modal.id; S.modal={type:'editInvoice', id:b.dataset.invEdit, supplierId}; render(); });
   document.querySelectorAll('[data-inv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('supplier_invoices', b.dataset.invDel); await loadSuppliers(); render(); toast('تم حذف الفاتورة',true); });
+  document.querySelectorAll('[data-sup-tab]').forEach(b=>b.onclick=()=>{ S.supplierDetailTab=b.dataset.supTab; render(); });
   const delSupBtn=document.getElementById('del-supplier-btn');
   if(delSupBtn) delSupBtn.onclick=()=>{ S.modal={type:'confirmDeleteSupplier', id:S.modal.id}; render(); };
 }
@@ -2192,12 +2265,13 @@ async function handleModalSave(){
   else if(m.type==='editKpi'){
     const month=document.getElementById('m-kpi-month').value;
     if(!month){ toast('حدد الشهر',false); return; }
+    const phase=document.getElementById('m-kpi-phase').value;
     const items = KPI_TEMPLATE.map((k,idx)=>{
       const actual = +document.getElementById(`kpi-actual-${idx}`).value || 0;
       return { category:k.category, name:k.name, weight:k.weight, actual, status: actual<k.weight? 'Needs Attention':'' };
     });
     const overall_score = items.reduce((s,i)=>s+i.actual, 0);
-    if(await dbUpdate('supplier_kpi', m.id, { month, items:JSON.stringify(items), overall_score, score:overall_score })){
+    if(await dbUpdate('supplier_kpi', m.id, { month, phase, items:JSON.stringify(items), overall_score, score:overall_score })){
       await loadSuppliers(); S.modal={type:'supplierDetail', id:m.supplierId}; render(); toast('تم حفظ التعديل',true);
     }
   }
@@ -2206,8 +2280,9 @@ async function handleModalSave(){
     const discount=document.getElementById('m-inv-discount').value||0;
     const invoice_date=document.getElementById('m-inv-date').value;
     const status=document.getElementById('m-inv-status').value;
+    const phase=document.getElementById('m-inv-phase').value;
     if(!amount||!invoice_date){ toast('استكمل مبلغ وتاريخ الفاتورة',false); return; }
-    if(await dbUpdate('supplier_invoices', m.id, { amount:+amount, discount:+discount, invoice_date, status })){
+    if(await dbUpdate('supplier_invoices', m.id, { amount:+amount, discount:+discount, invoice_date, phase, status })){
       await loadSuppliers(); S.modal={type:'supplierDetail', id:m.supplierId}; render(); toast('تم حفظ التعديل',true);
     }
   }
