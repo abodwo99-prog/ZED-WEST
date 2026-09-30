@@ -145,9 +145,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--mint) !i
 .tbl-wrap,.card,.stat,.toolbar,.sidebar{border-color:#E6E2D6;}
 
 /* ===== Ora background (inside the app only, after login) ===== */
-body.in-app{background:#1b1b1b;}
-body.in-app::before{content:'';position:fixed;inset:0;z-index:-1;background:#1b1b1b url('ora-bg.jpg') center center/cover no-repeat;}
-body.in-app .section-title h2,body.in-app .empty-state,body.in-app .content>p,body.in-app .wrap>p{color:#fff;}
+/* Ora background removed per Ahmed's request — restored original background */
 </style>
 </head>
 <body>
@@ -241,7 +239,7 @@ async function dbSelect(table, filters){
   let q = sb.from(table).select('*');
   if(filters) Object.keys(filters).forEach(k=>{ q = q.eq(k, filters[k]); });
   const {data,error} = await q;
-  if(error){ console.error(table, error); return []; }
+  if(error){ console.error(table, error); toast('تعذّر تحديث بيانات "'+table+'" — '+error.message, false); return []; }
   return data||[];
 }
 async function dbInsert(table, rows){ const {error}=await sb.from(table).insert(rows); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
@@ -343,7 +341,6 @@ function render(){
       <h2>التطبيق يحتاج إعداد</h2><p>ضع مفاتيح Supabase في أعلى الكود.</p></div>`;
     return;
   }
-  document.body.classList.toggle('in-app', !!(S.session && S.profile));
   if(!S.session){ app.innerHTML = renderAuthScreen(); bindAuthEvents(); return; }
   if(!S.profile){ app.innerHTML = `<div style="padding:60px;text-align:center;">جارِ التحميل...</div>`; return; }
   const tabs = tabsForRole(S.profile.role);
@@ -1273,12 +1270,16 @@ function bindDistribution(){
   document.querySelectorAll('[data-assign-zone]').forEach(sel=>sel.onchange=async ()=>{
     const supId=sel.dataset.assignZone;
     if(!sel.value) return;
+    const existing = S.zoneAssignments.find(z=>z.senior_supervisor_id===supId);
+    if(existing) await dbDelete('zone_assignments', existing.id);
     const row={ id:uid('za'), date:S.today, zone_id:sel.value, senior_supervisor_id:supId, assigned_by:S.session.user.id };
     if(await dbInsert('zone_assignments',[row])){ await loadDistData(); render(); toast('تم تعيين الزون',true); }
   });
   document.querySelectorAll('[data-assign-location]').forEach(sel=>sel.onchange=async ()=>{
     const locId=sel.dataset.assignLocation;
     if(!sel.value) return;
+    const existing = S.locationAssignments.find(la=>la.location_id===locId);
+    if(existing) await dbDelete('location_assignments', existing.id);
     const row={ id:uid('la'), date:S.today, location_id:locId, supervisor_id:sel.value, assigned_by:S.session.user.id };
     if(await dbInsert('location_assignments',[row])){ await loadDistData(); render(); toast('تم التعيين',true); }
   });
@@ -1300,10 +1301,12 @@ function renderManagerSection(){
     <p style="font-size:12.5px;color:var(--text-dim);">التوزيع بدأ اليوم. المشرفون الأوائل الحاضرون بس هيظهروا هنا بعد ما إداري HK يحدد الحضور.</p>
     ${seniors.length? seniors.map(u=>{
       const present = isPresent(u.id);
+      const presenceRow = S.presence.find(p=>p.user_id===u.id);
+      const actualName = presenceRow? presenceRow.actual_name : '';
       const currentZone = S.zoneAssignments.find(z=>z.senior_supervisor_id===u.id);
       if(present!==true) return `<div style="padding:8px 0;border-bottom:1px solid var(--line);color:var(--text-dim);font-size:13px;">${esc(u.full_name)} — ${present===false?'غائب اليوم':'بانتظار تحديد الحضور'}</div>`;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
-        <b style="font-size:13px;">${esc(u.full_name)}</b>
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:6px;">
+        <div><b style="font-size:13px;">${esc(u.full_name)}</b>${actualName?`<div style="font-size:11.5px;color:var(--mint);">الحاضر فعليًا: ${esc(actualName)}</div>`:''}</div>
         <select data-assign-zone="${u.id}">
           <option value="">${currentZone? 'الزون: '+esc((S.zones.find(z=>z.id===currentZone.zone_id)||{}).name||'') : 'اختر زون'}</option>
           ${S.zones.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}
@@ -1341,7 +1344,7 @@ function renderPresenceSection(){
     <h3 style="margin-top:0;">توزيع المسئولين — تحديد الحضور</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div><h4 style="font-size:13px;">المشرفون الأوائل</h4>${seniors.map(u=>row(u,false,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
-      <div><h4 style="font-size:13px;">المشرفون</h4>${supervisors.map(u=>row(u,true,false)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
+      <div><h4 style="font-size:13px;">المشرفون</h4>${supervisors.map(u=>row(u,true,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
     </div>
     <button class="primary-btn" id="save-presence-btn" style="margin-top:14px;">حفظ الحضور لليوم</button>
   </div>`;
@@ -1366,9 +1369,11 @@ function renderSeniorSection(){
         const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
         const loc=S.locations.find(l=>l.id===ci.location_id);
         const isDone=ci.status==='completed';
-        return `<div class="card" style="margin:0;">
+        const markedBySup=!!ci.supervisor_marked_done;
+        return `<div class="card" style="margin:0;${markedBySup&&!isDone?'border-color:var(--mint);':''}">
           <div style="display:flex;justify-content:space-between;"><b style="font-size:13px;">${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
           <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
+          ${!isDone && markedBySup? `<div style="font-size:11px;color:var(--mint);margin-bottom:6px;">${ICON.check(11)} المشرف قال إنه خلّص — جاهزة للاعتماد</div>`:''}
           <button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl-senior="${ci.id}" ${isDone?'disabled':''}>${isDone?ICON.check(14)+' معتمدة':ICON.qr(14)+' امسح كود التحقق'}</button>
         </div>`;
       }).join('')}
@@ -1385,13 +1390,14 @@ function renderSeniorSection(){
           if(!loc) return '';
           const currentAssign = S.locationAssignments.find(la=>la.location_id===locId);
           const assignedSup = currentAssign? S.users.find(u=>u.id===currentAssign.supervisor_id) : null;
+          const assignedPresence = assignedSup? S.presence.find(p=>p.user_id===assignedSup.id) : null;
           const auditCount = S.auditVisits.filter(v=>v.location_id===locId).length;
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;">
             <span style="font-size:13px;">${esc(loc.name)}</span>
             <div style="display:flex;gap:6px;align-items:center;">
               <select data-assign-location="${locId}">
-                <option value="">${assignedSup?'معيّن: '+esc(assignedSup.full_name):'اختر مشرف'}</option>
-                ${presentSupervisors.map(u=>`<option value="${u.id}">${esc(u.full_name)}</option>`).join('')}
+                <option value="">${assignedSup?'معيّن: '+esc(assignedSup.full_name)+(assignedPresence&&assignedPresence.actual_name?' ('+esc(assignedPresence.actual_name)+')':''):'اختر مشرف'}</option>
+                ${presentSupervisors.map(u=>{ const pr=S.presence.find(p=>p.user_id===u.id); const an=pr&&pr.actual_name? ' — '+pr.actual_name : ''; return `<option value="${u.id}">${esc(u.full_name+an)}</option>`; }).join('')}
               </select>
               <button class="ghost-btn" data-scan-audit="${locId}">${ICON.qr(12)} تدقيق${auditCount?' ('+auditCount+')':''}</button>
             </div>
@@ -1667,14 +1673,16 @@ function renderSupervisorToday(){
   const myWaste = S.waste.filter(w=>w.date===S.today && w.assigned_supervisor_id===uidMe && w.status==='scheduled');
 
   const showHK = true;
+  const showDeliveries = myScope==='units';
+  const showOrders = myScope==='units';
   const showPest = myPest.length>0;
   const showFacade = myFacade.length>0;
   const showWaste = myWaste.length>0;
 
   let stats = '';
-  if(showHK) stats += `<div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
-    <div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
-    ${myScope!=='units'?`<div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>`:''}`;
+  if(showDeliveries) stats += `<div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>`;
+  if(showOrders) stats += `<div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>`;
+  if(myScope!=='units') stats += `<div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>`;
   if(showPest) stats += `<div class="stat coral"><div class="num">${myPest.filter(p=>p.status==='completed').length}/${myPest.length}</div><div class="lbl">مكافحة حشرات</div></div>`;
   if(showFacade) stats += `<div class="stat amber"><div class="num">${myFacade.filter(f=>f.status==='completed').length}/${myFacade.length}</div><div class="lbl">نظافة واجهات</div></div>`;
   if(showWaste) stats += `<div class="stat ink"><div class="num">${myWaste.filter(w=>w.status==='completed').length}/${myWaste.length}</div><div class="lbl">رفع مخلفات</div></div>`;
@@ -1707,7 +1715,7 @@ function renderSupervisorToday(){
   </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}`;
 
   if(showHK){
-    html += `
+    html += showDeliveries ? `
     <div class="section-title"><h2>وحدات التسليم</h2></div>
     ${myDeliv.length? myDeliv.map(d=>{
       const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
@@ -1726,8 +1734,9 @@ function renderSupervisorToday(){
         ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
       </div>
     </div>`;
-    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}
+    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}` : '';
 
+    html += showOrders ? `
     <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${esc(o.scheduled_time||'')}
@@ -1739,7 +1748,7 @@ function renderSupervisorToday(){
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
       </select>
-    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}
+    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}` : '';
 
     ${myScope==='units' ? '' : `
     <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
@@ -1748,10 +1757,12 @@ function renderSupervisorToday(){
         const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
         const loc=S.locations.find(l=>l.id===ci.location_id);
         const isDone=ci.status==='completed';
+        const markedBySup=!!ci.supervisor_marked_done;
         return `<div class="card">
           <div style="display:flex;justify-content:space-between;"><b>${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
           <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
-          <div style="font-size:11.5px;color:var(--text-dim);text-align:center;padding:8px 0;border-top:1px dashed var(--line);">${isDone?ICON.check(13)+' تم اعتمادها من المشرف الأول':'بانتظار اعتماد المشرف الأول'}</div>
+          ${isDone? `<div style="font-size:11.5px;color:var(--mint);text-align:center;padding:8px 0;border-top:1px dashed var(--line);">${ICON.check(13)} تم اعتمادها من المشرف الأول</div>`
+            : `<button class="${markedBySup?'ghost-btn':'primary-btn'}" style="width:100%;justify-content:center;margin-top:4px;" data-cl-mark-done="${ci.id}" data-marked="${markedBySup?'1':'0'}">${markedBySup? ICON.check(13)+' تم الانتهاء ✓ (بانتظار اعتماد المشرف الأول)' : 'تم الانتهاء من التنفيذ'}</button>`}
         </div>`;
       }).join('')}
     </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر قوائم تحقق لك اليوم</p>`}`}`;
@@ -1767,6 +1778,12 @@ function bindSupervisorToday(){
   document.querySelectorAll('[data-my-waste-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.myWasteDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-my-waste-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.myWasteNotdone}; render(); });
   document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
+  document.querySelectorAll('[data-cl-mark-done]').forEach(b=>b.onclick=async ()=>{
+    const nowMarked = b.dataset.marked==='1';
+    await dbUpdate('checklist_instances', b.dataset.clMarkDone, { supervisor_marked_done: !nowMarked, supervisor_marked_done_at: !nowMarked? new Date().toISOString() : null });
+    S.checklistInstances = await dbSelect('checklist_instances'); render();
+    toast(nowMarked? 'تم الإلغاء' : 'تمام، هتظهر للمشرف الأول عشان يعتمدها', true);
+  });
 }
 
 function renderMyName(){
