@@ -788,18 +788,29 @@ const PEST_PRICE_BANDS = [
   { from:231, to:250, full_service:2500, flying_spray:1250, crawling_spray:1250, rodent_control:1250, specialized_spray:null },
   { from:251, to:269, full_service:2690, flying_spray:1345, crawling_spray:1345, rodent_control:1345, specialized_spray:null },
 ];
+const PER_METER_RATE_FALLBACK = { soft_cleaning:6, deep_cleaning:8 }; // EGP/m² — used only when a unit's BUA falls outside all fixed price bands (e.g. very small studios or large villas)
 function getUnitInfo(unit_code){ return S.units.find(x=>x.unit_code===(unit_code||'').trim()) || null; }
 function findBand(bands, bua){ return bands.find(b=> bua>=b.from && bua<=b.to) || null; }
 function calcOrderPrice(order_type, unit_code){
   if(order_type==='facade_cleaning') return FACADE_FLAT_PRICE;
   const u = getUnitInfo(unit_code); if(!u) return null;
   const band = findBand(PRICE_BANDS, +u.bua);
-  return band ? band[order_type] : null;
+  if(band) return band[order_type];
+  if(PER_METER_RATE_FALLBACK[order_type]) return Math.round(+u.bua * PER_METER_RATE_FALLBACK[order_type]);
+  return null;
+}
+function findNearestBand(bands, bua){
+  let nearest = bands[0], minDist = Infinity;
+  bands.forEach(b=>{
+    const dist = bua < b.from ? b.from - bua : (bua > b.to ? bua - b.to : 0);
+    if(dist < minDist){ minDist = dist; nearest = b; }
+  });
+  return nearest;
 }
 function calcPestPrice(service_type, unit_code){
   if(service_type==='specialized_spray') return null; // After Inspection — priced manually
   const u = getUnitInfo(unit_code); if(!u) return null;
-  const band = findBand(PEST_PRICE_BANDS, +u.bua);
+  const band = findBand(PEST_PRICE_BANDS, +u.bua) || findNearestBand(PEST_PRICE_BANDS, +u.bua);
   return band ? band[service_type] : null;
 }
 function priceDisplayHtml(price, isSpecialized){
