@@ -186,7 +186,7 @@ const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العم�
 const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
 const SUPPLIER_CAT_LABEL = { housekeeping:'Housekeeping', pest_control:'Pest Control', waste_mgt:'Waste MGT', facade_cleaning:'Facade Cleaning', scent_diffusers:'Scent Diffusers', yd_operator:'YD Operator' };
 const INVOICE_STATUS_LABEL = { pending:'معلّقة', submitted:'تم رفعها للحسابات', paid:'تم الدفع' };
-const KPI_TEMPLATE = [
+const KPI_TEMPLATE_DEFAULT = [
   { category:'Management', name:'Reporting & Communication', weight:10 },
   { category:'Management', name:'Training & Competency', weight:10 },
   { category:'Management', name:'Financial Compliance', weight:10 },
@@ -194,6 +194,32 @@ const KPI_TEMPLATE = [
   { category:'Technical', name:'HSE Compliance', weight:20 },
   { category:'Technical', name:'Requests Response', weight:25 },
 ];
+const KPI_TEMPLATES_BY_CATEGORY = {
+  waste_mgt: [
+    { category:'Waste Management', name:'الحضور (السيارة وطاقم العمل)', weight:42 },
+    { category:'Waste Management', name:'المظهر والسلوكيات لطاقم العمل', weight:16 },
+    { category:'Waste Management', name:'الاستجابة لطلبات العمل وحسن اتباع نظام التشغيل', weight:10 },
+    { category:'Waste Management', name:'جودة العمل والمعدات والسيارات المستخدمة', weight:16 },
+    { category:'Waste Management', name:'إرسال التقارير المطلوبة شهريًا', weight:16 },
+  ],
+  pest_control: [
+    { category:'Pest Control', name:'Daily Visual Inspection & Commitment of the monthly works schedule', weight:33 },
+    { category:'Pest Control', name:'Supervision objectives', weight:11 },
+    { category:'Pest Control', name:'Appearance & Attitude', weight:5 },
+    { category:'Pest Control', name:'Attendance', weight:17 },
+    { category:'Pest Control', name:'Tools, Equipment, and consumables', weight:17 },
+    { category:'Pest Control', name:'Quality of reports & Emergency response', weight:17 },
+  ],
+  facade_cleaning: [
+    { category:'Management', name:'Reporting & Communication', weight:10 },
+    { category:'Management', name:'Training & Competency', weight:10 },
+    { category:'Management', name:'Manpower and attendance', weight:10 },
+    { category:'Technical', name:'Façade Cleaning Performance', weight:25 },
+    { category:'Technical', name:'HSE Compliance', weight:20 },
+    { category:'Technical', name:'Tools and Equipment', weight:25 },
+  ],
+};
+function kpiTemplateFor(category){ return KPI_TEMPLATES_BY_CATEGORY[category] || KPI_TEMPLATE_DEFAULT; }
 const KPI_SCORING_CRITERIA = [
   { range:'95% and above', level:'satisfactory Performance', adj:'0% of monthly invoice', min:95 },
   { range:'91% – 94%', level:'Meet standards - needs improvement', adj:'5% of monthly invoice', min:91 },
@@ -1939,7 +1965,7 @@ function renderModal(){
         <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
       </div>
       <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
-        ${KPI_TEMPLATE.map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
+        ${kpiTemplateFor(s.category).map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
       </tbody></table></div>
       <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:14px;">حفظ تقييم الشهر</button>
     `;
@@ -1996,6 +2022,8 @@ function renderModal(){
   }
   if(m.type==='editKpi'){
     const k = S.supplierKpi.find(x=>x.id===m.id);
+    const kSupplier = S.suppliers.find(x=>x.id===k.supplier_id);
+    const tpl = kpiTemplateFor(kSupplier?kSupplier.category:null);
     let items=[]; try{ items = typeof k.items==='string'? JSON.parse(k.items) : (k.items||[]); }catch(e){}
     return modalWrap('تعديل تقييم '+esc(k.month), `
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -2003,7 +2031,7 @@ function renderModal(){
       <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((k.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
     </div>
     <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
-      ${KPI_TEMPLATE.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
+      ${tpl.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
     </tbody></table></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`, true);
   }
@@ -2083,12 +2111,12 @@ function bindModalEvents(){
     const month=document.getElementById('m-kpi-month').value;
     if(!month){ toast('حدد الشهر',false); return; }
     const phase=document.getElementById('m-kpi-phase').value;
-    const items = KPI_TEMPLATE.map((k,idx)=>{
+    const supplier = S.suppliers.find(x=>x.id===S.modal.id);
+    const items = kpiTemplateFor(supplier?supplier.category:null).map((k,idx)=>{
       const actual = +document.getElementById(`kpi-actual-${idx}`).value || 0;
       return { category:k.category, name:k.name, weight:k.weight, actual, status: actual<k.weight? 'Needs Attention':'' };
     });
     const overall_score = items.reduce((s,i)=>s+i.actual, 0);
-    const supplier = S.suppliers.find(x=>x.id===S.modal.id);
     await dbInsert('supplier_kpi',[{ id:uid('kpi'), supplier_id:S.modal.id, month, phase, items:JSON.stringify(items), overall_score, score:overall_score, company_name: supplier?supplier.name:'', created_by:S.session.user.id }]);
     await loadSuppliers(); render(); toast('تم حفظ تقييم الشهر',true);
   };
@@ -2266,7 +2294,8 @@ async function handleModalSave(){
     const month=document.getElementById('m-kpi-month').value;
     if(!month){ toast('حدد الشهر',false); return; }
     const phase=document.getElementById('m-kpi-phase').value;
-    const items = KPI_TEMPLATE.map((k,idx)=>{
+    const kOldSupplier = S.suppliers.find(x=>x.id===m.supplierId);
+    const items = kpiTemplateFor(kOldSupplier?kOldSupplier.category:null).map((k,idx)=>{
       const actual = +document.getElementById(`kpi-actual-${idx}`).value || 0;
       return { category:k.category, name:k.name, weight:k.weight, actual, status: actual<k.weight? 'Needs Attention':'' };
     });
