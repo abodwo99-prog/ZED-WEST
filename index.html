@@ -1736,7 +1736,7 @@ function renderSupervisorToday(){
     </div>`;
     }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}` : '';
 
-    html += showOrders ? `
+    html += `${showOrders ? `
     <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${esc(o.scheduled_time||'')}
@@ -1748,7 +1748,7 @@ function renderSupervisorToday(){
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
       </select>
-    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}` : '';
+    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}` : ''}
 
     ${myScope==='units' ? '' : `
     <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
