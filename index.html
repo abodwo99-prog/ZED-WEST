@@ -2677,6 +2677,11 @@ const EVENT_LABEL = { INSERT:'إضافة', UPDATE:'تعديل', DELETE:'حذف' 
 let realtimeSetup = false;
 let pollingStarted = false;
 function setupRealtime(){
+  // معطّل بطلب أحمد: التحديث اللحظي (realtime) + التحديث كل 25 ثانية كانا بيعملوا
+  // render() كامل للشاشة حتى لو حد بيكتب في حقل دلوقتي، فكان بيمسح اللي بيتكتب
+  // ويسيب التوزيعات / الحضور كأنها "اختفت". التنبيهات أصلاً ما كانتش شغالة لحد،
+  // فالميزة دي اتلغت تمامًا. كل حفظ بيعمل تحديث لشاشته هو بس زي ما هو من غير تغيير.
+  return;
   if(!sb) return;
   if(!realtimeSetup){
     realtimeSetup = true;
