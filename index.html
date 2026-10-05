@@ -787,7 +787,7 @@ const PEST_PRICE_BANDS = [
   { from:251, to:269, full_service:2690, flying_spray:1345, crawling_spray:1345, rodent_control:1345, specialized_spray:null },
 ];
 const PER_METER_RATE_FALLBACK = { soft_cleaning:6, deep_cleaning:8 }; // EGP/m² — used only when a unit's BUA falls outside all fixed price bands (e.g. very small studios or large villas)
-function getUnitInfo(unit_code){ return S.units.find(x=>x.unit_code===(unit_code||'').trim()) || null; }
+function getUnitInfo(unit_code){ const q=(unit_code||'').trim().toLowerCase(); if(!q) return null; return S.units.find(x=>(x.unit_code||'').trim().toLowerCase()===q) || null; }
 function findBand(bands, bua){ return bands.find(b=> bua>=b.from && bua<=b.to) || null; }
 function calcOrderPrice(order_type, unit_code){
   if(order_type==='facade_cleaning') return FACADE_FLAT_PRICE;
