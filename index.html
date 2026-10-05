@@ -788,10 +788,24 @@ const PEST_PRICE_BANDS = [
 ];
 const PER_METER_RATE_FALLBACK = { soft_cleaning:6, deep_cleaning:8 }; // EGP/m² — used only when a unit's BUA falls outside all fixed price bands (e.g. very small studios or large villas)
 function getUnitInfo(unit_code){ const q=(unit_code||'').trim().toLowerCase(); if(!q) return null; return S.units.find(x=>(x.unit_code||'').trim().toLowerCase()===q) || null; }
+const unitLiveCache = {};
+async function fetchUnitLive(unit_code){
+  const key=(unit_code||'').trim().toLowerCase();
+  if(!key) return null;
+  if(key in unitLiveCache) return unitLiveCache[key];
+  // Always check the database directly instead of only trusting the
+  // locally-cached S.units list, which can go stale if units were added
+  // in Supabase after this browser tab/session was loaded.
+  const {data,error} = await sb.from('units_master').select('*').ilike('unit_code', key).limit(1);
+  const unit = (!error && data && data[0]) ? data[0] : null;
+  unitLiveCache[key] = unit;
+  if(unit && !S.units.find(u=>u.unit_code===unit.unit_code)) S.units.push(unit);
+  return unit;
+}
 function findBand(bands, bua){ return bands.find(b=> bua>=b.from && bua<=b.to) || null; }
-function calcOrderPrice(order_type, unit_code){
+async function calcOrderPrice(order_type, unit_code){
   if(order_type==='facade_cleaning') return FACADE_FLAT_PRICE;
-  const u = getUnitInfo(unit_code); if(!u) return null;
+  const u = await fetchUnitLive(unit_code); if(!u) return null;
   const band = findBand(PRICE_BANDS, +u.bua);
   if(band) return band[order_type];
   if(PER_METER_RATE_FALLBACK[order_type]) return Math.round(+u.bua * PER_METER_RATE_FALLBACK[order_type]);
@@ -805,9 +819,9 @@ function findNearestBand(bands, bua){
   });
   return nearest;
 }
-function calcPestPrice(service_type, unit_code){
+async function calcPestPrice(service_type, unit_code){
   if(service_type==='specialized_spray') return null; // After Inspection — priced manually
-  const u = getUnitInfo(unit_code); if(!u) return null;
+  const u = await fetchUnitLive(unit_code); if(!u) return null;
   const band = findBand(PEST_PRICE_BANDS, +u.bua) || findNearestBand(PEST_PRICE_BANDS, +u.bua);
   return band ? band[service_type] : null;
 }
@@ -2176,13 +2190,28 @@ function bindModalEvents(){
   if(ordDateInput){ updateOrderAvailabilityMsg(ordDateInput.value); ordDateInput.onchange=()=>updateOrderAvailabilityMsg(ordDateInput.value); }
   const ordUnitInput=document.getElementById('m-ord-unit'), ordTypeSel=document.getElementById('m-ord-type');
   if(ordUnitInput && ordTypeSel){
-    const updateOrdPrice=()=>{ const p=calcOrderPrice(ordTypeSel.value, ordUnitInput.value); document.getElementById('ord-price-msg').innerHTML = priceDisplayHtml(p, false); };
-    ordUnitInput.oninput=updateOrdPrice; ordTypeSel.onchange=updateOrdPrice; updateOrdPrice();
+    let ordPriceTimer=null;
+    const updateOrdPrice=async ()=>{
+      const box=document.getElementById('ord-price-msg'); if(!box) return;
+      box.innerHTML = '<span style="color:var(--text-dim);">جارِ البحث عن الوحدة...</span>';
+      const p = await calcOrderPrice(ordTypeSel.value, ordUnitInput.value);
+      const box2=document.getElementById('ord-price-msg'); if(box2) box2.innerHTML = priceDisplayHtml(p, false);
+    };
+    ordUnitInput.oninput=()=>{ clearTimeout(ordPriceTimer); ordPriceTimer=setTimeout(updateOrdPrice, 300); };
+    ordTypeSel.onchange=updateOrdPrice; updateOrdPrice();
   }
   const pestUnitInput=document.getElementById('m-pest-unit'), pestTypeSel=document.getElementById('m-pest-type');
   if(pestUnitInput && pestTypeSel){
-    const updatePestPrice=()=>{ const isSpec = pestTypeSel.value==='specialized_spray'; const p=calcPestPrice(pestTypeSel.value, pestUnitInput.value); document.getElementById('pest-price-msg').innerHTML = priceDisplayHtml(p, isSpec); };
-    pestUnitInput.oninput=updatePestPrice; pestTypeSel.onchange=updatePestPrice; updatePestPrice();
+    let pestPriceTimer=null;
+    const updatePestPrice=async ()=>{
+      const isSpec = pestTypeSel.value==='specialized_spray';
+      const box=document.getElementById('pest-price-msg'); if(!box) return;
+      box.innerHTML = isSpec? priceDisplayHtml(null, true) : '<span style="color:var(--text-dim);">جارِ البحث عن الوحدة...</span>';
+      const p = isSpec? null : await calcPestPrice(pestTypeSel.value, pestUnitInput.value);
+      const box2=document.getElementById('pest-price-msg'); if(box2) box2.innerHTML = priceDisplayHtml(p, isSpec);
+    };
+    pestUnitInput.oninput=()=>{ clearTimeout(pestPriceTimer); pestPriceTimer=setTimeout(updatePestPrice, 300); };
+    pestTypeSel.onchange=updatePestPrice; updatePestPrice();
   }
   const addKpiBtn=document.getElementById('add-kpi-btn');
   if(addKpiBtn) addKpiBtn.onclick=async ()=>{
@@ -2249,7 +2278,8 @@ async function handleModalSave(){
     }
     const ord_unit_code = document.getElementById('m-ord-unit').value.trim();
     const ord_type = document.getElementById('m-ord-type').value;
-    const row={ id:uid('ord'), unit_code:ord_unit_code, order_type:ord_type, scheduled_date, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', price:calcOrderPrice(ord_type, ord_unit_code), payment_status:document.getElementById('m-ord-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
+    const ord_price = await calcOrderPrice(ord_type, ord_unit_code);
+    const row={ id:uid('ord'), unit_code:ord_unit_code, order_type:ord_type, scheduled_date, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', price:ord_price, payment_status:document.getElementById('m-ord-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
     if(await dbInsert('paid_service_orders',[row])){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
   }
   else if(m.type==='editOrder'){
@@ -2259,7 +2289,7 @@ async function handleModalSave(){
     const patch={
       unit_code: ord_unit_code,
       order_type: ord_type,
-      price: priceOverride!==''? +priceOverride : calcOrderPrice(ord_type, ord_unit_code),
+      price: priceOverride!==''? +priceOverride : await calcOrderPrice(ord_type, ord_unit_code),
       scheduled_date: document.getElementById('m-ord-date').value,
       scheduled_time: document.getElementById('m-ord-time').value,
       client_info: document.getElementById('m-ord-client').value.trim(),
@@ -2303,7 +2333,8 @@ async function handleModalSave(){
     const unit_code=document.getElementById('m-pest-unit').value.trim();
     if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
     const pest_service_type = document.getElementById('m-pest-type').value;
-    const row={ id:uid('pest'), unit_code, service_type:pest_service_type, scheduled_date:document.getElementById('m-pest-date').value, scheduled_time:document.getElementById('m-pest-time').value, status:'scheduled', price:calcPestPrice(pest_service_type, unit_code), payment_status:document.getElementById('m-pest-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
+    const pest_price = await calcPestPrice(pest_service_type, unit_code);
+    const row={ id:uid('pest'), unit_code, service_type:pest_service_type, scheduled_date:document.getElementById('m-pest-date').value, scheduled_time:document.getElementById('m-pest-time').value, status:'scheduled', price:pest_price, payment_status:document.getElementById('m-pest-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
     if(await dbInsert('pest_control_requests',[row])){ pendingPhoto=null; await loadPest(); S.modal=null; render(); toast('تم إنشاء الطلب',true); }
   }
   else if(m.type==='assignPest'){
