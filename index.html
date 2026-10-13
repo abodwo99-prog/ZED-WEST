@@ -1784,9 +1784,8 @@ function renderSupervisorToday(){
   const myPresence = (S.presence||[]).find(p=>p.user_id===uidMe);
   const myScope = myPresence? (myPresence.scope||'general_areas') : 'general_areas';
   const myChecklist = myScope==='units' ? [] : S.checklistInstances.filter(ci=> ci.date===S.today && effectiveLocs.includes(ci.location_id));
-  const myPest = S.pest.filter(p=>p.scheduled_date===S.today && p.assigned_supervisor_id===uidMe);
-  const myFacade = S.facade.filter(f=>f.date===S.today && f.status==='scheduled' && (effectiveLocs.includes(f.location_id)));
-  const myWaste = S.waste.filter(w=>w.date===S.today && w.assigned_supervisor_id===uidMe && w.status==='scheduled');
+  // مشرفو HK: مكافحة الحشرات ونظافة الواجهات ورفع المخلفات مش من شغلهم، فمخفيين من شاشتهم
+  const myPest = [], myFacade = [], myWaste = [];
 
   const showHK = true;
   const showDeliveries = myScope==='units';
@@ -1804,6 +1803,51 @@ function renderSupervisorToday(){
   if(showWaste) stats += `<div class="stat ink"><div class="num">${myWaste.filter(w=>w.status==='completed').length}/${myWaste.length}</div><div class="lbl">رفع مخلفات</div></div>`;
 
   let html = `<div class="stat-row">${stats}</div>`;
+
+  // كارت الترحيب + المطلوب اليوم بالترتيب
+  {
+    const hr = new Date().getHours();
+    const greet = hr<12 ? 'صباح الخير' : 'مساء الخير';
+    const dispName = (myPresence && myPresence.actual_name && myPresence.actual_name.trim()) || S.profile.full_name || '';
+    const assignedNow = Array.from(new Set(myGeneralLocs)).map(id=>S.locations.find(l=>l.id===id)).filter(Boolean);
+    const tasks = [];
+    const doneOf = arr => arr.filter(x=>x.status==='completed').length;
+    if(myScope==='units'){
+      if(myDeliv.length) tasks.push({ t:'تسليم وحدات', n:myDeliv.length, d:doneOf(myDeliv), sub:myDeliv.map(d=>d.unit_code).join('، ') });
+      if(myOrders.length) tasks.push({ t:'أوردرات الخدمة المدفوعة', n:myOrders.length, d:doneOf(myOrders), sub:myOrders.map(o=>(o.unit_code?o.unit_code+' ':'')+(ORDER_TYPE_LABEL[o.order_type]||'')+(o.scheduled_time?' ('+o.scheduled_time+')':'')).join('، ') });
+    } else {
+      if(assignedNow.length) tasks.push({ t:'متابعة المواقع المعيّنة عليك', n:assignedNow.length, sub:assignedNow.map(l=>l.name).join('، ') });
+      if(myChecklist.length) tasks.push({ t:'تنفيذ قوائم التحقق اليومية', n:myChecklist.length, d:doneOf(myChecklist) });
+    }
+    if(myPest.length) tasks.push({ t:'مكافحة حشرات', n:myPest.length, d:doneOf(myPest), sub:myPest.map(x=>x.unit_code+' — '+(PEST_TYPE_LABEL[x.service_type]||'')+(x.scheduled_time?' ('+x.scheduled_time+')':'')).join('، ') });
+    if(myFacade.length) tasks.push({ t:'نظافة واجهات', n:myFacade.length, d:0, sub:myFacade.map(f=>{ const l=S.locations.find(x=>x.id===f.location_id); return l?l.name:''; }).filter(Boolean).join('، ') });
+    if(myWaste.length) tasks.push({ t:'رفع مخلفات', n:myWaste.length, d:0, sub:myWaste.map(w=>w.description).join('، ') });
+    const noLocsNote = (myScope!=='units' && !assignedNow.length)
+      ? `<p style="color:var(--text-dim);font-size:12.5px;margin:10px 0 0;">لسه المشرف الأول ما حدّدلكش مواقع النهاردة.</p>` : '';
+    html += `<div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:16px;font-weight:900;">${greet} يا ${esc(dispName)} 👋</div>
+          <div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${tasks.length? 'المطلوب منك النهاردة بالترتيب:' : 'مفيش مهام متحددة ليك لحد دلوقتي.'}</div>
+        </div>
+        <button class="ghost-btn" id="refresh-my-locs">تحديث</button>
+      </div>
+      ${tasks.length? `<ol style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;">
+        ${tasks.map((k,i)=>{
+          const all = k.d!==undefined && k.d===k.n && k.n>0;
+          return `<li style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;${all?'background:var(--mint-light);':''}">
+            <span style="min-width:26px;height:26px;border-radius:50%;background:${all?'var(--mint)':'var(--ink)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;">${all?'✓':(i+1)}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:800;font-size:13.5px;">${k.t} <span style="color:var(--mint);">(${k.d!==undefined? k.d+' من '+k.n : k.n})</span></div>
+              ${k.sub? `<div style="font-size:12px;color:var(--text-dim);margin-top:3px;word-break:break-word;">${esc(k.sub)}</div>` : ''}
+            </div>
+          </li>`;
+        }).join('')}
+      </ol>` : ''}
+      ${noLocsNote}
+      ${myScope==='units' ? `<p style="color:var(--text-dim);font-size:12px;margin:10px 0 0;">حالتك اليوم "مشرف وحدات" فمش بتظهرلك قوائم تحقق المواقع.</p>` : ''}
+    </div>`;
+  }
 
   if(showPest) html += `
   <div class="section-title"><h2>مكافحة الحشرات</h2></div>
@@ -1887,6 +1931,8 @@ function renderSupervisorToday(){
   return html;
 }
 function bindSupervisorToday(){
+  const rb=document.getElementById('refresh-my-locs');
+  if(rb) rb.onclick=async ()=>{ rb.disabled=true; await refreshAssignments(); S.checklistInstances=(await dbSelect('checklist_instances')) ?? S.checklistInstances; render(); toast('تم التحديث',true); };
   document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.myDv, sel.value, loadDeliveries));
   document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.myOrd, sel.value, loadOrders));
   document.querySelectorAll('[data-my-pest]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.myPest, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
