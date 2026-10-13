@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ora Soft Services Operations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -146,6 +146,53 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--mint) !i
 
 /* ===== Ora background (inside the app only, after login) ===== */
 /* Ora background removed per Ahmed's request — restored original background */
+
+/* ===== Mobile / small screens (phones) ===== */
+html{-webkit-text-size-adjust:100%;}
+body{overflow-x:clip;-webkit-tap-highlight-color:transparent;}
+button,select,input,textarea,label{touch-action:manipulation;}
+img,canvas,svg{max-width:100%;}
+.mobile-tabs{display:none;}
+@media(max-width:820px){
+  /* the page must never be wider than the screen: let the content column shrink so tables scroll inside their own wrapper */
+  .shell{align-items:stretch;padding:10px 12px calc(16px + env(safe-area-inset-bottom));}
+  .content{width:100%;max-width:100%;}
+  .mobile-tabs{display:flex;gap:8px;overflow-x:auto;position:sticky;top:0;z-index:60;background:var(--sand);padding:10px 12px;border-bottom:1px solid var(--line);scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;}
+  .mobile-tabs::-webkit-scrollbar{display:none;}
+  .mobile-tabs button{flex-shrink:0;white-space:nowrap;scroll-snap-align:center;border:1px solid var(--line);background:var(--paper);color:var(--text-dim);padding:9px 15px;border-radius:999px;font-weight:700;font-size:13.5px;font-family:inherit;}
+  .mobile-tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .topbar{padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));gap:8px;flex-wrap:nowrap;}
+  .topbar .brand{min-width:0;}
+  .topbar .brand img{height:28px !important;}
+  .brand-text .t1{font-size:14px;white-space:nowrap;}
+  .brand-text .t2,.tb-date,.tb-name{display:none;}
+  .tb-right{gap:6px !important;flex-shrink:0;}
+  .role-badge{font-size:11px;padding:4px 10px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .grid-2{grid-template-columns:1fr !important;}
+  .section-title h2{font-size:16px;}
+  .stat-row{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .card{padding:14px;}
+  .toolbar{padding:10px;}
+  .toolbar>*{flex:1 1 140px;}
+  /* tables: compact, keep the first column (unit / name) visible while scrolling sideways */
+  table{min-width:0;}
+  th,td{padding:8px 10px;}
+  th:first-child,td:first-child{position:sticky;right:0;z-index:2;}
+  td:first-child{background:var(--paper);box-shadow:-6px 0 8px -6px rgba(14,42,43,.18);}
+  /* comfortable touch targets + no iOS zoom-on-focus */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:16px !important;min-height:42px;}
+  .ghost-btn,.primary-btn{min-height:40px;}
+  td .ghost-btn,td select{min-height:36px;}
+  .toast{max-width:calc(100% - 24px);width:max-content;bottom:calc(16px + env(safe-area-inset-bottom));text-align:center;}
+}
+@media(max-width:640px){
+  /* modals become bottom sheets */
+  .modal-bg{align-items:flex-end;padding:0;}
+  .modal,.modal.wide,.modal.full{max-width:100%;border-radius:20px 20px 0 0;max-height:92vh;max-height:92dvh;}
+  .modal.full{max-height:95vh;max-height:95dvh;}
+  .modal-head{padding:16px 16px 6px;position:sticky;top:0;background:var(--paper);z-index:3;}
+  .modal-body{padding:6px 16px calc(20px + env(safe-area-inset-bottom));}
+}
 </style>
 </head>
 <body>
@@ -172,7 +219,7 @@ let S = {
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[], supplierDetailTab:'overview',
   zones:[], distSession:null, presence:[], zoneAssignments:[], locationAssignments:[], auditVisits:[],
   complaints:[], suppliers:[], supplierKpi:[], supplierInvoices:[], supplierFilter:'all', clShowInactive:false,
-  reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10); })(),
+  reportFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return dateStr(d); })(),
   reportTo: todayStr(), reportType:'all',
   notifications:[], bellOpen:false,
   modal:null,
@@ -227,7 +274,8 @@ const KPI_SCORING_CRITERIA = [
   { range:'0% to 70%', level:'Service Termination', adj:'25% of monthly invoice', min:0 },
 ];
 
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function dateStr(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function todayStr(){ return dateStr(new Date()); }
 function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
 function fmtTime(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
 function nowTimeStr(){ const d=new Date(); return d.toTimeString().slice(0,5); }
@@ -244,6 +292,13 @@ async function dbSelect(table, filters){
 }
 async function dbInsert(table, rows){ const {error}=await sb.from(table).insert(rows); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
 async function dbUpdate(table, id, patch){ const {error}=await sb.from(table).update(patch).eq('id',id); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
+async function dbDeleteWhere(table, filters){
+  let q = sb.from(table).delete();
+  Object.keys(filters).forEach(k=>{ q = q.eq(k, filters[k]); });
+  const {error} = await q;
+  if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); }
+  return !error;
+}
 async function dbDelete(table, id){ const {error}=await sb.from(table).delete().eq('id',id); if(error){ console.error(table,error); toast('حصل خطأ: '+error.message,false); } return !error; }
 
 /* ============================= AUTH ============================= */
@@ -347,11 +402,7 @@ function render(){
   if(!S.tab || !tabs.find(t=>t[0]===S.tab)) S.tab = tabs.length?tabs[0][0]:null;
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="wrap" style="padding-bottom:0;">
-      <select class="mobile-tab-select" id="mobile-tab-select">
-        ${tabs.map(([id,label])=>`<option value="${id}" ${S.tab===id?'selected':''}>${esc(label)}</option>`).join('')}
-      </select>
-    </div>
+    <nav class="mobile-tabs" id="mobile-tabs">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${esc(label)}</button>`).join('')}</nav>
     <div class="shell">
       <div class="sidebar">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](16):''}<span>${esc(label)}</span></button>`).join('')}</div>
       <div class="content" id="tab-body">${renderTabBody()}</div>
@@ -360,6 +411,7 @@ function render(){
   `;
   bindGlobalEvents();
   bindTabEvents();
+  const _act=document.querySelector('.mobile-tabs button.active'); if(_act && _act.scrollIntoView) _act.scrollIntoView({inline:'center',block:'nearest'});
   if(S.tab==='home') drawHomeCharts();
 }
 
@@ -396,8 +448,8 @@ function renderTopbar(){
       <img src="logo-light.png" alt="logo" style="height:34px;">
       <div class="brand-text"><div class="t1">ORA SOFT SERVICES</div><div class="t2">Operations</div></div>
     </div>
-    <div style="font-size:12px;color:#9FC9BE;">${ICON.clock(13)} ${fmtDate(S.today)}</div>
-    <div style="display:flex;align-items:center;gap:10px;position:relative;">
+    <div class="tb-date" style="font-size:12px;color:#9FC9BE;">${ICON.clock(13)} ${fmtDate(S.today)}</div>
+    <div class="tb-right" style="display:flex;align-items:center;gap:10px;position:relative;">
       <button id="refresh-btn" title="تحديث البيانات" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
       </button>
@@ -407,7 +459,7 @@ function renderTopbar(){
       </button>
       ${S.bellOpen? renderBellDropdown() : ''}
       <span class="role-badge">${esc(ROLE_LABEL[S.profile.role]||S.profile.role)}</span>
-      <span style="font-size:12px;color:#9FC9BE;">${esc(S.profile.full_name||'')}</span>
+      <span class="tb-name" style="font-size:12px;color:#9FC9BE;">${esc(S.profile.full_name||'')}</span>
       <button id="logout-btn" style="border:none;background:rgba(255,255,255,.08);color:#B9CFCB;width:32px;height:32px;border-radius:9px;">${ICON.x(13)}</button>
     </div>
   </div>`;
@@ -424,7 +476,7 @@ function renderBellDropdown(){
 }
 
 function bindGlobalEvents(){
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today') await refreshAssignments(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
@@ -596,7 +648,7 @@ function bindHome(){
 function drawHomeCharts(){
   const el=document.getElementById('chartHome'); if(el && typeof Chart!=='undefined'){
     const days=[]; const vals=[];
-    for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().slice(0,10);
+    for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=dateStr(d);
       days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
       vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
     }
@@ -836,7 +888,7 @@ function findNextAvailableOrderDate(fromDate){
   let d = new Date(fromDate+'T00:00:00');
   for(let i=0;i<60;i++){
     d.setDate(d.getDate()+1);
-    const ds = d.toISOString().slice(0,10);
+    const ds = dateStr(d);
     if(ordersCountForDate(ds) < MAX_ORDERS_PER_DAY) return ds;
   }
   return null;
@@ -1243,6 +1295,33 @@ function printKpiReport(kpiId){
 }
 
 /* ============================= DAILY DISTRIBUTION WORKFLOW ============================= */
+const DIST_ROLES = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor'];
+async function refreshAssignments(){
+  const role = S.profile && S.profile.role;
+  const isDist = DIST_ROLES.includes(role);
+  if(!isDist && role!=='supervisor') return;
+  const [pres, za, la, av, ses] = await Promise.all([
+    dbSelect('daily_presence', { date: S.today }),
+    dbSelect('zone_assignments', { date: S.today }),
+    dbSelect('location_assignments', { date: S.today }),
+    dbSelect('location_audit_visits'),
+    isDist ? dbSelect('distribution_sessions', { date: S.today }) : Promise.resolve(null),
+  ]);
+  if(pres) S.presence = pres;
+  if(za) S.zoneAssignments = za;
+  if(la) S.locationAssignments = la;
+  if(av) S.auditVisits = av;
+  if(ses) S.distSession = ses[0] || null;
+}
+// true لو في أي حقل في الشاشة اتعدّل ولسه ما اتحفظش — عشان ما نمسحش اللي بيتكتب
+function hasUnsavedInput(){
+  return Array.from(document.querySelectorAll('#app input, #app textarea, #app select')).some(el=>{
+    if(el.type==='checkbox'||el.type==='radio') return el.checked!==el.defaultChecked;
+    if(el.tagName==='SELECT') return Array.from(el.options).some(o=>o.selected!==o.defaultSelected);
+    if(el.type==='file') return false;
+    return el.value!==el.defaultValue;
+  });
+}
 async function loadDistData(){
   S.zones = (await dbSelect('zones')) ?? S.zones;
   const sessionsRes = await dbSelect('distribution_sessions', { date: S.today });
@@ -1279,26 +1358,38 @@ function bindDistribution(){
     });
     // احذف القديم لليوم لنفس المستخدمين ثم أضف الجديد (أبسط من upsert يدوي)
     for(const r of rows){
-      const existing = S.presence.find(p=>p.user_id===r.user_id);
-      if(existing) await dbDelete('daily_presence', existing.id);
+      await dbDeleteWhere('daily_presence', { date:S.today, user_id:r.user_id });
     }
     if(await dbInsert('daily_presence', rows)){ await loadDistData(); render(); toast('تم حفظ الحضور',true); }
   };
   document.querySelectorAll('[data-assign-zone]').forEach(sel=>sel.onchange=async ()=>{
     const supId=sel.dataset.assignZone;
     if(!sel.value) return;
-    const existing = S.zoneAssignments.find(z=>z.senior_supervisor_id===supId);
-    if(existing) await dbDelete('zone_assignments', existing.id);
+    sel.disabled=true;
+    // امسح أي توزيع قديم لنفس المشرف في نفس اليوم من الداتابيز مباشرة (مش من الحالة المحلية)
+    if(!(await dbDeleteWhere('zone_assignments', { date:S.today, senior_supervisor_id:supId }))){ sel.disabled=false; return; }
     const row={ id:uid('za'), date:S.today, zone_id:sel.value, senior_supervisor_id:supId, assigned_by:S.session.user.id };
-    if(await dbInsert('zone_assignments',[row])){ await loadDistData(); render(); toast('تم تعيين الزون',true); }
+    if(await dbInsert('zone_assignments',[row])){
+      await loadDistData();
+      const saved = S.zoneAssignments.some(z=>z.id===row.id);
+      render();
+      if(saved) toast('تم تعيين الزون',true);
+      else toast('الزون اتحفظ لكن مش قادر أقراه تاني — مشكلة صلاحيات (RLS) على zone_assignments في Supabase',false);
+    } else { sel.disabled=false; }
   });
   document.querySelectorAll('[data-assign-location]').forEach(sel=>sel.onchange=async ()=>{
     const locId=sel.dataset.assignLocation;
     if(!sel.value) return;
-    const existing = S.locationAssignments.find(la=>la.location_id===locId);
-    if(existing) await dbDelete('location_assignments', existing.id);
+    sel.disabled=true;
+    if(!(await dbDeleteWhere('location_assignments', { date:S.today, location_id:locId }))){ sel.disabled=false; return; }
     const row={ id:uid('la'), date:S.today, location_id:locId, supervisor_id:sel.value, assigned_by:S.session.user.id };
-    if(await dbInsert('location_assignments',[row])){ await loadDistData(); render(); toast('تم التعيين',true); }
+    if(await dbInsert('location_assignments',[row])){
+      await loadDistData();
+      const saved = S.locationAssignments.some(l=>l.id===row.id);
+      render();
+      if(saved) toast('تم التعيين',true);
+      else toast('التعيين اتحفظ لكن مش قادر أقراه تاني — مشكلة صلاحيات (RLS) على location_assignments',false);
+    } else { sel.disabled=false; }
   });
   document.querySelectorAll('[data-scan-audit]').forEach(b=>b.onclick=()=>{ S.scanCtx={auditLocationId:b.dataset.scanAudit, mode:'audit'}; S.modal={type:'scanAudit'}; render(); });
   document.querySelectorAll('[data-scan-cl-senior]').forEach(b=>b.onclick=()=>{ S.scanCtx={instanceId:b.dataset.scanClSenior}; S.modal={type:'scan'}; render(); });
@@ -1365,7 +1456,7 @@ function renderPresenceSection(){
   };
   return `<div class="card" style="margin-bottom:16px;">
     <h3 style="margin-top:0;">توزيع المسئولين — تحديد الحضور</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div><h4 style="font-size:13px;">المشرفون الأوائل</h4>${seniors.map(u=>row(u,false,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
       <div><h4 style="font-size:13px;">المشرفون</h4>${supervisors.map(u=>row(u,true,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
     </div>
@@ -2536,6 +2627,12 @@ async function submitAuditVisit(locId){
   S.modal=null; S.scanCtx=null; render();
   toast(`تم تسجيل زيارة تدقيق ${loc?loc.name:''} — ${doneCount}/${todayChecklist.length} منجزة`, true);
 }
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState!=='visible' || !S.session || !S.profile || S.modal) return;
+  if(hasUnsavedInput()) return;
+  await refreshAssignments();
+  if(!S.modal && !hasUnsavedInput()) render();
+});
 let pendingPhoto=null;
 function handlePhotoSelect(file){
   if(!file) return;
@@ -2596,8 +2693,10 @@ async function loadRoleData(){
   if(distRoles.includes(role)){
     jobs.zones = dbSelect('zones');
     jobs.sessions = dbSelect('distribution_sessions', { date: S.today });
-    jobs.presence = dbSelect('daily_presence', { date: S.today });
-  } else if(role==='supervisor'){
+  }
+  // التوزيع اليومي: الحضور + توزيع الزونات + توزيع المواقع لازم يتحملوا لكل الأدوار المشاركة،
+  // مش بس المشرف العادي (كانوا بيبانوا فاضيين بعد أي ريفريش للمدير/الإداري/المشرف الأول)
+  if(distRoles.includes(role) || role==='supervisor'){
     jobs.presence = dbSelect('daily_presence', { date: S.today });
     jobs.zoneAssignments = dbSelect('zone_assignments', { date: S.today });
     jobs.locationAssignments = dbSelect('location_assignments', { date: S.today });
