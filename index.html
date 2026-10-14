@@ -10,6 +10,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAD5ElEQVR42u1WO0hrTRCefeScvEw0iYFIsDFNCGJjYW8h2JpoEcUQQRAhjY0E7YLcwlIQhEBEhBS26SSVjSCmEFRSRCG+qqBJNI/zmL9Y/+Mh8d7qv81/7xSHPTu7M9/MfDu7xGq1wu8UCr9Z/jr4AxxwAEDEb3WEEEMrxj0qoe1RmScRkXHODRNi0GNRrO5Z0w/lZygZY8xswozCvL8fplmr6/q3ewkhnBBCKdU0rQdIP2rxpZSa13ybHPM8R0RENOIQcIwBIgp0hBDGmJFZw4qqqmbTuq5TSs1l+CoyY6zVavUgkmVZBIeI7Xb7G5JwLmJCRFVVLRaLGIu4CSHciLTVak1OTsZisXA4jIilUimfz9/e3sqyrKqqJEnRaNRms6mqaqSu2+0WCgUBy+Fw+P3+SqUiWPNVQqvVKhrq9vZ2t9tFk9Tr9dXVVRGcx+NptVrYJ4FAQORkbW3t6uqKUmqxWPi/IssyOBwOAEilUmLD6elpKpXa2Ng4Pz8XM3NzcwDg9Xqr1aqiKGdnZ8fHx/l8Pp/PZ7NZj8dDKXW73Xd3d4i4srIiEss5Z4zJsgyc80AgUKvVEHFvb89IriRJJycniFgul61Wq9vtfnx8RMRoNGqugSRJAJDJZBBR07Snpyev18s5lyTp0wEAzM/PI+LDw4PL5aKUOhyOgYEBABgbG3t/f0fEqakpzvnz8zMiJhIJxpjdbpdl2Wq1UkpDoVCz2dQ0rd1uI+Lu7q4IQjigADA6OoqI19fX9XpdlLTb7XLOq9Xq/f09IgaDQVVVBRc0kwgSZzIZh8NRLBbX19dFMcLhcLfbFdSnAPD29kYIGRkZ4Zx/Hm7GAMDpdA4PDxNC6vW6+Xx9tklKO53O9PR0LBYDgN3d3Ww2e3FxYbfbd3Z2vohECBkfH1dVVVXVRCJhNpFOpxGxVqv5fD6n0ylqsLS0ZJSRcy64sL+/L7ZEIpFGo4GIMzMzAGC328FutwPA4eEhIjYajc3NzUgkMjEx8ePHj06ng4hbW1sAMDQ0VKlUFEWJx+OfOwEWFxd1Xf/4+Ein08vLy8lkMh6Pl0olRVEuLy8ZY5Ikgc1mk2V5cHCwWCz20/zo6EgQzuVyvb6+ImIymRQHOBgMCrA/E4GMA4DFYmk2m7Ozs6lUamFhIRQK6bp+c3OTy+UODg5ErRRFyeVyPp+vXC6LFhSJRAqFQrvdZoyZe6WoHwB4PB6n00lsNpv413W90+lIkuT3+zVNe3l5QUSLxWL0MqOvCS4Yv78QWZaJ8fAS/VJVVUVRxAkS0AzyiG6q67q5v/7Cujh6pP9lZ74p/5s7ud/z32fL/8rBP5agmid+YMvWAAAAAElFTkSuQmCC">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
 <meta name="theme-color" content="#0E2A2B">
+<meta name="referrer" content="no-referrer">
 <script src="qrcode.min.js"></script>
 <script src="jsQR.js"></script>
 <script src="chart.umd.min.js"></script>
@@ -193,6 +194,15 @@ img,canvas,svg{max-width:100%;}
   .modal-head{padding:16px 16px 6px;position:sticky;top:0;background:var(--paper);z-index:3;}
   .modal-body{padding:6px 16px calc(20px + env(safe-area-inset-bottom));}
 }
+
+/* ===== QR login ===== */
+.qr-or{display:flex;align-items:center;gap:10px;margin:14px 0 10px;color:var(--text-dim);font-size:12px;}
+.qr-or:before,.qr-or:after{content:'';flex:1;height:1px;background:var(--line);}
+.qr-thumb{width:64px;height:64px;cursor:pointer;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;}
+.qr-thumb img,.qr-thumb canvas{width:100% !important;height:100% !important;}
+#user-qr-target{display:flex;justify-content:center;margin:10px 0;}
+#user-qr-target img,#user-qr-target canvas{border-radius:10px;border:8px solid #fff;box-shadow:var(--shadow);}
+.auth-info{background:var(--blue-light);color:var(--blue);padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -207,7 +217,7 @@ function configMissing(){ return !sb; }
 
 /* ============================= STATE ============================= */
 let S = {
-  session:null, profile:null, authMode:'login', authError:'', authBusy:false,
+  session:null, profile:null, authMode:'login', authError:'', authBusy:false, authScan:false, authInfo:'', qrTokens:[], qrLoaded:false,
   tab:null, today: todayStr(),
   locations:[], users:[],
   deliveries:[], deliveryDate: todayStr(),
@@ -339,7 +349,71 @@ async function doSignIn(){
   if(error){ S.authError=translateAuthError(error.message); render(); return; }
   await refreshSession(); await bootApp();
 }
-async function doSignOut(){ await sb.auth.signOut(); S.session=null; S.profile=null; S.tab=null; render(); }
+async function doSignOut(){ await sb.auth.signOut(); S.session=null; S.profile=null; S.tab=null; S.qrTokens=[]; S.qrLoaded=false; render(); }
+
+/* ============================= QR LOGIN (optional extra — password login still works) ============================= */
+function qrUrl(token){ return location.origin+location.pathname+'?qr='+token; }
+function parseQrToken(text){
+  const t=(text||'').trim();
+  try{ const u=new URL(t); const q=u.searchParams.get('qr'); if(q && /^[a-f0-9]{64}$/i.test(q)) return q.toLowerCase(); }catch(e){}
+  if(/^[a-f0-9]{64}$/i.test(t)) return t.toLowerCase();
+  return null;
+}
+async function qrLoginWithToken(token){
+  stopAuthScanner(); S.authScan=false; S.authBusy=true; S.authError=''; S.authInfo='جارِ تسجيل الدخول بالـ QR…'; render();
+  try{
+    const res = await fetch(SUPABASE_URL+'/functions/v1/qr-auth', { method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY }, body:JSON.stringify({ action:'login', token }) });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.token_hash) throw new Error(data.error || 'تعذّر تسجيل الدخول بالكود');
+    let r = await sb.auth.verifyOtp({ token_hash:data.token_hash, type:'magiclink' });
+    if(r.error) r = await sb.auth.verifyOtp({ token_hash:data.token_hash, type:'email' });
+    if(r.error) throw new Error('الكود اتقرى بس تسجيل الدخول فشل، جرّب تاني');
+    S.authBusy=false; S.authInfo='';
+    await refreshSession(); await bootApp();
+  }catch(e){
+    S.authBusy=false; S.authInfo=''; S.authError=(e && e.message) || 'تعذّر تسجيل الدخول بالكود'; render();
+  }
+}
+async function startAuthScanner(){
+  const stage=document.getElementById('auth-scan-stage'); if(!stage) return;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    S.authStream=stream;
+    stage.innerHTML=`<video id="auth-scan-video" autoplay playsinline muted></video><div class="scan-frame">${ICON.bracket()}</div>`;
+    const video=document.getElementById('auth-scan-video'); video.srcObject=stream; await video.play();
+    const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d'); let stopped=false;
+    S.authStopLoop=()=>{ stopped=true; };
+    const tick=()=>{
+      if(stopped) return;
+      if(video.readyState===video.HAVE_ENOUGH_DATA){
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight; ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img=ctx.getImageData(0,0,canvas.width,canvas.height); const code=jsQR(img.data,img.width,img.height);
+        if(code && code.data){ const tok=parseQrToken(code.data); if(tok){ stopped=true; qrLoginWithToken(tok); return; } }
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){
+    stage.innerHTML='<div class="scan-msg"><span class="em">🚫</span>تعذّر الوصول للكاميرا. استخدم رفع صورة بدلاً من ذلك.</div>';
+  }
+}
+function stopAuthScanner(){ if(S.authStopLoop) S.authStopLoop(); if(S.authStream){ S.authStream.getTracks().forEach(t=>t.stop()); S.authStream=null; } }
+function decodeAuthQrFile(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas'); canvas.width=img.width; canvas.height=img.height;
+      const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+      const data=ctx.getImageData(0,0,canvas.width,canvas.height); const code=jsQR(data.data,data.width,data.height);
+      const tok = code && code.data ? parseQrToken(code.data) : null;
+      if(tok) qrLoginWithToken(tok); else toast('الصورة مفيهاش كود دخول صالح',false);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
 /* ============================= TOAST / ICONS ============================= */
 function toast(msg, ok){
@@ -428,8 +502,14 @@ function renderAuthScreen(){
       ${!isLogin?`<div class="form-row"><label>الاسم الكامل</label><input id="auth-fullname"></div>`:''}
       <div class="form-row"><label>الإيميل</label><input id="auth-email" type="email"></div>
       <div class="form-row"><label>الباسورد</label><input id="auth-password" type="password"></div>
+      ${S.authInfo?`<div class="auth-info">${esc(S.authInfo)}</div>`:''}
       ${S.authError?`<div style="background:var(--coral-light);color:var(--coral);padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:10px;">${esc(S.authError)}</div>`:''}
       <button class="primary-btn" style="width:100%;justify-content:center;" id="auth-submit" ${S.authBusy?'disabled':''}>${S.authBusy?'...':(isLogin?'دخول':'إنشاء الحساب')}</button>
+      ${isLogin && !S.authBusy ? `<div class="qr-or"><span>أو</span></div>
+        ${S.authScan ? `<div class="scan-stage" id="auth-scan-stage"><div class="scan-msg"><span class="em">📷</span>جارِ تشغيل الكاميرا...</div></div>
+          <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-top:10px;">${ICON.upload()} أو ارفع صورة للكود<input type="file" accept="image/*" id="auth-qr-file" capture="environment"></label>
+          <button class="ghost-btn" id="auth-scan-cancel" style="width:100%;margin-top:8px;">إلغاء</button>`
+        : `<button class="ghost-btn" id="auth-scan-btn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;">${ICON.qr(16)} الدخول بكود QR</button>`}` : ''}
       <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--text-dim);">
         ${isLogin?'مفيش حساب؟ ':'عندك حساب؟ '}
         <button id="auth-toggle" style="background:none;border:none;color:var(--mint);font-weight:800;text-decoration:underline;">${isLogin?'اعمل حساب جديد':'سجّل دخولك'}</button>
@@ -438,7 +518,11 @@ function renderAuthScreen(){
 }
 function bindAuthEvents(){
   const s=document.getElementById('auth-submit'); if(s) s.onclick=()=> S.authMode==='login'?doSignIn():doSignUp();
-  const t=document.getElementById('auth-toggle'); if(t) t.onclick=()=>{ S.authMode=S.authMode==='login'?'signup':'login'; S.authError=''; render(); };
+  const t=document.getElementById('auth-toggle'); if(t) t.onclick=()=>{ stopAuthScanner(); S.authScan=false; S.authMode=S.authMode==='login'?'signup':'login'; S.authError=''; render(); };
+  const sb1=document.getElementById('auth-scan-btn'); if(sb1) sb1.onclick=()=>{ S.authScan=true; S.authError=''; render(); };
+  const sc=document.getElementById('auth-scan-cancel'); if(sc) sc.onclick=()=>{ stopAuthScanner(); S.authScan=false; render(); };
+  const qf2=document.getElementById('auth-qr-file'); if(qf2) qf2.onchange=e=>decodeAuthQrFile(e.target.files[0]);
+  if(S.authScan && document.getElementById('auth-scan-stage')) startAuthScanner();
 }
 
 function renderTopbar(){
@@ -1593,8 +1677,9 @@ async function loadLocations(){ S.locations = (await dbSelect('locations')) ?? S
 function renderUsers(){
   return `
   <div class="toolbar"><button class="primary-btn" id="add-user-btn">${ICON.plus()} إضافة مستخدم جديد</button></div>
-  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th>دخول QR</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{
+    const qrRow = (S.qrTokens||[]).find(x=>x.user_id===u.id);
     const isSelf = u.id===S.session.user.id;
     return `<tr>
       <td><input data-u-name="${u.id}" value="${esc(u.full_name)}" style="width:120px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;">${isSelf?' (أنت)':''}</td>
@@ -1609,6 +1694,7 @@ function renderUsers(){
       <td><select multiple class="multi-sel" data-u-locs="${u.id}">
         ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
       </select></td>
+      <td>${qrRow? `<div class="qr-thumb" data-qr-open="${u.id}" data-qr-thumb="${qrRow.token}" title="عرض / طباعة"></div>` : (S.qrLoaded? `<button class="ghost-btn" data-qr-gen="${u.id}">${ICON.qr(13)} إنشاء</button>` : '<span style="color:var(--text-dim);">…</span>')}</td>
       <td>
         <button class="ghost-btn" data-save-user="${u.id}">حفظ</button>
         ${!isSelf?`<button class="ghost-btn danger" data-delete-user="${u.id}">${ICON.trash()} حذف نهائي</button>`:''}
@@ -1631,6 +1717,10 @@ function bindUsers(){
     await loadUsers(); render(); toast('تم حفظ بيانات المستخدم', true);
   });
   document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteUser', id:b.dataset.deleteUser}; render(); });
+  if(!S.qrLoaded){ loadQrTokens().then(()=>{ S.qrLoaded=true; if(S.tab==='users' && !S.modal && !hasUnsavedInput()) render(); }); }
+  document.querySelectorAll('[data-qr-thumb]').forEach(el=>{ el.innerHTML=''; new QRCode(el,{text:qrUrl(el.dataset.qrThumb),width:64,height:64,colorDark:'#0E2A2B',colorLight:'#ffffff'}); });
+  document.querySelectorAll('[data-qr-open]').forEach(el=>el.onclick=()=>{ S.modal={type:'userQr', id:el.dataset.qrOpen}; render(); });
+  document.querySelectorAll('[data-qr-gen]').forEach(b=>b.onclick=async ()=>{ b.disabled=true; await qrGenerate(b.dataset.qrGen); });
 }
 async function loadUsers(){ S.users = (await dbSelect('profiles')) ?? S.users; }
 
@@ -1641,6 +1731,79 @@ async function callAdminUsersFn(body){
     body: JSON.stringify(body)
   });
   return res.json();
+}
+
+async function callQrFn(body){
+  const res = await fetch(SUPABASE_URL + '/functions/v1/qr-auth', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+S.session.access_token },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+async function loadQrTokens(){
+  try{
+    const r = await callQrFn({ action:'list' });
+    if(r.error) throw new Error(r.error);
+    S.qrTokens = r.tokens || [];
+  }catch(e){
+    console.error('qr list', e);
+    toast('تعذّر تحميل أكواد QR — اتأكد إن دالة qr-auth اتنشرت', false);
+  }
+  S.qrLoaded = true;
+}
+async function qrGenerate(userId){
+  try{
+    const r = await callQrFn({ action:'generate', user_id:userId });
+    if(r.error) throw new Error(r.error);
+    S.qrTokens = (S.qrTokens||[]).filter(x=>x.user_id!==userId).concat([{ user_id:userId, token:r.token, created_at:r.created_at, last_used_at:null }]);
+    render(); toast('تم إنشاء كود الدخول', true);
+  }catch(e){ toast('حصل خطأ: '+(e.message||e), false); render(); }
+}
+async function qrRevoke(userId){
+  try{
+    const r = await callQrFn({ action:'revoke', user_id:userId });
+    if(r.error) throw new Error(r.error);
+    S.qrTokens = (S.qrTokens||[]).filter(x=>x.user_id!==userId);
+    S.modal=null; render(); toast('تم إلغاء كود الدخول', true);
+  }catch(e){ toast('حصل خطأ: '+(e.message||e), false); }
+}
+function qrDataUrl(text, size){
+  const tmp=document.createElement('div');
+  new QRCode(tmp,{text, width:size, height:size, colorDark:'#0E2A2B', colorLight:'#ffffff'});
+  const c=tmp.querySelector('canvas'); if(c) return c.toDataURL('image/png');
+  const i=tmp.querySelector('img'); return i? i.src : '';
+}
+function printUserQr(u, token){
+  const role = ROLE_LABEL[u.role]||u.role||'';
+  const html = `<div style="font-family:Arial,sans-serif;text-align:center;padding:40px;direction:rtl;">
+    <div style="font-weight:bold;font-size:18px;margin-bottom:6px;">Ora Soft Services — Operations</div>
+    <div style="font-size:13px;color:#555;margin-bottom:24px;">كود الدخول السريع</div>
+    <img src="${qrDataUrl(qrUrl(token),320)}" style="width:320px;height:320px;">
+    <div style="font-weight:bold;font-size:22px;margin-top:20px;">${esc(u.full_name)}</div>
+    <div style="font-size:14px;color:#555;margin-top:4px;">${esc(role)}</div>
+    <div style="font-size:12px;color:#888;margin-top:24px;">الكود ده شخصي — ما تشاركوش مع حد.</div>
+  </div>`;
+  let holder = document.getElementById('kpi-print-area');
+  if(!holder){ holder = document.createElement('div'); holder.id='kpi-print-area'; holder.className='print-sheet'; document.body.appendChild(holder); }
+  holder.innerHTML = html;
+  setTimeout(()=>window.print(), 150);
+}
+function bindUserQrModal(){
+  const m=S.modal; const u=S.users.find(x=>x.id===m.id); const t=(S.qrTokens||[]).find(x=>x.user_id===m.id);
+  if(!u||!t) return;
+  const target=document.getElementById('user-qr-target');
+  if(target && typeof QRCode!=='undefined'){ target.innerHTML=''; new QRCode(target,{text:qrUrl(t.token),width:210,height:210,colorDark:'#0E2A2B',colorLight:'#ffffff'}); }
+  const pr=document.getElementById('uqr-print'); if(pr) pr.onclick=()=>printUserQr(u,t.token);
+  const rg=document.getElementById('uqr-regen'); if(rg) rg.onclick=async ()=>{
+    if(!confirm('تجديد الكود هيبطّل الكود القديم فورًا. تكمّل؟')) return;
+    S.modal=null; await qrGenerate(m.id);
+    S.modal={type:'userQr', id:m.id}; render();
+  };
+  const rv=document.getElementById('uqr-revoke'); if(rv) rv.onclick=()=>{
+    if(!confirm('إلغاء الكود هيمنع صاحبه من الدخول بيه. تكمّل؟')) return;
+    qrRevoke(m.id);
+  };
 }
 
 /* ============================= REPORTS (admin) ============================= */
@@ -2048,6 +2211,21 @@ function renderModal(){
     <div class="form-row"><label>وقت السماح إلى (اختياري)</label><input type="time" id="m-cl-to" value="${c.valid_to||''}"></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
+  if(m.type==='userQr'){
+    const u=S.users.find(x=>x.id===m.id); const t=(S.qrTokens||[]).find(x=>x.user_id===m.id);
+    if(!u||!t) return '';
+    const used = t.last_used_at ? ' · آخر دخول بالكود: '+new Date(t.last_used_at).toLocaleString('ar-EG') : '';
+    return modalWrap('كود دخول: '+u.full_name, `<div style="text-align:center;">
+      <div id="user-qr-target"></div>
+      <div style="font-family:'Cairo';font-weight:800;">${esc(u.full_name)}</div>
+      <div style="font-size:11.5px;color:var(--text-dim);margin:4px 0 12px;">${esc(ROLE_LABEL[u.role]||u.role||'')}${esc(used)}</div>
+      <div style="background:var(--amber-light);color:var(--amber);border-radius:9px;padding:9px 12px;font-size:12px;text-align:right;margin-bottom:12px;line-height:1.7;">الكود ده زي باسورد دائم: أي حد معاه الكود يدخل بحساب ${esc(u.full_name)}. اطبعه وسلّمه لصاحبه بس، ولو اتسرّب اضغط تجديد أو إلغاء.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="primary-btn" id="uqr-print" style="flex:1;justify-content:center;">${ICON.printer(14)} طباعة</button>
+        <button class="ghost-btn" id="uqr-regen">تجديد</button>
+        <button class="ghost-btn danger" id="uqr-revoke">إلغاء الكود</button>
+      </div></div>`);
+  }
   if(m.type==='qr') return modalWrap('رمز QR', `<div style="text-align:center;"><div id="qr-render-target"></div><div style="font-family:'Cairo';font-weight:800;">${esc(S.qrTarget.label)}</div></div>`);
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
@@ -2320,6 +2498,7 @@ function bindModalEvents(){
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
   if(S.modal && S.modal.type==='qr') renderQrCanvas();
+  if(S.modal && S.modal.type==='userQr') bindUserQrModal();
   if(S.modal && (S.modal.type==='scan'||S.modal.type==='scanAudit')) startScanner();
   const qf=document.getElementById('qr-file-input'); if(qf) qf.onchange=e=>decodeFromFile(e.target.files[0]);
   const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
@@ -2928,8 +3107,21 @@ function playAlertSound(){
 
 (async function init(){
   if(configMissing()){ render(); return; }
+  const registerAuthListener=()=>sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; realtimeSetup=false; render(); } });
+  // دخول بكود QR: ?qr=TOKEN — نشيله من الرابط فورًا ونطلّع أي مستخدم داخل قبل ما ندخّل صاحب الكود
+  const qrParam = new URLSearchParams(location.search).get('qr');
+  if(qrParam){
+    try{ history.replaceState(null,'',location.pathname+location.hash); }catch(e){}
+    try{ await sb.auth.signOut(); }catch(e){}
+    S.session=null; S.profile=null;
+    registerAuthListener();
+    const tok = parseQrToken(qrParam);
+    if(tok){ await qrLoginWithToken(tok); }
+    else { S.authError='كود الدخول غير صالح'; render(); }
+    return;
+  }
   await refreshSession();
-  sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; realtimeSetup=false; render(); } });
+  registerAuthListener();
   if(S.session) await bootApp(); else render();
 })();
 
