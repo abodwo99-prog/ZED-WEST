@@ -203,6 +203,11 @@ img,canvas,svg{max-width:100%;}
 #user-qr-target{display:flex;justify-content:center;margin:10px 0;}
 #user-qr-target img,#user-qr-target canvas{border-radius:10px;border:8px solid #fff;box-shadow:var(--shadow);}
 .auth-info{background:var(--blue-light);color:var(--blue);padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:10px;}
+
+/* ===== photos / scheduled tasks ===== */
+.photo-preview{object-fit:contain;background:var(--sand);}
+details.card>summary{list-style:none;}
+details.card>summary::-webkit-details-marker{display:none;}
 </style>
 </head>
 <body>
@@ -223,7 +228,7 @@ let S = {
   deliveries:[], deliveryDate: todayStr(),
   orders:[], ordersDate:'',
   installs:[], installsDate: todayStr(),
-  checklistDefs:[], checklistInstances:[],
+  taskLists:[], taskItems:[], taskRuns:[], taskRunItems:[], openTaskAdmin:new Set(), openTaskSup:new Set(), seenExtra:new Set(),
   attendance:[], attendanceDate: todayStr(),
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[], supplierDetailTab:'overview',
@@ -445,20 +450,20 @@ const ICON = {
   list:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
   idcard:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>`,
 };
-const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', checklist:'qr', qrsheet:'printer', attendance:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', locations:'pin2', users:'users', reports:'chart', today:'list', myname:'idcard' };
+const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', tasks:'list', qrsheet:'printer', attendance:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['checklist','قوائم التحقق اليومية'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['locations','المواقع'],['users','المستخدمون'],['reports','التقارير']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['complaints','الشكاوى']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['myname','بياناتي']];
   if(role==='contractor_manager') return [['home','الرئيسية'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
   if(role==='contractor_admin') return [['attendance','الحضور']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['checklist','قوائم التحقق اليومية'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
-  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['checklist','قوائم التحقق اليومية'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
-  if(role==='hk_senior_supervisor') return [['distribution','توزيع المواقع'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_senior_supervisor') return [['distribution','اعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
   return [];
 }
 
@@ -563,6 +568,16 @@ function bindGlobalEvents(){
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today') await refreshAssignments(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
+  document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
+    e.stopPropagation();
+    const [k,id]=b.dataset.viewPhoto.split('|'); let src=null;
+    if(k==='ord'){ const o=S.orders.find(x=>x.id===id); src=o&&o.payment_photo; }
+    else if(k==='pest'){ const p=S.pest.find(x=>x.id===id); src=p&&p.payment_photo; }
+    else if(k==='inv'){ const i=S.supplierInvoices.find(x=>x.id===id); src=i&&i.photo; }
+    if(!src) return;
+    S.modal={ type:'viewPhoto', src, title: k==='inv'?'صورة الفاتورة':'إثبات الدفع', back:(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null };
+    render();
+  });
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
   const bb=document.getElementById('bell-btn'); if(bb) bb.onclick=(e)=>{
     e.stopPropagation();
@@ -592,13 +607,12 @@ function renderTabBody(){
     case 'facade': return renderFacade();
     case 'waste': return renderWaste();
     case 'installs': return renderInstalls();
-    case 'checklist': return renderChecklistAdmin();
+    case 'tasks': return renderTasksAdmin();
     case 'qrsheet': return renderQrSheet();
     case 'attendance': return renderAttendance();
     case 'distribution': return renderDistribution();
     case 'complaints': return renderComplaints();
     case 'suppliers': return renderSuppliers();
-    case 'locations': return renderLocations();
     case 'users': return renderUsers();
     case 'reports': return renderReports();
     case 'today': return renderSupervisorToday();
@@ -615,13 +629,12 @@ function bindTabEvents(){
     case 'facade': bindFacade(); break;
     case 'waste': bindWaste(); break;
     case 'installs': bindInstalls(); break;
-    case 'checklist': bindChecklistAdmin(); break;
+    case 'tasks': bindTasksAdmin(); break;
     case 'qrsheet': bindQrSheet(); break;
     case 'attendance': bindAttendance(); break;
     case 'distribution': bindDistribution(); break;
     case 'complaints': bindComplaints(); break;
     case 'suppliers': bindSuppliers(); break;
-    case 'locations': bindLocations(); break;
     case 'users': bindUsers(); break;
     case 'reports': bindReports(); break;
     case 'today': bindSupervisorToday(); break;
@@ -647,18 +660,20 @@ function renderHome(){
 
   const cardDefs = [
     { id:'deliveries', color:'mint', icon:'truck', label:'وحدات التسليم اليوم', data:S.deliveries, field:'date' },
-    { id:'orders', color:'blue', icon:'droplet', label:'الخدمة المدفوعة اليوم', data:S.orders, field:'scheduled_date' },
+    { id:'orders', color:'blue', icon:'droplet', label:'الخدمة المدفوعة اليوم', data:S.orders.filter(orderApproved), field:'scheduled_date' },
     { id:'pest', color:'coral', icon:'bug', label:'مكافحة الحشرات اليوم', data:S.pest||[], field:'scheduled_date' },
     { id:'facade', color:'amber', icon:'building', label:'نظافة الواجهات اليوم', data:S.facade||[], field:'date' },
     { id:'waste', color:'ink', icon:'trash2', label:'رفع المخلفات اليوم', data:S.waste||[], field:'date' },
     { id:'installs', color:'amber', icon:'brick', label:'أعمال التأسيسات اليوم', data:S.installs, field:'date' },
-    { id:'checklist', color:'mint', icon:'qr', label:'قوائم التحقق اليومية اليوم', data:S.checklistInstances||[], field:'date' },
+    { id:'tasks', color:'mint', icon:'list', label:'المهمات المجدولة اليوم', data:S.taskRuns||[], field:'date' },
   ];
   const cardsHtml = cardDefs.filter(c=>roleTabs.includes(c.id)).map(c=>{
     const items = c.data.filter(x=>x[c.field]===S.today);
     const done = items.filter(x=> x.status==='completed').length;
     return serviceCard(c.color, c.icon, c.label, `${done}/${items.length}`, c.id);
   }).join('');
+  const pendingExtra = (role==='admin'||role==='opm') ? S.orders.filter(o=>o.approval_status==='pending').length : 0;
+  const extraCard = pendingExtra ? serviceCard('coral','droplet','طلبات وحدات إضافية بانتظار موافقتك', String(pendingExtra), 'orders') : '';
   const attendanceCard = roleTabs.includes('attendance') ? (()=>{
     const att=(S.attendance||[]).filter(a=>a.date===S.today);
     return serviceCard('blue','idcard','سجلات حضور اليوم', `${att.length}`, 'attendance');
@@ -672,11 +687,11 @@ function renderHome(){
     </div>
     <div id="sys-search-results" style="margin-top:10px;font-size:13px;line-height:1.8;"></div>
   </div>
-  <div class="stat-row">${cardsHtml}${attendanceCard}</div>
+  <div class="stat-row">${extraCard}${cardsHtml}${attendanceCard}</div>
   ${(role==='admin'||role==='opm')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
   <div class="home-blocks">
-    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (قوائم التحقق اليومية)</h3><canvas id="chartHome" height="180"></canvas></div>
-    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">خطط التأسيسات وقوائم التحقق على مدار الشهر</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
+    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (مهمات مجدولة معتمدة)</h3><canvas id="chartHome" height="180"></canvas></div>
+    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات والمهمات المجدولة على مدار الشهر</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
     <div class="card">
       <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
       ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
@@ -705,7 +720,7 @@ function runSystemSearch(q){
     { tab:'complaints', label:'شكوى', data:S.complaints, title:c=>`${esc(c.unit_code||'-')} — ${esc((c.description||'').slice(0,50))}` },
     { tab:'suppliers', label:'مورد', data:S.suppliers, title:s=>esc(s.name||'-') },
     { tab:'users', label:'مستخدم', data:S.users, title:u=>esc(u.full_name||'-') },
-    { tab:'locations', label:'موقع', data:S.locations, title:l=>esc(l.name||'-') },
+    { tab:'tasks', label:'قائمة مهام', data:S.taskLists, title:l=>esc(l.name||'-') },
   ];
   const results=[];
   groups.forEach(g=>{
@@ -734,9 +749,9 @@ function drawHomeCharts(){
     const days=[]; const vals=[];
     for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=dateStr(d);
       days.push(d.toLocaleDateString('ar-EG',{weekday:'short'}));
-      vals.push(S.checklistInstances.filter(x=>x.date===ds && x.status==='completed').length);
+      vals.push((S.taskRuns||[]).filter(x=>x.date===ds && x.status==='completed').length);
     }
-    new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'قوائم تحقق منجزة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+    new Chart(el, { type:'line', data:{ labels:days, datasets:[{label:'مهمات معتمدة', data:vals, borderColor:'#0E2A2B', backgroundColor:'rgba(27,138,107,.15)', fill:true, tension:.35 }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
   }
   const elm=document.getElementById('chartMonthly'); if(elm && typeof Chart!=='undefined'){
     const now=new Date();
@@ -746,52 +761,41 @@ function drawHomeCharts(){
       const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       labels.push(String(d));
       installVals.push(S.installs.filter(i=>i.date===ds).length);
-      checklistVals.push(S.checklistInstances.filter(c=>c.date===ds).length);
+      checklistVals.push((S.taskRuns||[]).filter(c=>c.date===ds).length);
     }
     new Chart(elm, { type:'bar', data:{ labels, datasets:[
       { label:'أعمال تأسيسات', data:installVals, backgroundColor:'#DA8B1F' },
-      { label:'قوائم تحقق', data:checklistVals, backgroundColor:'#1B8A6B' },
+      { label:'مهمات مجدولة', data:checklistVals, backgroundColor:'#1B8A6B' },
     ]}, options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:11,font:{size:10.5}}}}, scales:{ x:{ stacked:false, ticks:{font:{size:9}} }, y:{ beginAtZero:true, ticks:{stepSize:1} } } } });
   }
   renderOrgChart();
 }
 function renderOrgChart(){
   const el = document.getElementById('orgChart'); if(!el) return;
-  const today = S.today;
-  const nameOf = id => { const u=S.users.find(x=>x.id===id); return u? u.full_name : '—'; };
-  const zoneAssignsToday = (S.zoneAssignments||[]).filter(z=>z.date===today);
-
-  const boxCss = 'display:inline-flex;flex-direction:column;align-items:center;justify-content:center;background:var(--paper);border:2px solid var(--mint);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;color:var(--ink);min-width:110px;text-align:center;';
-  const subBoxCss = 'display:inline-flex;flex-direction:column;align-items:center;justify-content:center;background:var(--sand);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;color:var(--text);min-width:90px;text-align:center;margin:4px;';
-
-  if(!zoneAssignsToday.length){
-    el.innerHTML = `<div class="empty-state" style="padding:20px;"><span class="em">🗂️</span>لسه مفيش توزيع اتعمل النهاردة (لا زونات ولا مواقع اتوزعت)</div>`;
+  const presRow = u => (S.presence||[]).find(p=>p.user_id===u.id);
+  const shownName = u => { const p=presRow(u); return (p && p.actual_name && p.actual_name.trim()) || u.full_name; };
+  const managers = S.users.filter(u=>u.role==='hk_manager' && u.active);
+  const seniors = S.users.filter(u=>u.role==='hk_senior_supervisor' && isPresent(u.id)===true);
+  const sups = S.users.filter(u=>u.role==='supervisor' && isPresent(u.id)===true);
+  if(!S.distSession && !seniors.length && !sups.length){
+    el.innerHTML = `<div class="empty-state" style="padding:20px;"><span class="em">🗂️</span>لسه مفيش توزيع اتعمل النهاردة (لا حضور اتسجّل)</div>`;
     return;
   }
-
-  let html = `<div style="display:flex;flex-direction:column;align-items:center;gap:0;min-width:600px;">`;
-  html += `<div style="${boxCss}background:var(--ink);color:#fff;border-color:var(--ink);">🏢 التوزيع اليومي<br><span style="font-weight:500;font-size:10px;">${today}</span></div>`;
-  html += `<div style="width:2px;height:18px;background:var(--line);"></div>`;
-  html += `<div style="display:flex;gap:26px;flex-wrap:wrap;justify-content:center;position:relative;">`;
-
-  zoneAssignsToday.forEach(za=>{
-    const zone = S.zones.find(z=>z.id===za.zone_id);
-    const zoneLocIds = zone? (zone.location_ids||[]) : [];
-    const locAssigns = (S.locationAssignments||[]).filter(la=>la.date===today && zoneLocIds.includes(la.location_id));
-    html += `<div style="display:flex;flex-direction:column;align-items:center;">
-      <div style="width:2px;height:14px;background:var(--line);"></div>
-      <div style="${boxCss}">👤 ${esc(nameOf(za.senior_supervisor_id))}<br><span style="font-weight:500;font-size:10px;color:var(--mint);">${esc(zone?zone.name:'بدون زون')}</span></div>
-      <div style="width:2px;height:14px;background:var(--line);"></div>
-      <div style="display:flex;flex-wrap:wrap;justify-content:center;max-width:260px;border-top:1px solid var(--line);padding-top:6px;">
-        ${locAssigns.length? locAssigns.map(la=>{
-          const loc=S.locations.find(l=>l.id===la.location_id);
-          return `<div style="${subBoxCss}">🧹 ${esc(nameOf(la.supervisor_id))}<br><span style="font-weight:500;color:var(--text-dim);">${esc(loc?loc.name:'')}</span></div>`;
-        }).join('') : `<div style="font-size:10.5px;color:var(--text-dim);padding:6px;">لسه مفيش مواقع اتوزعت</div>`}
-      </div>
-    </div>`;
-  });
-
-  html += `</div></div>`;
+  const box = (bg,fg,border) => `display:inline-flex;flex-direction:column;align-items:center;justify-content:center;background:${bg};color:${fg};border:2px solid ${border};border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;min-width:110px;text-align:center;margin:4px;`;
+  const line = '<div style="width:2px;height:16px;background:var(--line);"></div>';
+  const row = (items, css) => `<div style="display:flex;flex-wrap:wrap;justify-content:center;max-width:760px;border-top:2px solid var(--line);padding-top:8px;">${items.join('')}</div>`;
+  const mgrBoxes = managers.length ? managers.map(u=>`<div style="${box('var(--ink)','#fff','var(--ink)')}">🏢 مدير الموقع<br><span style="font-weight:500;font-size:11px;">${esc(u.full_name)}</span></div>`) : [`<div style="${box('var(--ink)','#fff','var(--ink)')}">🏢 مدير الموقع</div>`];
+  let html = `<div style="display:flex;flex-direction:column;align-items:center;min-width:300px;">`;
+  html += `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${mgrBoxes.join('')}</div>`;
+  html += line;
+  html += seniors.length
+    ? row(seniors.map(u=>`<div style="${box('var(--paper)','var(--ink)','var(--mint)')}">👤 مشرف أول<br><span style="font-weight:500;font-size:11px;">${esc(shownName(u))}</span></div>`))
+    : `<div style="font-size:11.5px;color:var(--text-dim);padding:4px;">لا يوجد مشرفون أوائل حاضرون</div>`;
+  html += line;
+  html += sups.length
+    ? row(sups.map(u=>{ const p=presRow(u)||{}; const sc = p.scope==='units' ? 'وحدات' : 'أماكن عامة'; const sh = SHIFT_LABEL[p.shift]||''; return `<div style="${box('var(--sand)','var(--text)','var(--line)')}font-size:11px;">🧹 ${esc(shownName(u))}<br><span style="font-weight:500;color:var(--text-dim);">${sc}${sh?' · '+sh:''}</span></div>`; }))
+    : `<div style="font-size:11.5px;color:var(--text-dim);padding:4px;">لا يوجد مشرفون حاضرون</div>`;
+  html += `</div>`;
   el.innerHTML = html;
 }
 function statusBadge(s){
@@ -807,14 +811,12 @@ function renderDeliveries(){
     <div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>
     <button class="primary-btn" id="dv-add">${ICON.plus()} إضافة وحدة</button>
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>المشرف المسؤول</th><th>الحالة</th><th>ملاحظات</th><th>بلاغات المشرف</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>الحالة</th><th>ملاحظات</th><th>بلاغات المشرف</th><th></th></tr></thead><tbody>
   ${list.length? list.map(d=>{
-    const sup = S.users.find(u=>u.id===d.assigned_supervisor_id);
-    const canChangeStatus = S.profile.role==='admin'||S.profile.role==='opm'||d.assigned_supervisor_id===S.session.user.id;
+    const canChangeStatus = ['admin','opm','supervisor'].includes(S.profile.role);
     const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
     return `<tr>
       <td>${esc(d.unit_code)}</td>
-      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">لم يُحدد</span>'}</td>
       <td>${canChangeStatus? `<select data-dv-status="${d.id}">
         <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
@@ -823,9 +825,9 @@ function renderDeliveries(){
       </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
       <td>${esc(d.notes||'-')}</td>
       <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
-      <td>${(S.profile.role==='admin'||S.profile.role==='opm')?`<button class="ghost-btn" data-dv-assign="${d.id}">تعيين</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
+      <td>${(S.profile.role==='admin'||S.profile.role==='opm')?`<button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
 async function handleStatusSelectChange(table, id, value, reload){
@@ -841,7 +843,6 @@ function bindDeliveries(){
   document.getElementById('dv-date').onchange=e=>{ S.deliveryDate=e.target.value; loadDeliveries().then(render); };
   document.getElementById('dv-add').onclick=()=>{ S.modal={type:'addDelivery'}; render(); };
   document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.dvStatus, sel.value, loadDeliveries));
-  document.querySelectorAll('[data-dv-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignDelivery', id:b.dataset.dvAssign}; render(); });
   document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
   document.querySelectorAll('[data-view-notes]').forEach(b=>b.onclick=()=>{ S.modal={type:'viewUnitNotes', id:b.dataset.viewNotes}; render(); });
 }
@@ -849,55 +850,77 @@ async function loadDeliveries(){ S.deliveries = (await dbSelect('delivery_units'
 async function loadUnitNotes(){ S.unitNotes = (await dbSelect('unit_notes')) ?? S.unitNotes; }
 
 /* ============================= PAID SERVICE ORDERS ============================= */
+function orderApproved(o){ return !o.approval_status || o.approval_status==='approved'; }
 function renderOrders(){
   const role=S.profile.role;
-  const list = S.ordersDate ? S.orders.filter(o=>o.scheduled_date===S.ordersDate) : S.orders;
-  const canCreate = role==='fm_dispatcher'||role==='admin'||role==='opm';
-  const canAssign = role==='opm'||role==='admin';
+  const isApprover = role==='admin'||role==='opm';
+  const canCreate = role==='fm_dispatcher'||isApprover;
+  const canManage = isApprover;
+  let list = S.ordersDate ? S.orders.filter(o=>o.scheduled_date===S.ordersDate) : S.orders;
+  if(!canCreate) list = list.filter(orderApproved);
+  const pending = isApprover ? S.orders.filter(o=>o.approval_status==='pending') : [];
+  const pendingHtml = pending.length ? `<div class="card" style="margin-bottom:14px;border-color:var(--amber);background:var(--amber-light);">
+    <h3 style="margin:0 0 8px;font-size:14px;color:var(--amber);">طلبات وحدات إضافية بانتظار موافقتك (${pending.length})</h3>
+    ${pending.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px dashed var(--line);">
+      <div style="font-size:13px;"><b>${esc(o.unit_code||'-')}</b> — ${ORDER_TYPE_LABEL[o.order_type]||o.order_type} — ${o.scheduled_date}${o.scheduled_time?' '+esc(o.scheduled_time):''}${o.extra_reason?`<div style="font-size:12px;color:var(--text-dim);">السبب: ${esc(o.extra_reason)}</div>`:''}</div>
+      <div style="display:flex;gap:6px;"><button class="primary-btn" data-ord-approve="${o.id}">${ICON.check(13)} موافقة</button><button class="ghost-btn danger" data-ord-reject="${o.id}">رفض</button></div>
+    </div>`).join('')}
+  </div>` : '';
   return `
+  ${pendingHtml}
   <div class="toolbar">
     <div class="fgroup"><label>فلتر بالتاريخ</label><input type="date" id="ord-date" value="${S.ordersDate}"></div>
     <button class="ghost-btn" id="ord-clear">مسح الفلتر</button>
     ${canCreate?`<button class="primary-btn" id="ord-add">${ICON.plus()} أوردر جديد</button>`:''}
+    ${canCreate?`<button class="ghost-btn" id="ord-extra">${ICON.plus(13)} طلب وحدة إضافية</button>`:''}
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>ملاحظات OPM</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(o=>{
-    const sup = S.users.find(u=>u.id===o.assigned_supervisor_id);
-    const canChangeStatus = role==='admin'||role==='opm'||o.assigned_supervisor_id===S.session.user.id;
-    const canManage = role==='admin'||role==='opm';
-    return `<tr>
-      <td>${esc(o.unit_code||'-')}</td>
+    const canChangeStatus = (isApprover||role==='supervisor') && orderApproved(o);
+    const extraTag = o.extra_reason ? ' <span class="tag-shift evening">إضافية</span>' : '';
+    const statusCell = o.approval_status==='pending' ? '<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'
+      : o.approval_status==='rejected' ? '<span class="badge postponed"><span class="dot"></span>مرفوض</span>'
+      : (canChangeStatus? `<select data-ord-status="${o.id}">
+        <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
+        <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
+        <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
+        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
+      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}` : statusBadge(o.status));
+    return `<tr style="${o.approval_status==='rejected'?'opacity:.6;':''}">
+      <td>${esc(o.unit_code||'-')}${extraTag}</td>
       <td>${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</td>
       <td>${o.price!=null? (+o.price).toLocaleString('en-US')+' ج.م' : '-'}</td>
       <td>${canManage? `<select data-ord-payment="${o.id}">
         <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
         <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
-      </select>${o.payment_photo?`<div><img src="${o.payment_photo}" data-view-payment-photo="${o.id}" style="width:24px;height:24px;border-radius:4px;object-fit:cover;cursor:pointer;margin-top:3px;"></div>`:''}` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>
+      </select>${o.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>
       <td>${o.scheduled_date}</td>
       <td>${esc(o.scheduled_time||'-')}</td>
-      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${esc(o.opm_notes||'-')}</td>
-      <td>${canChangeStatus? `<select data-ord-status="${o.id}">
-        <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
-        <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
-        <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
-        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}`:statusBadge(o.status)}</td>
-      <td>${canAssign?`<button class="ghost-btn" data-ord-assign="${o.id}">تعيين مشرف</button>`:''}${(canManage||role==='fm_dispatcher')?` <button class="ghost-btn" data-ord-edit="${o.id}">تعديل</button>`:''}${canManage?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
+      <td>${statusCell}</td>
+      <td>${(canManage||role==='fm_dispatcher')?`<button class="ghost-btn" data-ord-edit="${o.id}">تعديل</button>`:''}${canManage?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
+  }).join(''): `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
   </tbody></table></div>`;
 }
 function bindOrders(){
   document.getElementById('ord-date').onchange=e=>{ S.ordersDate=e.target.value; render(); };
   document.getElementById('ord-clear').onclick=()=>{ S.ordersDate=''; render(); };
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
+  const ex=document.getElementById('ord-extra'); if(ex) ex.onclick=()=>{ S.modal={type:'addOrder', extra:true}; render(); };
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
-  document.querySelectorAll('[data-ord-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignOrder', id:b.dataset.ordAssign}; render(); });
   document.querySelectorAll('[data-ord-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editOrder', id:b.dataset.ordEdit}; render(); });
   document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
   document.querySelectorAll('[data-ord-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordPayment, {payment_status:sel.value}); await loadOrders(); render(); toast('تم تحديث حالة الدفع',true); });
-  document.querySelectorAll('[data-view-payment-photo]').forEach(img=>img.onclick=()=>{ window.open(img.src, '_blank'); });
+  document.querySelectorAll('[data-ord-approve]').forEach(b=>b.onclick=async ()=>{
+    b.disabled=true;
+    if(await dbUpdate('paid_service_orders', b.dataset.ordApprove, { approval_status:'approved', approved_by:S.session.user.id, approved_at:new Date().toISOString() })){ await loadOrders(); render(); toast('تمت الموافقة على الوحدة الإضافية',true); } else b.disabled=false;
+  });
+  document.querySelectorAll('[data-ord-reject]').forEach(b=>b.onclick=async ()=>{
+    if(!confirm('رفض طلب الوحدة الإضافية؟')) return;
+    b.disabled=true;
+    if(await dbUpdate('paid_service_orders', b.dataset.ordReject, { approval_status:'rejected', approved_by:S.session.user.id, approved_at:new Date().toISOString() })){ await loadOrders(); render(); toast('تم رفض الطلب',true); } else b.disabled=false;
+  });
 }
 async function loadOrders(){ S.orders = (await dbSelect('paid_service_orders')) ?? S.orders; }
 async function loadUnits(){ S.units = (await dbSelect('units_master')) ?? S.units; }
@@ -967,7 +990,7 @@ function priceDisplayHtml(price, isSpecialized){
   return `<span style="color:var(--mint);font-weight:700;">السعر: ${price.toLocaleString('en-US')} ج.م</span>`;
 }
 const MAX_ORDERS_PER_DAY = 2;
-function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && o.status!=='postponed').length; }
+function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && o.status!=='postponed' && orderApproved(o) && !o.extra_reason).length; }
 function findNextAvailableOrderDate(fromDate){
   let d = new Date(fromDate+'T00:00:00');
   for(let i=0;i<60;i++){
@@ -1010,7 +1033,7 @@ function renderPest(){
       <td>${canManage? `<select data-pest-payment="${p.id}">
         <option value="unpaid" ${p.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
         <option value="paid" ${p.payment_status==='paid'?'selected':''}>مدفوع</option>
-      </select>${p.payment_photo?`<div><img src="${p.payment_photo}" data-view-pest-payment-photo="${p.id}" style="width:24px;height:24px;border-radius:4px;object-fit:cover;cursor:pointer;margin-top:3px;"></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
+      </select>${p.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="pest|${p.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
       <td>${p.scheduled_date}</td><td>${esc(p.scheduled_time||'-')}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${canChangeStatus? `<select data-pest-status="${p.id}">
@@ -1027,7 +1050,6 @@ function bindPest(){
   const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
   document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-pest-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestPayment, {payment_status:sel.value}); await loadPest(); render(); toast('تم تحديث حالة الدفع',true); });
-  document.querySelectorAll('[data-view-pest-payment-photo]').forEach(img=>img.onclick=()=>{ window.open(img.src, '_blank'); });
   document.querySelectorAll('[data-pest-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignPest', id:b.dataset.pestAssign}; render(); });
   document.querySelectorAll('[data-pest-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('pest_control_requests', b.dataset.pestDel); await loadPest(); render(); toast('تم الحذف',true); });
 }
@@ -1043,14 +1065,13 @@ function renderFacade(){
     <div class="fgroup"><label>التاريخ</label><input type="date" id="fc-date" value="${S.facadeDate}"></div>
     ${canCreate?`<button class="primary-btn" id="fc-add">${ICON.plus()} إضافة عمل</button>`:''}
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الموقع</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(f=>{
-    const loc=S.locations.find(l=>l.id===f.location_id);
     return `<tr>
-      <td>${esc(f.description||'-')}</td><td>${loc?esc(loc.name):'-'}</td><td>${statusBadge(f.status)}</td>
+      <td>${esc(f.description||'-')}</td><td>${statusBadge(f.status)}</td>
       <td>${f.status==='scheduled'?`<button class="ghost-btn" data-fc-complete="${f.id}">تم الانتهاء</button>`:(f.photo?`<img src="${f.photo}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;">`:'')}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
+  }).join(''): `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
 function bindFacade(){
@@ -1119,47 +1140,159 @@ function bindInstalls(){
 async function loadInstalls(){ S.installs = (await dbSelect('installation_works')) ?? S.installs; }
 
 /* ============================= CHECKLIST DEFINITIONS (admin) ============================= */
-function renderChecklistAdmin(){
-  const showInactive = S.clShowInactive;
-  const list = showInactive? S.checklistDefs : S.checklistDefs.filter(c=>c.active);
-  return `
-  <div class="toolbar">
-    <button class="primary-btn" id="cl-add">${ICON.plus()} إضافة عنصر قوائم تحقق يومية</button>
-    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" id="cl-show-inactive" ${showInactive?'checked':''}> إظهار الموقوفة</label>
-  </div>
-  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الموقع</th><th>الوردية</th><th>وقت السماح</th><th>الحالة</th><th></th></tr></thead><tbody>
-  ${list.length? list.map(c=>{
-    const loc=S.locations.find(l=>l.id===c.location_id);
-    return `<tr>
-      <td>${esc(c.name)}</td>
-      <td>${loc?esc(loc.name):'-'}</td>
-      <td><span class="tag-shift ${c.shift}">${SHIFT_LABEL[c.shift]}</span></td>
-      <td>${c.valid_from&&c.valid_to? esc(c.valid_from)+' - '+esc(c.valid_to) : 'بدون قيد'}</td>
-      <td>${c.active?'<span class="badge done"><span class="dot"></span>مفعّل</span>':'<span class="badge pending"><span class="dot"></span>موقوف</span>'}</td>
-      <td>
-        <button class="ghost-btn" data-cl-qr="${c.id}">${ICON.qr(13)}</button>
-        <button class="ghost-btn" data-cl-edit="${c.id}">تعديل</button>
-        <button class="ghost-btn" data-cl-toggle="${c.id}" data-active="${c.active}">${c.active?'إيقاف':'تفعيل'}</button>
-        <button class="ghost-btn danger" data-cl-hard-del="${c.id}">${ICON.trash(13)} حذف نهائي</button>
-      </td>
-    </tr>`;
-  }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد عناصر</td></tr>`}
-  </tbody></table></div>`;
-}
-function bindChecklistAdmin(){
-  document.getElementById('cl-add').onclick=()=>{ S.modal={type:'addChecklistDef'}; render(); };
-  document.getElementById('cl-show-inactive').onchange=e=>{ S.clShowInactive=e.target.checked; render(); };
-  document.querySelectorAll('[data-cl-qr]').forEach(b=>b.onclick=()=>{ const c=S.checklistDefs.find(x=>x.id===b.dataset.clQr); S.qrTarget={code:'ZEDWEST|CL|'+c.id, label:c.name}; S.modal={type:'qr'}; render(); });
-  document.querySelectorAll('[data-cl-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editChecklistDef', id:b.dataset.clEdit}; render(); });
-  document.querySelectorAll('[data-cl-toggle]').forEach(b=>b.onclick=async ()=>{
-    const nowActive = b.dataset.active==='true';
-    await dbUpdate('checklist_definitions', b.dataset.clToggle, {active: !nowActive});
-    await loadChecklistDefs(); render();
-  });
-  document.querySelectorAll('[data-cl-hard-del]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteChecklistDef', id:b.dataset.clHardDel}; render(); });
-}
-async function loadChecklistDefs(){ S.checklistDefs = (await dbSelect('checklist_definitions')) ?? S.checklistDefs; }
 
+/* ============================= SCHEDULED TASKS (المهمات المجدولة) ============================= */
+function taskItemsOf(listId){
+  return (S.taskItems||[]).filter(i=>i.list_id===listId && i.active!==false).sort((a,b)=>(a.position||0)-(b.position||0) || String(a.id).localeCompare(String(b.id)));
+}
+function taskRunOf(listId, date){ return (S.taskRuns||[]).find(r=>r.list_id===listId && r.date===(date||S.today)) || null; }
+function taskItemDone(run, itemId){ const x=(S.taskRunItems||[]).find(z=>z.run_id===run.id && z.item_id===itemId); return !!(x && x.done); }
+function taskProgress(list){
+  const run=taskRunOf(list.id); const items=taskItemsOf(list.id);
+  const done = run? items.filter(it=>taskItemDone(run,it.id)).length : 0;
+  return { run, total:items.length, done };
+}
+function sortedTaskLists(){ return (S.taskLists||[]).slice().sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''))); }
+function tasksForShift(shift){ return sortedTaskLists().filter(l=>l.active!==false && (!l.shift || l.shift==='both' || l.shift===shift)); }
+function taskRunBadge(run){
+  if(!run) return '<span class="badge pending"><span class="dot"></span>قيد التجهيز</span>';
+  if(run.status==='completed') return '<span class="badge done"><span class="dot"></span>تم اعتمادها</span>';
+  if(run.supervisor_marked_done) return '<span class="badge progress"><span class="dot"></span>بانتظار اعتماد المشرف الأول</span>';
+  return '<span class="badge pending"><span class="dot"></span>قيد التنفيذ</span>';
+}
+async function loadTaskData(){
+  const d=new Date(); d.setDate(d.getDate()-45); const from=dateStr(d);
+  const [lists, items, runsRes] = await Promise.all([
+    dbSelect('task_lists'), dbSelect('task_items'),
+    sb.from('task_runs').select('*').gte('date', from)
+  ]);
+  if(lists) S.taskLists=lists;
+  if(items) S.taskItems=items;
+  if(runsRes.error){ console.error('task_runs', runsRes.error); toast('تعذّر تحميل المهمات المجدولة — '+runsRes.error.message,false); }
+  else S.taskRuns = runsRes.data||[];
+  await loadTaskRunItems();
+}
+async function loadTaskRunItems(){
+  const ids=(S.taskRuns||[]).filter(r=>r.date===S.today).map(r=>r.id);
+  if(!ids.length){ S.taskRunItems=[]; return; }
+  const {data,error}=await sb.from('task_run_items').select('*').in('run_id',ids);
+  if(error){ console.error('task_run_items',error); return; }
+  S.taskRunItems=data||[];
+}
+async function ensureTodayTaskRuns(){
+  const date=S.today;
+  const existing=(S.taskRuns||[]).filter(r=>r.date===date);
+  const missing=(S.taskLists||[]).filter(l=>l.active!==false && !existing.find(r=>r.list_id===l.id))
+    .map(l=>({ id:uid('trun'), date, list_id:l.id, status:'incomplete', supervisor_marked_done:false }));
+  if(!missing.length) return;
+  const {error}=await sb.from('task_runs').upsert(missing,{onConflict:'list_id,date',ignoreDuplicates:true});
+  if(error){ console.error('task_runs upsert',error); return; }
+  await loadTaskData();
+}
+async function refreshTasks(){ await loadTaskData(); await ensureTodayTaskRuns(); render(); }
+
+function renderTasksAdmin(){
+  const lists=sortedTaskLists();
+  return `
+  <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button></div>
+  <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك كل يوم للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
+  ${lists.length? lists.map(l=>{
+    const items=taskItemsOf(l.id); const {run,done,total}=taskProgress(l);
+    const open=S.openTaskAdmin.has(l.id);
+    return `<details class="card" data-tl-open="${l.id}" ${open?'open':''} style="margin-bottom:12px;${l.active===false?'opacity:.65;':''}">
+      <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span><b style="font-size:14.5px;">${esc(l.name)}</b> <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span></span>
+        <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text-dim);">${total} بند · اليوم ${done}/${total}</span>${l.active===false?'<span class="badge pending"><span class="dot"></span>موقوفة</span>':taskRunBadge(run)}</span>
+      </summary>
+      <div style="margin-top:12px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="ghost-btn" data-tl-qr="${l.id}">${ICON.qr(13)} كود QR</button>
+          <button class="ghost-btn" data-tl-edit="${l.id}">تعديل الاسم / الوردية</button>
+          <button class="ghost-btn" data-tl-toggle="${l.id}">${l.active===false?'تفعيل':'إيقاف'}</button>
+          <button class="ghost-btn danger" data-tl-del="${l.id}">${ICON.trash(13)} حذف القائمة</button>
+        </div>
+        ${items.length? items.map((it,idx)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+          <span style="min-width:22px;color:var(--text-dim);font-size:12px;">${idx+1}</span>
+          <input data-ti-name="${it.id}" value="${esc(it.name)}" style="flex:1;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sand);">
+          <button class="ghost-btn" data-ti-up="${it.id}" ${idx===0?'disabled':''}>▲</button>
+          <button class="ghost-btn" data-ti-down="${it.id}" ${idx===items.length-1?'disabled':''}>▼</button>
+          <button class="ghost-btn" data-ti-save="${it.id}">حفظ</button>
+          <button class="ghost-btn danger" data-ti-del="${it.id}">${ICON.trash(12)}</button>
+        </div>`).join('') : '<p style="font-size:12.5px;color:var(--text-dim);">القائمة لسه فاضية — ضيف بنود تحت.</p>'}
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          <input data-ti-new="${l.id}" placeholder="بند جديد (مثال: الأسانسير)" style="flex:1;min-width:160px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sand);">
+          <button class="primary-btn" data-ti-add="${l.id}">${ICON.plus(13)} إضافة</button>
+        </div>
+        <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--mint);font-weight:700;">إضافة عدة بنود مرة واحدة</summary>
+          <textarea data-ti-bulk="${l.id}" rows="5" placeholder="اكتب كل بند في سطر (مثال: الدور 1، الدور 2، أبواب الشقق...)" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--sand);"></textarea>
+          <button class="ghost-btn" data-ti-bulk-add="${l.id}" style="margin-top:6px;">إضافة البنود</button>
+        </details>
+      </div>
+    </details>`;
+  }).join('') : `<div class="empty-state"><span class="em">📋</span>لسه مفيش قوائم مهام — دوس "قائمة مهام جديدة"</div>`}`;
+}
+async function addTaskItems(listId, names){
+  const items=taskItemsOf(listId); let pos=items.reduce((m,i)=>Math.max(m,i.position||0),0);
+  const rows=names.map(n=>({ id:uid('ti'), list_id:listId, name:n, position:++pos, active:true }));
+  if(await dbInsert('task_items',rows)){ S.openTaskAdmin.add(listId); await refreshTasks(); toast('تمت إضافة '+rows.length+' بند',true); }
+}
+async function moveTaskItem(id, dir){
+  const it=(S.taskItems||[]).find(x=>x.id===id); if(!it) return;
+  const items=taskItemsOf(it.list_id); const i=items.findIndex(x=>x.id===id); const j=i+dir;
+  if(j<0||j>=items.length) return;
+  const order=items.map(x=>x.id); const tmp=order[i]; order[i]=order[j]; order[j]=tmp;
+  for(let k=0;k<order.length;k++){ const cur=items.find(x=>x.id===order[k]); if(cur.position!==k+1) await dbUpdate('task_items',cur.id,{position:k+1}); }
+  S.openTaskAdmin.add(it.list_id); await refreshTasks();
+}
+function bindTasksAdmin(){
+  const add=document.getElementById('tl-add'); if(add) add.onclick=()=>{ S.modal={type:'addTaskList'}; render(); };
+  document.querySelectorAll('details[data-tl-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskAdmin.add(d.dataset.tlOpen); else S.openTaskAdmin.delete(d.dataset.tlOpen); }));
+  document.querySelectorAll('[data-tl-qr]').forEach(b=>b.onclick=()=>{ const l=S.taskLists.find(x=>x.id===b.dataset.tlQr); S.qrTarget={code:'ZEDWEST|TL|'+l.id, label:l.name}; S.modal={type:'qr'}; render(); });
+  document.querySelectorAll('[data-tl-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editTaskList', id:b.dataset.tlEdit}; render(); });
+  document.querySelectorAll('[data-tl-toggle]').forEach(b=>b.onclick=async ()=>{ const l=S.taskLists.find(x=>x.id===b.dataset.tlToggle); await dbUpdate('task_lists', l.id, {active: l.active===false}); await refreshTasks(); });
+  document.querySelectorAll('[data-tl-del]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteTaskList', id:b.dataset.tlDel}; render(); });
+  document.querySelectorAll('[data-ti-add]').forEach(b=>b.onclick=async ()=>{
+    const lid=b.dataset.tiAdd; const inp=document.querySelector(`[data-ti-new="${lid}"]`); const name=(inp.value||'').trim();
+    if(!name){ toast('اكتب اسم البند',false); return; }
+    await addTaskItems(lid,[name]);
+  });
+  document.querySelectorAll('[data-ti-bulk-add]').forEach(b=>b.onclick=async ()=>{
+    const lid=b.dataset.tiBulkAdd; const ta=document.querySelector(`[data-ti-bulk="${lid}"]`);
+    const names=(ta.value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    if(!names.length){ toast('اكتب بند واحد على الأقل',false); return; }
+    await addTaskItems(lid,names);
+  });
+  document.querySelectorAll('[data-ti-save]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.tiSave; const name=(document.querySelector(`[data-ti-name="${id}"]`).value||'').trim();
+    if(!name){ toast('اسم البند مينفعش يبقى فاضي',false); return; }
+    if(await dbUpdate('task_items',id,{name})){ const it=S.taskItems.find(x=>x.id===id); if(it){ S.openTaskAdmin.add(it.list_id); } await refreshTasks(); toast('تم حفظ البند',true); }
+  });
+  document.querySelectorAll('[data-ti-del]').forEach(b=>b.onclick=async ()=>{
+    if(!confirm('حذف البند ده؟')) return;
+    const it=S.taskItems.find(x=>x.id===b.dataset.tiDel); if(it) S.openTaskAdmin.add(it.list_id);
+    if(await dbDelete('task_items',b.dataset.tiDel)){ await refreshTasks(); toast('تم حذف البند',true); }
+  });
+  document.querySelectorAll('[data-ti-up]').forEach(b=>b.onclick=()=>moveTaskItem(b.dataset.tiUp,-1));
+  document.querySelectorAll('[data-ti-down]').forEach(b=>b.onclick=()=>moveTaskItem(b.dataset.tiDown,1));
+}
+function renderSupTaskLists(shift){
+  const lists=tasksForShift(shift);
+  const cards=lists.map(l=>{
+    const run=taskRunOf(l.id); if(!run) return '';
+    const items=taskItemsOf(l.id); const {done,total}=taskProgress(l);
+    const locked = run.status==='completed';
+    return `<details class="card" data-tsup-open="${l.id}" ${S.openTaskSup.has(l.id)?'open':''} style="margin-bottom:10px;">
+      <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b>${esc(l.name)}</b><span style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-dim);">${done}/${total}</span>${taskRunBadge(run)}</span></summary>
+      <div style="margin-top:10px;">
+        ${items.length? items.map(it=>{ const ok=taskItemDone(run,it.id); return `<label style="display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px dashed var(--line);${ok?'background:var(--mint-light);':''}"><input type="checkbox" data-ti-check="${run.id}|${it.id}" ${ok?'checked':''} ${locked?'disabled':''} style="width:20px;height:20px;flex-shrink:0;"><span style="flex:1;font-size:13.5px;${ok?'color:var(--text-dim);text-decoration:line-through;':''}">${esc(it.name)}</span></label>`; }).join('') : '<p style="color:var(--text-dim);font-size:13px;">القائمة لسه فاضية.</p>'}
+        ${locked? `<div style="font-size:12px;color:var(--mint);text-align:center;padding:10px 0 0;">${ICON.check(13)} تم اعتمادها من المشرف الأول</div>`
+          : `<button class="${run.supervisor_marked_done?'ghost-btn':'primary-btn'}" style="width:100%;justify-content:center;margin-top:10px;" data-tl-mark="${run.id}" data-marked="${run.supervisor_marked_done?'1':'0'}">${run.supervisor_marked_done? ICON.check(13)+' تم الانتهاء ✓ (بانتظار اعتماد المشرف الأول) — دوس للتراجع' : 'تم الانتهاء من القائمة'}</button>`}
+      </div>
+    </details>`;
+  }).join('');
+  return cards || `<p style="color:var(--text-dim);font-size:13px;">مفيش مهمات مجدولة للوردية دي النهاردة.</p>`;
+}
+async function ensureTodayTaskRunsAndRender(){ await refreshTasks(); }
 function renderQrSheet(){
   return `<div class="card"><p style="font-size:13px;color:var(--text-dim);margin-top:0;">اطبع الصفحة واعلّق كل رمز في مكانه.</p>
   <button class="primary-btn" id="do-print">${ICON.printer(13)} طباعة كل الرموز</button></div>
@@ -1172,14 +1305,13 @@ function bindQrSheet(){
 function buildPrintPreview(){
   const holder=document.getElementById('print-preview'); if(!holder) return;
   holder.innerHTML='';
-  S.checklistDefs.filter(c=>c.active).forEach(c=>{
-    const loc=S.locations.find(l=>l.id===c.location_id);
+  sortedTaskLists().filter(l=>l.active!==false).forEach(l=>{
     const tile=document.createElement('div'); tile.className='print-tile';
     const qrDiv=document.createElement('div'); tile.appendChild(qrDiv);
-    const pn=document.createElement('div'); pn.className='pn'; pn.textContent=c.name; tile.appendChild(pn);
-    const pl=document.createElement('div'); pl.style.fontSize='10px'; pl.style.color='#666'; pl.textContent=(loc?loc.name:'')+' · '+SHIFT_LABEL[c.shift]; tile.appendChild(pl);
+    const pn=document.createElement('div'); pn.className='pn'; pn.textContent=l.name; tile.appendChild(pn);
+    const pl=document.createElement('div'); pl.style.fontSize='10px'; pl.style.color='#666'; pl.textContent=SHIFT_LABEL[l.shift||'both']; tile.appendChild(pl);
     holder.appendChild(tile);
-    new QRCode(qrDiv, { text:'ZEDWEST|CL|'+c.id, width:110, height:110, colorDark:'#0E2A2B', colorLight:'#fff' });
+    new QRCode(qrDiv, { text:'ZEDWEST|TL|'+l.id, width:110, height:110, colorDark:'#0E2A2B', colorLight:'#fff' });
   });
 }
 
@@ -1384,17 +1516,11 @@ async function refreshAssignments(){
   const role = S.profile && S.profile.role;
   const isDist = DIST_ROLES.includes(role);
   if(!isDist && role!=='supervisor') return;
-  const [pres, za, la, av, ses] = await Promise.all([
+  const [pres, ses] = await Promise.all([
     dbSelect('daily_presence', { date: S.today }),
-    dbSelect('zone_assignments', { date: S.today }),
-    dbSelect('location_assignments', { date: S.today }),
-    dbSelect('location_audit_visits'),
     isDist ? dbSelect('distribution_sessions', { date: S.today }) : Promise.resolve(null),
   ]);
   if(pres) S.presence = pres;
-  if(za) S.zoneAssignments = za;
-  if(la) S.locationAssignments = la;
-  if(av) S.auditVisits = av;
   if(ses) S.distSession = ses[0] || null;
 }
 // true لو في أي حقل في الشاشة اتعدّل ولسه ما اتحفظش — عشان ما نمسحش اللي بيتكتب
@@ -1407,13 +1533,9 @@ function hasUnsavedInput(){
   });
 }
 async function loadDistData(){
-  S.zones = (await dbSelect('zones')) ?? S.zones;
   const sessionsRes = await dbSelect('distribution_sessions', { date: S.today });
   if(sessionsRes) S.distSession = sessionsRes[0] || null;
   S.presence = (await dbSelect('daily_presence', { date: S.today })) ?? S.presence;
-  S.zoneAssignments = (await dbSelect('zone_assignments', { date: S.today })) ?? S.zoneAssignments;
-  S.locationAssignments = (await dbSelect('location_assignments', { date: S.today })) ?? S.locationAssignments;
-  S.auditVisits = (await dbSelect('location_audit_visits')) ?? S.auditVisits;
 }
 function isPresent(userId){ const p=S.presence.find(x=>x.user_id===userId); return p? p.present : null; }
 
@@ -1437,46 +1559,18 @@ function bindDistribution(){
     document.querySelectorAll('[data-presence-select]').forEach(sel=>{
       const userId = sel.dataset.presenceSelect;
       const scopeSel = document.querySelector(`[data-presence-scope="${userId}"]`);
+      const shiftSel = document.querySelector(`[data-presence-shift="${userId}"]`);
       const nameInput = document.querySelector(`[data-presence-name="${userId}"]`);
-      rows.push({ id:uid('pres'), date:S.today, user_id:userId, present:sel.value==='1', scope: scopeSel? scopeSel.value : 'general_areas', actual_name: nameInput? nameInput.value.trim() : null, marked_by:S.session.user.id });
+      const r = { id:uid('pres'), date:S.today, user_id:userId, present:sel.value==='1', scope: scopeSel? scopeSel.value : 'general_areas', actual_name: nameInput? nameInput.value.trim() : null, marked_by:S.session.user.id };
+      if(shiftSel) r.shift = shiftSel.value;
+      rows.push(r);
     });
-    // احذف القديم لليوم لنفس المستخدمين ثم أضف الجديد (أبسط من upsert يدوي)
     for(const r of rows){
       await dbDeleteWhere('daily_presence', { date:S.today, user_id:r.user_id });
     }
     if(await dbInsert('daily_presence', rows)){ await loadDistData(); render(); toast('تم حفظ الحضور',true); }
   };
-  document.querySelectorAll('[data-assign-zone]').forEach(sel=>sel.onchange=async ()=>{
-    const supId=sel.dataset.assignZone;
-    if(!sel.value) return;
-    sel.disabled=true;
-    // امسح أي توزيع قديم لنفس المشرف في نفس اليوم من الداتابيز مباشرة (مش من الحالة المحلية)
-    if(!(await dbDeleteWhere('zone_assignments', { date:S.today, senior_supervisor_id:supId }))){ sel.disabled=false; return; }
-    const row={ id:uid('za'), date:S.today, zone_id:sel.value, senior_supervisor_id:supId, assigned_by:S.session.user.id };
-    if(await dbInsert('zone_assignments',[row])){
-      await loadDistData();
-      const saved = S.zoneAssignments.some(z=>z.id===row.id);
-      render();
-      if(saved) toast('تم تعيين الزون',true);
-      else toast('الزون اتحفظ لكن مش قادر أقراه تاني — مشكلة صلاحيات (RLS) على zone_assignments في Supabase',false);
-    } else { sel.disabled=false; }
-  });
-  document.querySelectorAll('[data-assign-location]').forEach(sel=>sel.onchange=async ()=>{
-    const locId=sel.dataset.assignLocation;
-    if(!sel.value) return;
-    sel.disabled=true;
-    if(!(await dbDeleteWhere('location_assignments', { date:S.today, location_id:locId }))){ sel.disabled=false; return; }
-    const row={ id:uid('la'), date:S.today, location_id:locId, supervisor_id:sel.value, assigned_by:S.session.user.id };
-    if(await dbInsert('location_assignments',[row])){
-      await loadDistData();
-      const saved = S.locationAssignments.some(l=>l.id===row.id);
-      render();
-      if(saved) toast('تم التعيين',true);
-      else toast('التعيين اتحفظ لكن مش قادر أقراه تاني — مشكلة صلاحيات (RLS) على location_assignments',false);
-    } else { sel.disabled=false; }
-  });
-  document.querySelectorAll('[data-scan-audit]').forEach(b=>b.onclick=()=>{ S.scanCtx={auditLocationId:b.dataset.scanAudit, mode:'audit'}; S.modal={type:'scanAudit'}; render(); });
-  document.querySelectorAll('[data-scan-cl-senior]').forEach(b=>b.onclick=()=>{ S.scanCtx={instanceId:b.dataset.scanClSenior}; S.modal={type:'scan'}; render(); });
+  document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
 }
 
 function renderManagerSection(){
@@ -1487,24 +1581,21 @@ function renderManagerSection(){
       <button class="primary-btn" id="start-dist-btn">🚀 بدء التوزيع</button>
     </div>`;
   }
-  const seniors = S.users.filter(u=>u.role==='hk_senior_supervisor' && u.active);
+  const rolesOf = id => { const u=S.users.find(x=>x.id===id); return u? u.role : null; };
+  const presentRows = (S.presence||[]).filter(p=>p.present===true);
+  const seniors = presentRows.filter(p=>rolesOf(p.user_id)==='hk_senior_supervisor').length;
+  const supRows = presentRows.filter(p=>rolesOf(p.user_id)==='supervisor');
+  const units = supRows.filter(p=>p.scope==='units').length;
+  const general = supRows.length - units;
   return `<div class="card" style="margin-bottom:16px;">
-    <h3 style="margin-top:0;">توزيع الزونات على المشرفين الأوائل</h3>
-    <p style="font-size:12.5px;color:var(--text-dim);">التوزيع بدأ اليوم. المشرفون الأوائل الحاضرون بس هيظهروا هنا بعد ما إداري HK يحدد الحضور.</p>
-    ${seniors.length? seniors.map(u=>{
-      const present = isPresent(u.id);
-      const presenceRow = S.presence.find(p=>p.user_id===u.id);
-      const actualName = presenceRow? presenceRow.actual_name : '';
-      const currentZone = S.zoneAssignments.find(z=>z.senior_supervisor_id===u.id);
-      if(present!==true) return `<div style="padding:8px 0;border-bottom:1px solid var(--line);color:var(--text-dim);font-size:13px;">${esc(u.full_name)} — ${present===false?'غائب اليوم':'بانتظار تحديد الحضور'}</div>`;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:6px;">
-        <div><b style="font-size:13px;">${esc(u.full_name)}</b>${actualName?`<div style="font-size:11.5px;color:var(--mint);">الحاضر فعليًا: ${esc(actualName)}</div>`:''}</div>
-        <select data-assign-zone="${u.id}">
-          <option value="">${currentZone? 'الزون: '+esc((S.zones.find(z=>z.id===currentZone.zone_id)||{}).name||'') : 'اختر زون'}</option>
-          ${S.zones.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}
-        </select>
-      </div>`;
-    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا يوجد مشرفون أوائل مسجلون بعد.</p>`}
+    <h3 style="margin-top:0;">التوزيع اليومي</h3>
+    <span class="badge done"><span class="dot"></span>التوزيع بدأ النهاردة</span>
+    <p style="font-size:12.5px;color:var(--text-dim);line-height:1.8;">من غير تعيين: المهمات والوحدات بتنزل أوتوماتيك للمشرفين الحاضرين حسب نوعهم ووردياتهم اللي بيحددها إداري HK في الحضور.</p>
+    <div class="stat-row" style="margin:0;">
+      <div class="stat mint"><div class="num">${seniors}</div><div class="lbl">مشرفون أوائل حاضرون</div></div>
+      <div class="stat blue"><div class="num">${units}</div><div class="lbl">مشرفو وحدات حاضرون</div></div>
+      <div class="stat amber"><div class="num">${general}</div><div class="lbl">مشرفو أماكن عامة حاضرون</div></div>
+    </div>
   </div>`;
 }
 
@@ -1517,19 +1608,25 @@ function renderPresenceSection(){
   }
   const seniors = S.users.filter(u=>u.role==='hk_senior_supervisor' && u.active);
   const supervisors = S.users.filter(u=>u.role==='supervisor' && u.active);
-  const row=(u, withScope, withName)=>{
+  const selStyle = 'border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;';
+  const row=(u, isSup)=>{
     const cur = isPresent(u.id);
     const val = cur===false? '0' : '1';
     const existing = S.presence.find(p=>p.user_id===u.id);
     const scope = (existing && existing.scope) || 'general_areas';
+    const shift = (existing && existing.shift) || 'morning';
     const actualName = (existing && existing.actual_name) || '';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;">
       <span style="font-size:13px;">${esc(u.full_name)}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        ${withName? `<input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;width:130px;">` : ''}
-        ${withScope? `<select data-presence-scope="${u.id}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;">
+        <input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" style="${selStyle}width:130px;">
+        ${isSup? `<select data-presence-scope="${u.id}" style="${selStyle}">
           <option value="general_areas" ${scope==='general_areas'?'selected':''}>مشرف أماكن عامة</option>
           <option value="units" ${scope==='units'?'selected':''}>مشرف وحدات</option>
+        </select>
+        <select data-presence-shift="${u.id}" style="${selStyle}">
+          <option value="morning" ${shift==='morning'?'selected':''}>صباحي</option>
+          <option value="evening" ${shift==='evening'?'selected':''}>مسائي</option>
         </select>` : ''}
         <select data-presence-select="${u.id}" style="border:1px solid ${val==='1'?'var(--mint)':'var(--coral)'};color:${val==='1'?'var(--mint)':'var(--coral)'};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
           <option value="1" ${val==='1'?'selected':''}>حاضر</option>
@@ -1541,143 +1638,41 @@ function renderPresenceSection(){
   return `<div class="card" style="margin-bottom:16px;">
     <h3 style="margin-top:0;">توزيع المسئولين — تحديد الحضور</h3>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-      <div><h4 style="font-size:13px;">المشرفون الأوائل</h4>${seniors.map(u=>row(u,false,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
-      <div><h4 style="font-size:13px;">المشرفون</h4>${supervisors.map(u=>row(u,true,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
+      <div><h4 style="font-size:13px;">المشرفون الأوائل</h4>${seniors.map(u=>row(u,false)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
+      <div><h4 style="font-size:13px;">المشرفون (النوع + الوردية)</h4>${supervisors.map(u=>row(u,true)).join('') || '<p style="color:var(--text-dim);font-size:12.5px;">لا يوجد</p>'}</div>
     </div>
     <button class="primary-btn" id="save-presence-btn" style="margin-top:14px;">حفظ الحضور لليوم</button>
   </div>`;
 }
 
 function renderSeniorSection(){
-  const uidMe = S.session.user.id;
-  const myZoneAssignments = S.zoneAssignments.filter(z=>z.senior_supervisor_id===uidMe);
-  const myZones = myZoneAssignments.map(za=>S.zones.find(z=>z.id===za.zone_id)).filter(Boolean);
-  const presentSupervisors = S.users.filter(u=>u.role==='supervisor' && isPresent(u.id)===true);
-  if(!myZones.length && (S.profile.role==='hk_senior_supervisor')){
-    return `<div class="card" style="margin-bottom:16px;"><p style="color:var(--text-dim);font-size:13px;">لسه مديرك ما وزّعش عليك زون النهاردة.</p></div>`;
-  }
-  const myLocIds = Array.from(new Set(myZones.flatMap(z=>z.location_ids||[])));
-  const myChecklistToday = (S.checklistInstances||[]).filter(ci=>ci.date===S.today && myLocIds.includes(ci.location_id));
-  const checklistSection = (S.profile.role==='hk_senior_supervisor') ? `
-  <div class="card" style="margin-bottom:16px;">
-    <h3 style="margin-top:0;">اعتماد قوائم التحقق اليومية</h3>
-    <p style="font-size:11.5px;color:var(--text-dim);margin-top:-6px;">القائمة ما بتتقفلش إلا لما تمسح كود التحقق بتاعها بنفسك.</p>
-    ${myChecklistToday.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-      ${myChecklistToday.map(ci=>{
-        const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
-        const loc=S.locations.find(l=>l.id===ci.location_id);
-        const isDone=ci.status==='completed';
-        const markedBySup=!!ci.supervisor_marked_done;
-        return `<div class="card" style="margin:0;${markedBySup&&!isDone?'border-color:var(--mint);':''}">
-          <div style="display:flex;justify-content:space-between;"><b style="font-size:13px;">${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
-          <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
-          ${!isDone && markedBySup? `<div style="font-size:11px;color:var(--mint);margin-bottom:6px;">${ICON.check(11)} المشرف قال إنه خلّص — جاهزة للاعتماد</div>`:''}
+  const runs = sortedTaskLists().filter(l=>l.active!==false).map(l=>({ l, run:taskRunOf(l.id), p:taskProgress(l) })).filter(x=>x.run);
+  return `<div class="card" style="margin-bottom:16px;">
+    <h3 style="margin-top:0;">اعتماد المهمات المجدولة</h3>
+    <p style="font-size:11.5px;color:var(--text-dim);margin-top:-6px;">القائمة ما بتتقفلش إلا لما تمسح كود الـ QR بتاعها بنفسك بعد ما المشرف يأكد الانتهاء.</p>
+    ${runs.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">
+      ${runs.map(({l,run,p})=>{
+        const isDone=run.status==='completed'; const marked=!!run.supervisor_marked_done;
+        return `<div class="card" style="margin:0;${marked&&!isDone?'border-color:var(--mint);':''}">
+          <div style="display:flex;justify-content:space-between;gap:6px;"><b style="font-size:13px;">${esc(l.name)}</b><span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span></div>
+          <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">البنود المنجزة: ${p.done}/${p.total}</div>
+          <div style="margin-bottom:8px;">${taskRunBadge(run)}</div>
           ${isDone? `<button class="primary-btn" style="width:100%;justify-content:center;" disabled>${ICON.check(14)} معتمدة</button>`
-            : markedBySup? `<button class="primary-btn" style="width:100%;justify-content:center;" data-scan-cl-senior="${ci.id}">${ICON.qr(14)} امسح كود التحقق</button>`
+            : marked? `<button class="primary-btn" style="width:100%;justify-content:center;" data-scan-task="${run.id}">${ICON.qr(14)} امسح كود التحقق</button>`
             : `<button class="ghost-btn" style="width:100%;justify-content:center;" disabled>بانتظار المشرف يأكد الانتهاء</button>`}
         </div>`;
       }).join('')}
-    </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد قوائم تحقق النهاردة في الزون بتاعك</p>`}
-  </div>` : '';
-  return checklistSection + `<div class="card">
-    <h3 style="margin-top:0;">توزيع المواقع على المشرفين</h3>
-    ${myZones.map(zone=>{
-      const locIds = zone.location_ids||[];
-      return `<div style="margin-bottom:14px;">
-        <div style="font-weight:800;font-size:13px;color:var(--mint);margin-bottom:6px;">زون: ${esc(zone.name)}</div>
-        ${locIds.map(locId=>{
-          const loc=S.locations.find(l=>l.id===locId);
-          if(!loc) return '';
-          const currentAssign = S.locationAssignments.find(la=>la.location_id===locId);
-          const assignedSup = currentAssign? S.users.find(u=>u.id===currentAssign.supervisor_id) : null;
-          const assignedPresence = assignedSup? S.presence.find(p=>p.user_id===assignedSup.id) : null;
-          const auditCount = S.auditVisits.filter(v=>v.location_id===locId).length;
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;">
-            <span style="font-size:13px;">${esc(loc.name)}</span>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <select data-assign-location="${locId}">
-                <option value="">${assignedSup?'معيّن: '+esc(assignedSup.full_name)+(assignedPresence&&assignedPresence.actual_name?' ('+esc(assignedPresence.actual_name)+')':''):'اختر مشرف'}</option>
-                ${presentSupervisors.map(u=>{ const pr=S.presence.find(p=>p.user_id===u.id); const an=pr&&pr.actual_name? ' — '+pr.actual_name : ''; return `<option value="${u.id}">${esc(u.full_name+an)}</option>`; }).join('')}
-              </select>
-              <button class="ghost-btn" data-scan-audit="${locId}">${ICON.qr(12)} تدقيق${auditCount?' ('+auditCount+')':''}</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}
+    </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد مهمات مجدولة النهاردة.</p>`}
   </div>`;
 }
 
 /* ============================= LOCATIONS (admin) ============================= */
-function renderLocations(){
-  return `<div class="card" style="margin-bottom:16px;">
-    <h3 style="margin-top:0;">المواقع</h3>
-    ${S.locations.map(l=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);align-items:center;">
-      <div><b>${esc(l.name)}</b> <span style="color:var(--text-dim);font-size:12px;">${esc(l.building||'')}</span></div>
-      <div style="display:flex;gap:6px;">
-        <button class="ghost-btn" data-loc-audit-qr="${l.id}">${ICON.qr(12)} كود تدقيق</button>
-        <button class="ghost-btn danger" data-loc-del="${l.id}">${ICON.trash()}</button>
-      </div>
-    </div>`).join('') || '<p style="color:var(--text-dim);">لا توجد مواقع</p>'}
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-      <input id="new-loc-name" placeholder="اسم الموقع" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
-      <input id="new-loc-building" placeholder="القطاع (اختياري)" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;">
-      <button class="primary-btn" id="add-loc">${ICON.plus()} إضافة</button>
-    </div>
-  </div>
-  <div class="card">
-    <h3 style="margin-top:0;">الزونات (تجميعة مواقع)</h3>
-    ${S.zones.map(z=>`<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
-      <div><b>${esc(z.name)}</b> <span style="color:var(--text-dim);font-size:12px;">(${(z.location_ids||[]).length} موقع)</span></div>
-      <div style="display:flex;gap:6px;">
-        <button class="ghost-btn" data-zone-edit="${z.id}">تعديل</button>
-        <button class="ghost-btn danger" data-zone-del="${z.id}">${ICON.trash()}</button>
-      </div>
-    </div>`).join('') || '<p style="color:var(--text-dim);">لا توجد زونات بعد</p>'}
-    <div style="margin-top:12px;">
-      <div class="form-row"><label>اسم الزون</label><input id="new-zone-name" placeholder="مثال: زون شمال"></div>
-      <div class="form-row"><label>المواقع</label><select multiple class="multi-sel" id="new-zone-locs">
-        ${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}
-      </select></div>
-      <button class="primary-btn" id="add-zone">${ICON.plus()} إضافة زون</button>
-    </div>
-  </div>`;
-}
-function bindLocations(){
-  document.getElementById('add-loc').onclick=async ()=>{
-    const name=document.getElementById('new-loc-name').value.trim();
-    const building=document.getElementById('new-loc-building').value.trim();
-    if(!name){ toast('اكتب اسم الموقع',false); return; }
-    const ok = await dbInsert('locations', [{id:uid('loc'), name, building}]);
-    if(ok){ await loadLocations(); render(); }
-  };
-  document.querySelectorAll('[data-loc-audit-qr]').forEach(b=>b.onclick=()=>{
-    const loc=S.locations.find(l=>l.id===b.dataset.locAuditQr);
-    S.qrTarget={code:'ZEDWEST|LOC|'+loc.id, label:'كود تدقيق: '+loc.name};
-    S.modal={type:'qr'}; render();
-  });
-  document.getElementById('add-zone').onclick=async ()=>{
-    const name=document.getElementById('new-zone-name').value.trim();
-    const sel=document.getElementById('new-zone-locs');
-    const location_ids=Array.from(sel.selectedOptions).map(o=>o.value);
-    if(!name||!location_ids.length){ toast('اكتب اسم الزون واختر مواقع له',false); return; }
-    const ok = await dbInsert('zones', [{id:uid('zone'), name, location_ids, created_by:S.session.user.id}]);
-    if(ok){ S.zones = (await dbSelect('zones')) ?? S.zones; render(); toast('تمت إضافة الزون',true); }
-  };
-  document.querySelectorAll('[data-zone-del]').forEach(b=>b.onclick=async ()=>{
-    await dbDelete('zones', b.dataset.zoneDel);
-    S.zones = (await dbSelect('zones')) ?? S.zones; render();
-  });
-  document.querySelectorAll('[data-zone-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editZone', id:b.dataset.zoneEdit}; render(); });
-  document.querySelectorAll('[data-loc-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('locations', b.dataset.locDel); await loadLocations(); render(); });
-}
-async function loadLocations(){ S.locations = (await dbSelect('locations')) ?? S.locations; }
 
 /* ============================= USERS (admin) ============================= */
 function renderUsers(){
   return `
   <div class="toolbar"><button class="primary-btn" id="add-user-btn">${ICON.plus()} إضافة مستخدم جديد</button></div>
-  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>المواقع المسموحة</th><th>دخول QR</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>دخول QR</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{
     const qrRow = (S.qrTokens||[]).find(x=>x.user_id===u.id);
     const isSelf = u.id===S.session.user.id;
@@ -1690,9 +1685,6 @@ function renderUsers(){
       <td><select data-u-active="${u.id}" ${isSelf?'disabled':''}>
         <option value="1" ${u.active?'selected':''}>مفعّل</option>
         <option value="0" ${!u.active?'selected':''}>موقوف</option>
-      </select></td>
-      <td><select multiple class="multi-sel" data-u-locs="${u.id}">
-        ${S.locations.map(l=>`<option value="${l.id}" ${(u.allowed_locations||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
       </select></td>
       <td>${qrRow? `<div class="qr-thumb" data-qr-open="${u.id}" data-qr-thumb="${qrRow.token}" title="عرض / طباعة"></div>` : (S.qrLoaded? `<button class="ghost-btn" data-qr-gen="${u.id}">${ICON.qr(13)} إنشاء</button>` : '<span style="color:var(--text-dim);">…</span>')}</td>
       <td>
@@ -1710,10 +1702,8 @@ function bindUsers(){
     const full_name=document.querySelector(`[data-u-name="${id}"]`).value.trim();
     const role=document.querySelector(`[data-u-role="${id}"]`).value;
     const active=document.querySelector(`[data-u-active="${id}"]`).value==='1';
-    const locsSel=document.querySelector(`[data-u-locs="${id}"]`);
-    const allowed_locations=Array.from(locsSel.selectedOptions).map(o=>o.value);
     if(!full_name){ toast('اكتب اسم صحيح',false); return; }
-    await dbUpdate('profiles', id, {full_name, role, active, allowed_locations});
+    await dbUpdate('profiles', id, {full_name, role, active});
     await loadUsers(); render(); toast('تم حفظ بيانات المستخدم', true);
   });
   document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteUser', id:b.dataset.deleteUser}; render(); });
@@ -1817,7 +1807,7 @@ function getReportData(){
     facade: (S.facade||[]).filter(f=>inRange(f.date)),
     waste: (S.waste||[]).filter(w=>inRange(w.date)),
     installs: S.installs.filter(i=>inRange(i.date)),
-    checklist: S.checklistInstances.filter(c=>inRange(c.date)),
+    checklist: (S.taskRuns||[]).filter(c=>inRange(c.date)).map(c=>({...c, list_name:((S.taskLists||[]).find(l=>l.id===c.list_id)||{}).name||''})),
     attendance: S.attendance.filter(a=>inRange(a.date)),
   };
 }
@@ -1836,7 +1826,7 @@ function renderReports(){
       <option value="facade" ${type==='facade'?'selected':''}>نظافة الواجهات</option>
       <option value="waste" ${type==='waste'?'selected':''}>رفع المخلفات</option>
       <option value="installs" ${type==='installs'?'selected':''}>أعمال التأسيسات</option>
-      <option value="checklist" ${type==='checklist'?'selected':''}>قوائم التحقق اليومية</option>
+      <option value="checklist" ${type==='checklist'?'selected':''}>المهمات المجدولة</option>
       <option value="attendance" ${type==='attendance'?'selected':''}>الحضور</option>
     </select></div>
     <button class="ghost-btn" id="rp-go">تحديث</button>
@@ -1852,7 +1842,7 @@ function renderReports(){
       <div class="stat amber"><div class="num">${facade.filter(f=>f.status==='completed').length}/${facade.length}</div><div class="lbl">نظافة واجهات منجزة</div></div>
       <div class="stat ink"><div class="num">${waste.filter(w=>w.status==='completed').length}/${waste.length}</div><div class="lbl">رفع مخلفات منجزة</div></div>
       <div class="stat amber"><div class="num">${installs.filter(i=>i.status==='completed').length}/${installs.length}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
-      <div class="stat ink"><div class="num">${checklist.filter(c=>c.status==='completed').length}/${checklist.length}</div><div class="lbl">قوائم تحقق منجزة</div></div>
+      <div class="stat ink"><div class="num">${checklist.filter(c=>c.status==='completed').length}/${checklist.length}</div><div class="lbl">مهمات مجدولة منجزة</div></div>
       <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور</div></div>
     </div>`;
   }
@@ -1864,7 +1854,7 @@ function renderReports(){
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     installs: { rows:installs, cols:[['description','الوصف'],['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
-    checklist: { rows:checklist, cols:[['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
+    checklist: { rows:checklist, cols:[['date','التاريخ'],['list_name','القائمة'],['status','الحالة']] },
     attendance: { rows:attendance, cols:[['date','التاريخ'],['shift','الوردية'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة']] },
   };
   const t = tables[type];
@@ -1917,7 +1907,7 @@ function exportReportExcel(){
   addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   addSheet(data.installs, 'أعمال التأسيسات', [['description','الوصف'],['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
-  addSheet(data.checklist, 'قوائم التحقق اليومية', [['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt]]);
+  addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',statusFmt]]);
   addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
   if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
   const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
@@ -1936,131 +1926,55 @@ function exportReportExcel(){
 /* ============================= SUPERVISOR: TODAY ============================= */
 function renderSupervisorToday(){
   const uidMe = S.session.user.id;
-  const myDeliv = S.deliveries.filter(d=>d.date===S.today && d.assigned_supervisor_id===uidMe);
-  const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && o.assigned_supervisor_id===uidMe);
-  const myGeneralLocs = (S.locationAssignments||[]).filter(la=>la.supervisor_id===uidMe).map(la=>la.location_id);
-  const allowedLocs = Array.from(new Set([
-    ...((S.profile.allowed_locations&&S.profile.allowed_locations.length)? S.profile.allowed_locations : []),
-    ...myGeneralLocs,
-  ]));
-  const effectiveLocs = allowedLocs.length? allowedLocs : S.locations.map(l=>l.id);
   const myPresence = (S.presence||[]).find(p=>p.user_id===uidMe);
-  const myScope = myPresence? (myPresence.scope||'general_areas') : 'general_areas';
-  const myChecklist = myScope==='units' ? [] : S.checklistInstances.filter(ci=> ci.date===S.today && effectiveLocs.includes(ci.location_id));
-  // مشرفو HK: مكافحة الحشرات ونظافة الواجهات ورفع المخلفات مش من شغلهم، فمخفيين من شاشتهم
-  const myPest = [], myFacade = [], myWaste = [];
-
-  const showHK = true;
-  const showDeliveries = myScope==='units';
-  const showOrders = myScope==='units';
-  const showPest = myPest.length>0;
-  const showFacade = myFacade.length>0;
-  const showWaste = myWaste.length>0;
-
-  let stats = '';
-  if(showDeliveries) stats += `<div class="stat mint"><div class="num">${myDeliv.filter(d=>d.status==='completed').length}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>`;
-  if(showOrders) stats += `<div class="stat blue"><div class="num">${myOrders.filter(o=>o.status==='completed').length}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>`;
-  if(myScope!=='units') stats += `<div class="stat amber"><div class="num">${myChecklist.filter(c=>c.status==='completed').length}/${myChecklist.length}</div><div class="lbl">قوائم التحقق اليومية</div></div>`;
-  if(showPest) stats += `<div class="stat coral"><div class="num">${myPest.filter(p=>p.status==='completed').length}/${myPest.length}</div><div class="lbl">مكافحة حشرات</div></div>`;
-  if(showFacade) stats += `<div class="stat amber"><div class="num">${myFacade.filter(f=>f.status==='completed').length}/${myFacade.length}</div><div class="lbl">نظافة واجهات</div></div>`;
-  if(showWaste) stats += `<div class="stat ink"><div class="num">${myWaste.filter(w=>w.status==='completed').length}/${myWaste.length}</div><div class="lbl">رفع مخلفات</div></div>`;
-
-  let html = `<div class="stat-row">${stats}</div>`;
-
-  // كارت الترحيب + المطلوب اليوم بالترتيب
-  {
-    const hr = new Date().getHours();
-    const greet = hr<12 ? 'صباح الخير' : 'مساء الخير';
-    const dispName = (myPresence && myPresence.actual_name && myPresence.actual_name.trim()) || S.profile.full_name || '';
-    const assignedNow = Array.from(new Set(myGeneralLocs)).map(id=>S.locations.find(l=>l.id===id)).filter(Boolean);
-    const tasks = [];
-    const doneOf = arr => arr.filter(x=>x.status==='completed').length;
-    if(myScope==='units'){
-      if(myDeliv.length) tasks.push({ t:'تسليم وحدات', n:myDeliv.length, d:doneOf(myDeliv), sub:myDeliv.map(d=>d.unit_code).join('، ') });
-      if(myOrders.length) tasks.push({ t:'أوردرات الخدمة المدفوعة', n:myOrders.length, d:doneOf(myOrders), sub:myOrders.map(o=>(o.unit_code?o.unit_code+' ':'')+(ORDER_TYPE_LABEL[o.order_type]||'')+(o.scheduled_time?' ('+o.scheduled_time+')':'')).join('، ') });
-    } else {
-      if(assignedNow.length) tasks.push({ t:'متابعة المواقع المعيّنة عليك', n:assignedNow.length, sub:assignedNow.map(l=>l.name).join('، ') });
-      if(myChecklist.length) tasks.push({ t:'تنفيذ قوائم التحقق اليومية', n:myChecklist.length, d:doneOf(myChecklist) });
-    }
-    if(myPest.length) tasks.push({ t:'مكافحة حشرات', n:myPest.length, d:doneOf(myPest), sub:myPest.map(x=>x.unit_code+' — '+(PEST_TYPE_LABEL[x.service_type]||'')+(x.scheduled_time?' ('+x.scheduled_time+')':'')).join('، ') });
-    if(myFacade.length) tasks.push({ t:'نظافة واجهات', n:myFacade.length, d:0, sub:myFacade.map(f=>{ const l=S.locations.find(x=>x.id===f.location_id); return l?l.name:''; }).filter(Boolean).join('، ') });
-    if(myWaste.length) tasks.push({ t:'رفع مخلفات', n:myWaste.length, d:0, sub:myWaste.map(w=>w.description).join('، ') });
-    const noLocsNote = (myScope!=='units' && !assignedNow.length)
-      ? `<p style="color:var(--text-dim);font-size:12.5px;margin:10px 0 0;">لسه المشرف الأول ما حدّدلكش مواقع النهاردة.</p>` : '';
-    html += `<div class="card" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:16px;font-weight:900;">${greet} يا ${esc(dispName)} 👋</div>
-          <div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${tasks.length? 'المطلوب منك النهاردة بالترتيب:' : 'مفيش مهام متحددة ليك لحد دلوقتي.'}</div>
-        </div>
-        <button class="ghost-btn" id="refresh-my-locs">تحديث</button>
+  const presentToday = !!(myPresence && myPresence.present===true);
+  const myScope = myPresence ? (myPresence.scope||'general_areas') : 'general_areas';
+  const myShift = (myPresence && myPresence.shift) || 'morning';
+  const hr = new Date().getHours();
+  const greet = hr<12 ? 'صباح الخير' : 'مساء الخير';
+  const dispName = (myPresence && myPresence.actual_name && myPresence.actual_name.trim()) || S.profile.full_name || '';
+  const head = (sub) => `<div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:16px;font-weight:900;">${greet} يا ${esc(dispName)} 👋</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${sub}</div>
       </div>
-      ${tasks.length? `<ol style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;">
-        ${tasks.map((k,i)=>{
-          const all = k.d!==undefined && k.d===k.n && k.n>0;
-          return `<li style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;${all?'background:var(--mint-light);':''}">
-            <span style="min-width:26px;height:26px;border-radius:50%;background:${all?'var(--mint)':'var(--ink)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;">${all?'✓':(i+1)}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:800;font-size:13.5px;">${k.t} <span style="color:var(--mint);">(${k.d!==undefined? k.d+' من '+k.n : k.n})</span></div>
-              ${k.sub? `<div style="font-size:12px;color:var(--text-dim);margin-top:3px;word-break:break-word;">${esc(k.sub)}</div>` : ''}
-            </div>
-          </li>`;
-        }).join('')}
-      </ol>` : ''}
-      ${noLocsNote}
-      ${myScope==='units' ? `<p style="color:var(--text-dim);font-size:12px;margin:10px 0 0;">حالتك اليوم "مشرف وحدات" فمش بتظهرلك قوائم تحقق المواقع.</p>` : ''}
-    </div>`;
+      <button class="ghost-btn" id="refresh-my-locs">تحديث</button>
+    </div></div>`;
+
+  if(!presentToday){
+    return head(myPresence ? 'اتسجّلت غائب النهاردة.' : 'لسه ما اتسجلش حضورك النهاردة — إداري HK هيسجّله وبعدها هتنزلك مهامك.');
   }
 
-  if(showPest) html += `
-  <div class="section-title"><h2>مكافحة الحشرات</h2></div>
-  ${myPest.length? myPest.map(p=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div><b>${esc(p.unit_code)}</b> — ${PEST_TYPE_LABEL[p.service_type]} ${esc(p.scheduled_time||'')}</div>
-    <select data-my-pest="${p.id}">
-      <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
-      <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
-      <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
-    </select>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد طلبات مكافحة حشرات لك اليوم</p>`}`;
-
-  if(showFacade) html += `
-  <div class="section-title"><h2>نظافة الواجهات</h2></div>
-  ${myFacade.length? myFacade.map(f=>{ const loc=S.locations.find(l=>l.id===f.location_id); return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div>${esc(loc?loc.name:'')} ${f.description?`<div style="font-size:12px;color:var(--text-dim);">${esc(f.description)}</div>`:''}</div>
-    <button class="ghost-btn" data-my-facade="${f.id}">تم الانتهاء</button>
-  </div>`; }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال نظافة واجهات لك اليوم</p>`}`;
-
-  if(showWaste) html += `
-  <div class="section-title"><h2>رفع المخلفات</h2></div>
-  ${myWaste.length? myWaste.map(w=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div>${esc(w.description)}</div>
-    <span style="display:flex;gap:6px;"><button class="ghost-btn" data-my-waste-done="${w.id}">تم الانتهاء</button><button class="ghost-btn danger" data-my-waste-notdone="${w.id}">لم يتم</button></span>
-  </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أعمال رفع مخلفات لك اليوم</p>`}`;
-
-  if(showHK){
-    html += showDeliveries ? `
-    <div class="section-title"><h2>وحدات التسليم</h2></div>
+  if(myScope==='units'){
+    const myDeliv = S.deliveries.filter(d=>d.date===S.today);
+    const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && orderApproved(o));
+    const doneOf = arr => arr.filter(x=>x.status==='completed').length;
+    let html = head('أنت النهاردة مشرف وحدات — كل وحدات اليوم نازلة لك أوتوماتيك.');
+    html += `<div class="stat-row">
+      <div class="stat mint"><div class="num">${doneOf(myDeliv)}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
+      <div class="stat blue"><div class="num">${doneOf(myOrders)}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
+    </div>`;
+    html += `<div class="section-title"><h2>وحدات التسليم</h2></div>
     ${myDeliv.length? myDeliv.map(d=>{
       const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
       return `<div class="card" style="margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
-        <select data-my-dv="${d.id}">
-          <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
-          <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
-          <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
-          <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
-        </select>
-      </div>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-        <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
-        ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
-      </div>
-    </div>`;
-    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم لك اليوم</p>`}` : '';
-
-    html += `${showOrders ? `
-    <div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div><b>${esc(d.unit_code)}</b> ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
+          <select data-my-dv="${d.id}">
+            <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
+            <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
+            <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
+            <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
+          </select>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
+          ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
+        </div>
+      </div>`;
+    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة</p>`}`;
+    html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${esc(o.scheduled_time||'')}
         ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
@@ -2071,43 +1985,46 @@ function renderSupervisorToday(){
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
       </select>
-    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات لك اليوم</p>`}` : ''}
-
-    ${myScope==='units' ? '' : `
-    <div class="section-title"><h2>قوائم التحقق اليومية</h2></div>
-    ${myChecklist.length? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
-      ${myChecklist.map(ci=>{
-        const def=S.checklistDefs.find(c=>c.id===ci.checklist_definition_id);
-        const loc=S.locations.find(l=>l.id===ci.location_id);
-        const isDone=ci.status==='completed';
-        const markedBySup=!!ci.supervisor_marked_done;
-        return `<div class="card">
-          <div style="display:flex;justify-content:space-between;"><b>${esc(def?def.name:'')}</b>${statusBadge(ci.status)}</div>
-          <div style="font-size:12px;color:var(--text-dim);margin:6px 0;">${esc(loc?loc.name:'')}</div>
-          ${isDone? `<div style="font-size:11.5px;color:var(--mint);text-align:center;padding:8px 0;border-top:1px dashed var(--line);">${ICON.check(13)} تم اعتمادها من المشرف الأول</div>`
-            : `<button class="${markedBySup?'ghost-btn':'primary-btn'}" style="width:100%;justify-content:center;margin-top:4px;" data-cl-mark-done="${ci.id}" data-marked="${markedBySup?'1':'0'}">${markedBySup? ICON.check(13)+' تم الانتهاء ✓ (بانتظار اعتماد المشرف الأول)' : 'تم الانتهاء من التنفيذ'}</button>`}
-        </div>`;
-      }).join('')}
-    </div>` : `<p style="color:var(--text-dim);font-size:13px;">لا توجد عناصر قوائم تحقق لك اليوم</p>`}`}`;
+    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة</p>`}`;
+    return html;
   }
 
+  // مشرف أماكن عامة: المهمات المجدولة بتاعت وردية الحضور
+  const lists = tasksForShift(myShift);
+  let tot=0, don=0; lists.forEach(l=>{ const p=taskProgress(l); if(p.run){ tot++; if(p.run.status==='completed'||p.run.supervisor_marked_done) don++; } });
+  let html = head(`أنت النهاردة مشرف أماكن عامة — الوردية: ${SHIFT_LABEL[myShift]||''}`);
+  html += `<div class="stat-row"><div class="stat amber"><div class="num">${don}/${tot}</div><div class="lbl">مهمات مجدولة منتهية</div></div></div>`;
+  html += `<div class="section-title"><h2>المهمات المجدولة</h2></div>` + renderSupTaskLists(myShift);
   return html;
 }
 function bindSupervisorToday(){
   const rb=document.getElementById('refresh-my-locs');
-  if(rb) rb.onclick=async ()=>{ rb.disabled=true; await refreshAssignments(); S.checklistInstances=(await dbSelect('checklist_instances')) ?? S.checklistInstances; render(); toast('تم التحديث',true); };
+  if(rb) rb.onclick=async ()=>{
+    rb.disabled=true;
+    await refreshAssignments(); await loadDeliveries(); await loadOrders(); await loadTaskData(); await ensureTodayTaskRuns();
+    render(); toast('تم التحديث',true);
+  };
   document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.myDv, sel.value, loadDeliveries));
   document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.myOrd, sel.value, loadOrders));
-  document.querySelectorAll('[data-my-pest]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.myPest, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
-  document.querySelectorAll('[data-my-facade]').forEach(b=>b.onclick=()=>{ S.modal={type:'completeFacade', id:b.dataset.myFacade}; render(); });
-  document.querySelectorAll('[data-my-waste-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.myWasteDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم التحديث',true); });
-  document.querySelectorAll('[data-my-waste-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.myWasteNotdone}; render(); });
   document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
-  document.querySelectorAll('[data-cl-mark-done]').forEach(b=>b.onclick=async ()=>{
-    const nowMarked = b.dataset.marked==='1';
-    await dbUpdate('checklist_instances', b.dataset.clMarkDone, { supervisor_marked_done: !nowMarked, supervisor_marked_done_at: !nowMarked? new Date().toISOString() : null });
-    S.checklistInstances = (await dbSelect('checklist_instances')) ?? S.checklistInstances; render();
-    toast(nowMarked? 'تم الإلغاء' : 'تمام، هتظهر للمشرف الأول عشان يعتمدها', true);
+  document.querySelectorAll('details[data-tsup-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskSup.add(d.dataset.tsupOpen); else S.openTaskSup.delete(d.dataset.tsupOpen); }));
+  document.querySelectorAll('[data-ti-check]').forEach(cb=>cb.onchange=async ()=>{
+    const [runId,itemId]=cb.dataset.tiCheck.split('|'); const checked=cb.checked; cb.disabled=true;
+    const row={ run_id:runId, item_id:itemId, done:checked, done_by:S.session.user.id, done_at: checked? new Date().toISOString():null };
+    const {error}=await sb.from('task_run_items').upsert([row],{onConflict:'run_id,item_id'});
+    const y=window.scrollY;
+    if(error){ console.error(error); toast('حصل خطأ: '+error.message,false); await loadTaskRunItems(); render(); window.scrollTo(0,y); return; }
+    S.taskRunItems=(S.taskRunItems||[]).filter(x=>!(x.run_id===runId&&x.item_id===itemId)).concat([row]);
+    render(); window.scrollTo(0,y);
+  });
+  document.querySelectorAll('[data-tl-mark]').forEach(b=>b.onclick=async ()=>{
+    const nowMarked=b.dataset.marked==='1'; b.disabled=true;
+    const patch={ supervisor_marked_done: !nowMarked, supervisor_marked_done_at: !nowMarked? new Date().toISOString() : null };
+    if(await dbUpdate('task_runs', b.dataset.tlMark, patch)){
+      const r=S.taskRuns.find(x=>x.id===b.dataset.tlMark); if(r) Object.assign(r,patch);
+      const y=window.scrollY; render(); window.scrollTo(0,y);
+      toast(nowMarked? 'تم الإلغاء' : 'تمام، هتظهر للمشرف الأول عشان يعتمدها', true);
+    } else { b.disabled=false; }
   });
 }
 
@@ -2134,29 +2051,8 @@ function renderModal(){
   if(m.type==='addDelivery') return modalWrap('إضافة وحدة تسليم', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-unit-code"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-unit-date" value="${S.deliveryDate}"></div>
-    <div class="form-row"><label>المشرف (اختياري الآن)</label><select id="m-unit-sup"><option value="">بدون تعيين</option>${supervisorOptions()}</select></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="m-unit-notes"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
-  if(m.type==='assignDelivery') return modalWrap('تعيين مشرف للوحدة', `
-    <div class="form-row"><label>المشرف</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
-  if(m.type==='addOrder') return modalWrap('أوردر خدمة مدفوعة جديد', `
-    <div class="form-row"><label>رقم الوحدة</label><input id="m-ord-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
-    <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
-    <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="facade_cleaning">Early Façade Cleaning</option></select></div>
-    <div id="ord-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
-    <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
-    <div id="ord-availability-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
-    <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
-    <div class="form-row"><label>بيانات العميل (اختياري)</label><input id="m-ord-client"></div>
-    <div class="form-row"><label>حالة الدفع</label><select id="m-ord-payment"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع</option></select></div>
-    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إثبات الدفع (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
-    <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إنشاء الأوردر</button>`);
-  if(m.type==='assignOrder') return modalWrap('تعيين مشرف للأوردر', `
-    <div class="form-row"><label>المشرف المتاح</label><select id="m-assign-sup">${supervisorOptions()}</select></div>
-    <div class="form-row"><label>ملاحظات للمشرف</label><textarea id="m-ord-notes"></textarea></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
   if(m.type==='editOrder'){
     const o = S.orders.find(x=>x.id===m.id);
     return modalWrap('تعديل الأوردر', `
@@ -2176,9 +2072,10 @@ function renderModal(){
       <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
       <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
     </select></div>
-    ${o.payment_photo?`<img src="${o.payment_photo}" class="photo-preview" style="max-height:100px;margin-bottom:6px;">`:''}
+    ${o.payment_photo?`<img src="${o.payment_photo}" class="photo-preview" style="max-height:140px;margin-bottom:6px;">`:''}
     <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} ${o.payment_photo?'تغيير':'رفع'} إثبات الدفع<input type="file" accept="image/*" id="cf-photo"></label>
     <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
+    <div class="form-row"><label>ملاحظات للمشرف (اختياري)</label><textarea id="m-ord-notes">${esc(o.opm_notes||'')}</textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
   if(m.type==='addInstall') return modalWrap('جدولة عمل تأسيسات', `
@@ -2189,28 +2086,6 @@ function renderModal(){
   if(m.type==='postponeInstall') return modalWrap('تأجيل العمل', `
     <div class="form-row"><label>سبب التأجيل</label><textarea id="m-postpone-reason" placeholder="لازم تكتب السبب"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
-  if(m.type==='addChecklistDef') return modalWrap('عنصر قوائم تحقق يومية جديد', `
-    <div class="form-row"><label>الاسم</label><input id="m-cl-name" placeholder="مثال: تنظيف مدخل عمارة A"></div>
-    <div class="form-row"><label>الموقع</label><select id="m-cl-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
-    <div class="form-row"><label>الوردية</label><select id="m-cl-shift"><option value="both">الاثنين</option><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="emergency">طوارئ</option></select></div>
-    <div class="form-row"><label>وقت السماح من (اختياري)</label><input type="time" id="m-cl-from"></div>
-    <div class="form-row"><label>وقت السماح إلى (اختياري)</label><input type="time" id="m-cl-to"></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
-  if(m.type==='editChecklistDef'){
-    const c = S.checklistDefs.find(x=>x.id===m.id);
-    return modalWrap('تعديل عنصر قوائم التحقق', `
-    <div class="form-row"><label>الاسم</label><input id="m-cl-name" value="${esc(c.name||'')}"></div>
-    <div class="form-row"><label>الموقع</label><select id="m-cl-loc">${S.locations.map(l=>`<option value="${l.id}" ${c.location_id===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
-    <div class="form-row"><label>الوردية</label><select id="m-cl-shift">
-      <option value="both" ${c.shift==='both'?'selected':''}>الاثنين</option>
-      <option value="morning" ${c.shift==='morning'?'selected':''}>صباحي</option>
-      <option value="evening" ${c.shift==='evening'?'selected':''}>مسائي</option>
-      <option value="emergency" ${c.shift==='emergency'?'selected':''}>طوارئ</option>
-    </select></div>
-    <div class="form-row"><label>وقت السماح من (اختياري)</label><input type="time" id="m-cl-from" value="${c.valid_from||''}"></div>
-    <div class="form-row"><label>وقت السماح إلى (اختياري)</label><input type="time" id="m-cl-to" value="${c.valid_to||''}"></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
-  }
   if(m.type==='userQr'){
     const u=S.users.find(x=>x.id===m.id); const t=(S.qrTokens||[]).find(x=>x.user_id===m.id);
     if(!u||!t) return '';
@@ -2227,6 +2102,50 @@ function renderModal(){
       </div></div>`);
   }
   if(m.type==='qr') return modalWrap('رمز QR', `<div style="text-align:center;"><div id="qr-render-target"></div><div style="font-family:'Cairo';font-weight:800;">${esc(S.qrTarget.label)}</div></div>`);
+  if(m.type==='addOrder'){
+    const ex=!!m.extra; const isAppr=S.profile.role==='admin'||S.profile.role==='opm';
+    return modalWrap(ex?'طلب وحدة إضافية':'أوردر خدمة مدفوعة جديد', `
+    ${ex?`<div style="background:var(--amber-light);color:var(--amber);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.7;">${isAppr?'الأوردر ده زيادة عن الحد اليومي ('+MAX_ORDERS_PER_DAY+')، وبما إنك من المعتمدين هيتسجّل مباشرة.':'الأوردر ده زيادة عن الحد اليومي ('+MAX_ORDERS_PER_DAY+'). هيتبعت لموافقة الإدارة و OPM، ومش هيظهر للمشرفين إلا بعد الموافقة.'}</div>`:''}
+    <div class="form-row"><label>رقم الوحدة</label><input id="m-ord-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
+    <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
+    <div class="form-row"><label>نوع الخدمة</label><select id="m-ord-type"><option value="soft_cleaning">Soft Cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="facade_cleaning">Early Façade Cleaning</option></select></div>
+    <div id="ord-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
+    ${ex?'':'<div id="ord-availability-msg" style="font-size:12px;margin:-4px 0 10px;"></div>'}
+    <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
+    <div class="form-row"><label>بيانات العميل (اختياري)</label><input id="m-ord-client"></div>
+    ${ex?'<div class="form-row"><label>سبب الطلب الإضافي</label><textarea id="m-ord-extra-reason" placeholder="مثال: العميل طلب موعد عاجل"></textarea></div>':''}
+    <div class="form-row"><label>ملاحظات للمشرف (اختياري)</label><textarea id="m-ord-notes"></textarea></div>
+    <div class="form-row"><label>حالة الدفع</label><select id="m-ord-payment"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع</option></select></div>
+    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إثبات الدفع (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
+    <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:120px;margin-bottom:6px;">
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ex?(isAppr?'تسجيل الأوردر':'إرسال الطلب للموافقة'):'إنشاء الأوردر'}</button>`);
+  }
+  if(m.type==='addTaskList') return modalWrap('قائمة مهام جديدة', `
+    <div class="form-row"><label>اسم القائمة</label><input id="m-tl-name" placeholder="مثال: YA Tower"></div>
+    <div class="form-row"><label>الوردية</label><select id="m-tl-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="both">الاثنين</option></select></div>
+    <div class="form-row"><label>البنود (اختياري — كل بند في سطر)</label><textarea id="m-tl-items" rows="6" placeholder="الأسانسير&#10;الدور 1&#10;أبواب الشقق"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
+  if(m.type==='editTaskList'){
+    const l=S.taskLists.find(x=>x.id===m.id); if(!l) return '';
+    return modalWrap('تعديل القائمة', `
+    <div class="form-row"><label>اسم القائمة</label><input id="m-tl-name" value="${esc(l.name||'')}"></div>
+    <div class="form-row"><label>الوردية</label><select id="m-tl-shift">
+      <option value="morning" ${l.shift==='morning'?'selected':''}>صباحي</option>
+      <option value="evening" ${l.shift==='evening'?'selected':''}>مسائي</option>
+      <option value="both" ${(!l.shift||l.shift==='both')?'selected':''}>الاثنين</option>
+    </select></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
+  }
+  if(m.type==='confirmDeleteTaskList'){
+    const l=S.taskLists.find(x=>x.id===m.id);
+    return modalWrap('تأكيد الحذف النهائي', `
+    <p style="font-size:13.5px;">هتحذف قائمة <b>${esc(l?l.name:'')}</b> بكل بنودها وسجلات تنفيذها القديمة نهائيًا. لا يمكن التراجع.</p>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
+  }
+  if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
+    <img src="${m.src}" style="max-width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:var(--sand);">
+    <div style="margin-top:10px;"><a class="ghost-btn" href="${m.src}" download="photo.jpg" style="display:inline-block;text-decoration:none;">تحميل الصورة</a></div></div>`, 'wide');
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
     <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
@@ -2243,7 +2162,6 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تعيين</button>`);
   if(m.type==='addFacade') return modalWrap('إضافة عمل نظافة واجهات', `
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-fc-date" value="${S.facadeDate}"></div>
-    <div class="form-row"><label>الموقع</label><select id="m-fc-loc">${S.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>
     <div class="form-row"><label>وصف العمل (اختياري)</label><textarea id="m-fc-desc"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
   if(m.type==='completeFacade') return modalWrap('تأكيد الانتهاء', `
@@ -2269,12 +2187,6 @@ function renderModal(){
     const s = S.suppliers.find(x=>x.id===m.id);
     return modalWrap('تأكيد حذف المورد', `
     <p style="font-size:13.5px;">هتحذف مورد <b>${esc(s?s.name:'')}</b> وكل تقييماته وفواتيره نهائيًا. لا يمكن التراجع.</p>
-    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
-  }
-  if(m.type==='confirmDeleteChecklistDef'){
-    const c = S.checklistDefs.find(x=>x.id===m.id);
-    return modalWrap('تأكيد الحذف النهائي', `
-    <p style="font-size:13.5px;">هتحذف عنصر <b>${esc(c?c.name:'')}</b> نهائيًا وكل سجلات تنفيذه القديمة. لا يمكن التراجع.</p>
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='confirmDeleteUser'){
@@ -2312,15 +2224,6 @@ function renderModal(){
   if(m.type==='resolveComplaint') return modalWrap('تسجيل حل الشكوى', `
     <div class="form-row"><label>ملاحظات الحل</label><textarea id="m-cx-resolution" placeholder="اكتب إيه اللي اتعمل لحل الشكوى"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} تأكيد الحل</button>`);
-  if(m.type==='editZone'){
-    const z = S.zones.find(x=>x.id===m.id);
-    return modalWrap('تعديل الزون', `
-    <div class="form-row"><label>اسم الزون</label><input id="m-zone-name" value="${esc(z.name||'')}"></div>
-    <div class="form-row"><label>المواقع</label><select multiple class="multi-sel" id="m-zone-locs" size="8">
-      ${S.locations.map(l=>`<option value="${l.id}" ${(z.location_ids||[]).includes(l.id)?'selected':''}>${esc(l.name)}</option>`).join('')}
-    </select></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
-  }
   if(m.type==='addSupplier') return modalWrap('إضافة مورد جديد', `
     <div class="form-row"><label>اسم المورد</label><input id="m-sup-name"></div>
     <div class="form-row"><label>القطاع</label><select id="m-sup-cat">
@@ -2411,7 +2314,7 @@ function renderModal(){
       <div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th><th>الفاتورة</th><th></th></tr></thead><tbody>
         ${list.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
           <select data-inv-status="${i.id}">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select>
-        </td><td>${i.photo?`<img src="${i.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" data-view-inv-photo="${i.id}">`:'-'}</td>
+        </td><td>${i.photo?`<img src="${i.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" data-view-photo="inv|${i.id}">`:'-'}</td>
         <td><button class="ghost-btn" data-inv-edit="${i.id}">تعديل</button> <button class="ghost-btn danger" data-inv-del="${i.id}">${ICON.trash(12)}</button></td></tr>`).join('')}
       </tbody></table></div>`;
     }).join('') || `<p style="font-size:12px;color:var(--text-dim);">لا توجد فواتير بعد</p>`;
@@ -2468,7 +2371,7 @@ function renderModal(){
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtTime(n.created_at)} · ${n.created_at?n.created_at.slice(0,10):''}</div>
       </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد ملاحظات على هذه الوحدة</p>`);
   }
-  if(m.type==='scan'||m.type==='scanAudit') return modalWrap('مسح رمز QR', `
+  if(m.type==='scan') return modalWrap('مسح رمز QR', `
     <div class="scan-stage" id="scan-stage"><div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div></div>
     <div style="margin-top:12px;">
       <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.upload()} أو ارفع صورة لرمز QR<input type="file" accept="image/*" id="qr-file-input" capture="environment"></label>
@@ -2494,12 +2397,12 @@ function supervisorOptions(){
 }
 
 function bindModalEvents(){
-  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); S.modal=null; S.scanCtx=null; render(); });
+  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
   if(S.modal && S.modal.type==='qr') renderQrCanvas();
   if(S.modal && S.modal.type==='userQr') bindUserQrModal();
-  if(S.modal && (S.modal.type==='scan'||S.modal.type==='scanAudit')) startScanner();
+  if(S.modal && (S.modal.type==='scan')) startScanner();
   const qf=document.getElementById('qr-file-input'); if(qf) qf.onchange=e=>decodeFromFile(e.target.files[0]);
   const cfPhoto=document.getElementById('cf-photo'); if(cfPhoto) cfPhoto.onchange=e=>handlePhotoSelect(e.target.files[0]);
   const ordDateInput=document.getElementById('m-ord-date');
@@ -2558,10 +2461,6 @@ function bindModalEvents(){
     pendingPhoto=null;
     await loadSuppliers(); render(); toast('تم إضافة الفاتورة',true);
   };
-  document.querySelectorAll('[data-view-inv-photo]').forEach(img=>img.onclick=()=>{
-    const inv = S.supplierInvoices.find(x=>x.id===img.dataset.viewInvPhoto);
-    if(inv && inv.photo) window.open(inv.photo, '_blank');
-  });
   document.querySelectorAll('[data-inv-status]').forEach(sel=>sel.onchange=async ()=>{
     await dbUpdate('supplier_invoices', sel.dataset.invStatus, { status:sel.value, paid_at: sel.value==='paid'? new Date().toISOString():null });
     await loadSuppliers(); render(); toast('تم تحديث حالة الفاتورة',true);
@@ -2578,25 +2477,25 @@ async function handleModalSave(){
   if(m.type==='addDelivery'){
     const unit_code=document.getElementById('m-unit-code').value.trim();
     if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
-    const row={ id:uid('dv'), unit_code, date:document.getElementById('m-unit-date').value, assigned_supervisor_id: document.getElementById('m-unit-sup').value||null, notes: document.getElementById('m-unit-notes').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    const row={ id:uid('dv'), unit_code, date:document.getElementById('m-unit-date').value, notes: document.getElementById('m-unit-notes').value.trim(), status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('delivery_units',[row])){ await loadDeliveries(); S.modal=null; render(); toast('تمت الإضافة',true); }
   }
-  else if(m.type==='assignDelivery'){
-    const sup=document.getElementById('m-assign-sup').value;
-    if(await dbUpdate('delivery_units', m.id, {assigned_supervisor_id:sup})){ await loadDeliveries(); S.modal=null; render(); toast('تم التعيين',true); }
-  }
   else if(m.type==='addOrder'){
+    const ex = !!m.extra;
+    const isAppr = S.profile.role==='admin'||S.profile.role==='opm';
     const scheduled_date = document.getElementById('m-ord-date').value;
-    if(ordersCountForDate(scheduled_date) >= MAX_ORDERS_PER_DAY){
+    if(!ex && ordersCountForDate(scheduled_date) >= MAX_ORDERS_PER_DAY){
       const next = findNextAvailableOrderDate(scheduled_date);
-      toast(`اليوم ده مكتمل${next?' — أقرب موعد متاح: '+next:''}`, false);
+      toast(`اليوم ده مكتمل${next?' — أقرب موعد متاح: '+next:''} — أو استخدم "طلب وحدة إضافية"`, false);
       return;
     }
     const ord_unit_code = document.getElementById('m-ord-unit').value.trim();
     const ord_type = document.getElementById('m-ord-type').value;
     const ord_price = await calcOrderPrice(ord_type, ord_unit_code);
     const row={ id:uid('ord'), unit_code:ord_unit_code, order_type:ord_type, scheduled_date, scheduled_time:document.getElementById('m-ord-time').value, client_info:document.getElementById('m-ord-client').value.trim(), status:'scheduled', price:ord_price, payment_status:document.getElementById('m-ord-payment').value, payment_photo:pendingPhoto, created_by:S.session.user.id };
-    if(await dbInsert('paid_service_orders',[row])){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast('تم إنشاء الأوردر',true); }
+    const notes=(document.getElementById('m-ord-notes').value||'').trim(); if(notes) row.opm_notes=notes;
+    if(ex){ row.extra_reason=(document.getElementById('m-ord-extra-reason').value||'').trim() || '(بدون سبب)'; row.approval_status = isAppr ? 'approved' : 'pending'; }
+    if(await dbInsert('paid_service_orders',[row])){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast(ex&&!isAppr ? 'تم إرسال الطلب لموافقة الإدارة و OPM' : 'تم إنشاء الأوردر',true); }
   }
   else if(m.type==='editOrder'){
     const ord_unit_code = document.getElementById('m-ord-unit').value.trim();
@@ -2610,14 +2509,10 @@ async function handleModalSave(){
       scheduled_time: document.getElementById('m-ord-time').value,
       client_info: document.getElementById('m-ord-client').value.trim(),
       payment_status: document.getElementById('m-ord-payment').value,
+      opm_notes: (document.getElementById('m-ord-notes').value||'').trim() || null,
     };
     if(pendingPhoto) patch.payment_photo = pendingPhoto;
     if(await dbUpdate('paid_service_orders', m.id, patch)){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
-  }
-  else if(m.type==='assignOrder'){
-    const sup=document.getElementById('m-assign-sup').value;
-    const notes=document.getElementById('m-ord-notes').value.trim();
-    if(await dbUpdate('paid_service_orders', m.id, {assigned_supervisor_id:sup, opm_notes:notes, assigned_by:S.session.user.id})){ await loadOrders(); S.modal=null; render(); toast('تم التعيين',true); }
   }
   else if(m.type==='addInstall'){
     const description=document.getElementById('m-in-desc').value.trim();
@@ -2630,20 +2525,27 @@ async function handleModalSave(){
     if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
     if(await dbUpdate('installation_works', m.id, {status:'postponed', postpone_reason:reason, updated_by:S.session.user.id, updated_at:new Date().toISOString()})){ await loadInstalls(); S.modal=null; render(); toast('تم تسجيل التأجيل',true); }
   }
-  else if(m.type==='addChecklistDef'){
-    const name=document.getElementById('m-cl-name').value.trim();
-    if(!name){ toast('اكتب اسم العنصر',false); return; }
-    const row={ id:uid('cldef'), name, location_id:document.getElementById('m-cl-loc').value, shift:document.getElementById('m-cl-shift').value, valid_from:document.getElementById('m-cl-from').value||null, valid_to:document.getElementById('m-cl-to').value||null, active:true };
-    if(await dbInsert('checklist_definitions',[row])){ await loadChecklistDefs(); await ensureTodayChecklistInstances(); S.modal=null; render(); toast('تمت الإضافة',true); }
-  }
-  else if(m.type==='editChecklistDef'){
-    const name=document.getElementById('m-cl-name').value.trim();
-    if(!name){ toast('اكتب اسم العنصر',false); return; }
-    const patch={ name, location_id:document.getElementById('m-cl-loc').value, shift:document.getElementById('m-cl-shift').value, valid_from:document.getElementById('m-cl-from').value||null, valid_to:document.getElementById('m-cl-to').value||null };
-    if(await dbUpdate('checklist_definitions', m.id, patch)){ await loadChecklistDefs(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
-  }
   else if(m.type==='confirmChecklist'){
-    await submitChecklistConfirm();
+    await submitTaskConfirm();
+  }
+  else if(m.type==='addTaskList'){
+    const name=document.getElementById('m-tl-name').value.trim();
+    if(!name){ toast('اكتب اسم القائمة',false); return; }
+    const id=uid('tl');
+    const row={ id, name, shift:document.getElementById('m-tl-shift').value, active:true, created_by:S.session.user.id };
+    if(await dbInsert('task_lists',[row])){
+      const lines=(document.getElementById('m-tl-items').value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+      if(lines.length) await dbInsert('task_items', lines.map((n,i)=>({ id:uid('ti'), list_id:id, name:n, position:i+1, active:true })));
+      S.openTaskAdmin.add(id); await loadTaskData(); await ensureTodayTaskRuns(); S.modal=null; render(); toast('تمت إضافة القائمة',true);
+    }
+  }
+  else if(m.type==='editTaskList'){
+    const name=document.getElementById('m-tl-name').value.trim();
+    if(!name){ toast('اكتب اسم القائمة',false); return; }
+    if(await dbUpdate('task_lists', m.id, { name, shift:document.getElementById('m-tl-shift').value })){ await loadTaskData(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
+  }
+  else if(m.type==='confirmDeleteTaskList'){
+    if(await dbDelete('task_lists', m.id)){ S.openTaskAdmin.delete(m.id); await loadTaskData(); S.modal=null; render(); toast('تم حذف القائمة',true); }
   }
   else if(m.type==='addPest'){
     const unit_code=document.getElementById('m-pest-unit').value.trim();
@@ -2658,7 +2560,7 @@ async function handleModalSave(){
     if(await dbUpdate('pest_control_requests', m.id, {assigned_supervisor_id:sup})){ await loadPest(); S.modal=null; render(); toast('تم التعيين',true); }
   }
   else if(m.type==='addFacade'){
-    const row={ id:uid('fc'), date:document.getElementById('m-fc-date').value, location_id:document.getElementById('m-fc-loc').value, description:document.getElementById('m-fc-desc').value.trim(), status:'scheduled', created_by:S.session.user.id };
+    const row={ id:uid('fc'), date:document.getElementById('m-fc-date').value, description:document.getElementById('m-fc-desc').value.trim(), status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('facade_works',[row])){ await loadFacade(); S.modal=null; render(); toast('تمت الإضافة',true); }
   }
   else if(m.type==='completeFacade'){
@@ -2700,10 +2602,6 @@ async function handleModalSave(){
     await dbDelete('suppliers', m.id);
     await loadSuppliers(); S.modal=null; render(); toast('تم حذف المورد',true);
   }
-  else if(m.type==='confirmDeleteChecklistDef'){
-    await dbDelete('checklist_definitions', m.id);
-    await loadChecklistDefs(); S.checklistInstances = (await dbSelect('checklist_instances')) ?? S.checklistInstances; S.modal=null; render(); toast('تم الحذف النهائي',true);
-  }
   else if(m.type==='confirmDeleteUser'){
     const res = await callAdminUsersFn({ action:'delete', user_id:m.id });
     if(res.error){ toast('حصل خطأ: '+res.error,false); return; }
@@ -2729,13 +2627,6 @@ async function handleModalSave(){
     const resolutionInput = document.getElementById('m-cx-resolution');
     if(resolutionInput) patch.resolution_notes = resolutionInput.value.trim();
     if(await dbUpdate('complaints', m.id, patch)){ await loadComplaints(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
-  }
-  else if(m.type==='editZone'){
-    const name=document.getElementById('m-zone-name').value.trim();
-    const sel=document.getElementById('m-zone-locs');
-    const location_ids=Array.from(sel.selectedOptions).map(o=>o.value);
-    if(!name||!location_ids.length){ toast('اكتب اسم الزون واختر مواقع له',false); return; }
-    if(await dbUpdate('zones', m.id, {name, location_ids})){ S.zones = (await dbSelect('zones')) ?? S.zones; S.modal=null; render(); toast('تم حفظ التعديل',true); }
   }
   else if(m.type==='editKpi'){
     const month=document.getElementById('m-kpi-month').value;
@@ -2776,7 +2667,7 @@ async function handleModalSave(){
   }
 }
 
-/* ============================= QR SCAN (checklist) ============================= */
+/* ============================= QR SCAN (task lists) ============================= */
 function renderQrCanvas(){
   const el=document.getElementById('qr-render-target'); if(!el||typeof QRCode==='undefined') return;
   el.innerHTML=''; new QRCode(el,{text:S.qrTarget.code,width:190,height:190,colorDark:'#0E2A2B',colorLight:'#ffffff'});
@@ -2822,40 +2713,22 @@ function decodeFromFile(file){
 }
 function handleScannedCode(code){
   const clean=(code||'').trim();
-  if(S.scanCtx && S.scanCtx.mode==='audit'){
-    const locId = clean.startsWith('ZEDWEST|LOC|') ? clean.split('|')[2] : clean;
-    if(locId !== S.scanCtx.auditLocationId){ toast('هذا الكود يخص موقع مختلف',false); return; }
-    stopScanner();
-    submitAuditVisit(locId);
-    return;
-  }
-  const defId = clean.startsWith('ZEDWEST|CL|') ? clean.split('|')[2] : clean;
-  const inst = S.checklistInstances.find(ci=>ci.id===S.scanCtx.instanceId);
-  if(!inst){ toast('تعذر إيجاد المهمة',false); return; }
-  if(inst.checklist_definition_id !== defId){ toast('هذا الرمز يخص مهمة مختلفة',false); return; }
-  const def=S.checklistDefs.find(c=>c.id===defId);
-  if(def && def.valid_from && def.valid_to){
-    const now=nowTimeStr();
-    if(now < def.valid_from || now > def.valid_to){ toast('خارج وقت السماح بتنفيذ هذه المهمة ('+def.valid_from+' - '+def.valid_to+')', false); stopScanner(); S.modal=null; S.scanCtx=null; render(); return; }
-  }
+  const listId = clean.startsWith('ZEDWEST|TL|') ? clean.split('|')[2] : clean;
+  const run = (S.taskRuns||[]).find(r=>r.id===(S.scanCtx&&S.scanCtx.runId));
+  if(!run){ toast('تعذر إيجاد المهمة',false); return; }
+  if(run.list_id !== listId){ toast('هذا الرمز يخص قائمة مختلفة',false); return; }
   stopScanner();
   S.modal={type:'confirmChecklist'};
   render();
-}
-async function submitAuditVisit(locId){
-  const loc = S.locations.find(l=>l.id===locId);
-  const todayChecklist = (S.checklistInstances||[]).filter(ci=>ci.location_id===locId && ci.date===S.today);
-  const doneCount = todayChecklist.filter(ci=>ci.status==='completed').length;
-  const row = { id:uid('av'), location_id:locId, senior_supervisor_id:S.session.user.id, note:`عند التدقيق: ${doneCount}/${todayChecklist.length} من قوائم التحقق منجزة` };
-  await dbInsert('location_audit_visits',[row]);
-  await loadDistData();
-  S.modal=null; S.scanCtx=null; render();
-  toast(`تم تسجيل زيارة تدقيق ${loc?loc.name:''} — ${doneCount}/${todayChecklist.length} منجزة`, true);
 }
 document.addEventListener('visibilitychange', async ()=>{
   if(document.visibilityState!=='visible' || !S.session || !S.profile || S.modal) return;
   if(hasUnsavedInput()) return;
   await refreshAssignments();
+  const r = S.profile.role;
+  if(r==='admin'||r==='opm'){ await loadOrders(); checkPendingExtras(true); }
+  if(['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','supervisor'].includes(r)){ await loadTaskData(); await ensureTodayTaskRuns(); }
+  if(r==='supervisor'){ await loadDeliveries(); await loadOrders(); }
   if(!S.modal && !hasUnsavedInput()) render();
 });
 let pendingPhoto=null;
@@ -2875,58 +2748,29 @@ function handlePhotoSelect(file){
   };
   reader.readAsDataURL(file);
 }
-async function submitChecklistConfirm(){
-  const notes=document.getElementById('cf-notes').value.trim();
-  const patch={ status:'completed', supervisor_id:S.session.user.id, completed_at:new Date().toISOString(), notes, photo:pendingPhoto, scanned:true };
-  if(await dbUpdate('checklist_instances', S.scanCtx.instanceId, patch)){
-    await loadChecklistInstances(); pendingPhoto=null; S.modal=null; S.scanCtx=null; render(); toast('تم تسجيل تنفيذ المهمة', true);
-  }
-}
-async function loadChecklistInstances(){ S.checklistInstances = (await dbSelect('checklist_instances')) ?? S.checklistInstances; }
 
-/* ============================= ENSURE DAILY INSTANCES ============================= */
-async function ensureTodayChecklistInstances(){
-  const date=S.today;
-  const existing = S.checklistInstances.filter(ci=>ci.date===date);
-  const missing=[];
-  S.checklistDefs.filter(c=>c.active).forEach(def=>{
-    if(!existing.find(ci=>ci.checklist_definition_id===def.id)){
-      missing.push({ id:uid('cli'), date, checklist_definition_id:def.id, location_id:def.location_id, shift:def.shift, status:'incomplete', supervisor_id:null, completed_at:null, notes:'', photo:null, scanned:false });
-    }
-  });
-  if(missing.length){
-    // upsert مع تجاهل التكرار: لو صف تاني (من طلب متزامن) سبقنا بنفس (التعريف+التاريخ)، تجاهله بهدوء بدل ما يفشل الإدخال كله
-    const { error } = await sb.from('checklist_instances').upsert(missing, { onConflict:'checklist_definition_id,date', ignoreDuplicates:true });
-    if(error) console.error('checklist_instances upsert', error);
+async function submitTaskConfirm(){
+  const notes=(document.getElementById('cf-notes')||{value:''}).value.trim();
+  const patch={ status:'completed', verified_by:S.session.user.id, completed_at:new Date().toISOString(), notes, photo:pendingPhoto };
+  if(await dbUpdate('task_runs', S.scanCtx.runId, patch)){
+    const r=S.taskRuns.find(x=>x.id===S.scanCtx.runId); if(r) Object.assign(r,patch);
+    pendingPhoto=null; S.modal=null; S.scanCtx=null; render(); toast('تم اعتماد القائمة', true);
   }
-  S.checklistInstances = (await dbSelect('checklist_instances')) ?? S.checklistInstances;
 }
 
 /* ============================= BOOT ============================= */
 async function loadRoleData(){
   const role=S.profile.role;
   const isMgmt = role==='admin'||role==='opm';
+  const isHK = role==='hk_manager'||role==='hk_admin'||role==='hk_senior_supervisor';
   const distRoles = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor'];
-  const wantsChecklist = isMgmt || role==='hk_senior_supervisor' || role==='supervisor';
+  const wantsTasks = isMgmt || isHK || role==='supervisor';
   const wantsOpsData = isMgmt || role==='supervisor';
 
   // كل الجلبات المستقلة عن بعضها بتتنفذ في نفس الوقت بدل ما تستنى بعضها
-  const jobs = {
-    locations: dbSelect('locations'),
-    users: dbSelect('profiles'),
-  };
-  if(distRoles.includes(role)){
-    jobs.zones = dbSelect('zones');
-    jobs.sessions = dbSelect('distribution_sessions', { date: S.today });
-  }
-  // التوزيع اليومي: الحضور + توزيع الزونات + توزيع المواقع لازم يتحملوا لكل الأدوار المشاركة،
-  // مش بس المشرف العادي (كانوا بيبانوا فاضيين بعد أي ريفريش للمدير/الإداري/المشرف الأول)
-  if(distRoles.includes(role) || role==='supervisor'){
-    jobs.presence = dbSelect('daily_presence', { date: S.today });
-    jobs.zoneAssignments = dbSelect('zone_assignments', { date: S.today });
-    jobs.locationAssignments = dbSelect('location_assignments', { date: S.today });
-    jobs.auditVisits = dbSelect('location_audit_visits');
-  }
+  const jobs = { users: dbSelect('profiles') };
+  if(distRoles.includes(role)) jobs.sessions = dbSelect('distribution_sessions', { date: S.today });
+  if(distRoles.includes(role) || role==='supervisor') jobs.presence = dbSelect('daily_presence', { date: S.today });
   if(isMgmt || role==='fm_dispatcher'){
     jobs.orders = dbSelect('paid_service_orders');
     jobs.pest = dbSelect('pest_control_requests');
@@ -2941,12 +2785,14 @@ async function loadRoleData(){
     jobs.unitNotes = dbSelect('unit_notes');
     jobs.units = dbSelect('units_master');
   }
-  if(isMgmt || role==='contractor_manager') jobs.installs = dbSelect('installation_works');
-  if(wantsChecklist) jobs.checklistDefs = dbSelect('checklist_definitions');
-  if(isMgmt || role==='hk_senior_supervisor' || role==='supervisor') jobs.checklistInstances = dbSelect('checklist_instances');
-  if(isMgmt || role==='fm_dispatcher'){
-    jobs.complaints = dbSelect('complaints');
+  if(isHK){
+    jobs.orders = dbSelect('paid_service_orders');
+    jobs.deliveries = dbSelect('delivery_units');
+    jobs.unitNotes = dbSelect('unit_notes');
+    jobs.units = dbSelect('units_master');
   }
+  if(isMgmt || role==='contractor_manager') jobs.installs = dbSelect('installation_works');
+  if(isMgmt || role==='fm_dispatcher') jobs.complaints = dbSelect('complaints');
   if(isMgmt){
     jobs.suppliers = dbSelect('suppliers');
     jobs.supplierKpi = dbSelect('supplier_kpi');
@@ -2958,14 +2804,9 @@ async function loadRoleData(){
   const results = await Promise.all(keys.map(k=>jobs[k]));
   const data = {}; keys.forEach((k,i)=>data[k]=results[i]);
 
-  S.locations = data.locations || S.locations;
   S.users = data.users || S.users;
-  if(data.zones) S.zones = data.zones;
   if(data.sessions) S.distSession = data.sessions[0] || null;
   if(data.presence) S.presence = data.presence;
-  if(data.zoneAssignments) S.zoneAssignments = data.zoneAssignments;
-  if(data.locationAssignments) S.locationAssignments = data.locationAssignments;
-  if(data.auditVisits) S.auditVisits = data.auditVisits;
   if(data.orders) S.orders = data.orders;
   if(data.pest) S.pest = data.pest;
   if(data.units) S.units = data.units;
@@ -2974,15 +2815,14 @@ async function loadRoleData(){
   if(data.deliveries) S.deliveries = data.deliveries;
   if(data.unitNotes) S.unitNotes = data.unitNotes;
   if(data.installs) S.installs = data.installs;
-  if(data.checklistDefs) S.checklistDefs = data.checklistDefs;
-  if(data.checklistInstances) S.checklistInstances = data.checklistInstances;
   if(data.complaints) S.complaints = data.complaints;
   if(data.suppliers) S.suppliers = data.suppliers;
   if(data.supplierKpi) S.supplierKpi = data.supplierKpi;
   if(data.supplierInvoices) S.supplierInvoices = data.supplierInvoices;
   if(data.attendance) S.attendance = data.attendance;
 
-  if(wantsChecklist) await ensureTodayChecklistInstances();
+  if(wantsTasks){ await loadTaskData(); await ensureTodayTaskRuns(); }
+  checkPendingExtras(false);
 }
 
 async function bootApp(){
@@ -2997,6 +2837,7 @@ async function bootApp(){
   await loadRoleData();
   render();
   setupRealtime();
+  startExtraPoll();
 }
 
 async function manualRefresh(){
@@ -3086,6 +2927,33 @@ async function handleRealtimeEvent(table, payload){
     pushNotification(`${EVENT_LABEL[payload.eventType]||'تغيير'}: ${info.module}`, info.tab);
   }
   render();
+}
+function checkPendingExtras(withSound){
+  const r = S.profile && S.profile.role;
+  if(r!=='admin' && r!=='opm') return;
+  const pend = (S.orders||[]).filter(o=>o.approval_status==='pending');
+  let fresh = 0;
+  pend.forEach(o=>{
+    if(!S.seenExtra.has(o.id)){
+      S.seenExtra.add(o.id); fresh++;
+      pushNotification('طلب وحدة إضافية بانتظار موافقتك: '+(o.unit_code||'-')+' — '+o.scheduled_date, 'orders');
+    }
+  });
+  if(fresh && withSound){ playAlertSound(); toast('فيه طلب وحدة إضافية جديد بانتظار موافقتك', true); }
+}
+let extraPollStarted = false;
+function startExtraPoll(){
+  if(extraPollStarted) return; extraPollStarted = true;
+  // فحص خفيف كل دقيقة للإدارة و OPM بس: ما بيعملش render إلا لو مفيش مودال مفتوح ولا حاجة بتتكتب
+  setInterval(async ()=>{
+    if(!S.session || !S.profile || document.visibilityState!=='visible') return;
+    const r = S.profile.role; if(r!=='admin' && r!=='opm') return;
+    const {data,error} = await sb.from('paid_service_orders').select('id').eq('approval_status','pending');
+    if(error || !data) return;
+    if(!data.some(o=>!S.seenExtra.has(o.id))) return;
+    await loadOrders(); checkPendingExtras(true);
+    if(!S.modal && !hasUnsavedInput()) render();
+  }, 60000);
 }
 function pushNotification(text, tab){
   S.notifications.unshift({ id: uid('ntf'), text, tab, time: new Date().toISOString(), read:false });
