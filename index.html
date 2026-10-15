@@ -227,7 +227,7 @@ let S = {
   locations:[], users:[],
   deliveries:[], deliveryDate: todayStr(),
   orders:[], ordersDate:'',
-  installs:[], installsDate: todayStr(),
+  
   taskLists:[], taskItems:[], taskRuns:[], taskRunItems:[], openTaskAdmin:new Set(), openTaskSup:new Set(), seenExtra:new Set(),
   attendance:[], attendanceDate: todayStr(),
   availability:[],
@@ -439,31 +439,32 @@ const ICON = {
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
   home:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
   truck:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+  dollar:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  keyhand:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16.5" cy="4.5" r="2.7"/><path d="M14.6 6.4L9 12M12 9.4l1.6 1.6M10.4 11l1.4 1.4"/></svg>`,
   droplet:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69s-6 6.34-6 10.31a6 6 0 0 0 12 0c0-3.97-6-10.31-6-10.31z"/></svg>`,
   bug:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M8 10H4M20 10h-4M8 16H4M20 16h-4M12 6V3M9 3l1.5 2M15 3l-1.5 2"/></svg>`,
   building:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/></svg>`,
   trash2:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  brick:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16"/><line x1="2" y1="10" x2="9" y2="10"/><line x1="15" y1="10" x2="22" y2="10"/><line x1="2" y1="16" x2="7" y2="16"/><line x1="12" y1="16" x2="17" y2="16"/><line x1="9" y1="4" x2="9" y2="10"/><line x1="15" y1="10" x2="15" y2="16"/><line x1="7" y1="16" x2="7" y2="20"/><line x1="17" y1="4" x2="17" y2="10"/></svg>`,
   users:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   pin2:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
   chart:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
   list:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
   idcard:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>`,
 };
-const TAB_ICON = { home:'home', deliveries:'truck', orders:'droplet', pest:'bug', facade:'building', waste:'trash2', installs:'brick', tasks:'list', qrsheet:'printer', attendance:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', qrsheet:'printer', attendance:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['installs','أعمال التأسيسات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['complaints','الشكاوى']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['myname','بياناتي']];
-  if(role==='contractor_manager') return [['home','الرئيسية'],['installs','أعمال التأسيسات'],['attendance','الحضور']];
+  if(role==='contractor_manager') return [['home','الرئيسية'],['attendance','الحضور']];
   if(role==='contractor_admin') return [['attendance','الحضور']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
-  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
-  if(role==='hk_senior_supervisor') return [['distribution','اعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['installs','أعمال التأسيسات'],['myname','بياناتي']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['myname','بياناتي']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['myname','بياناتي']];
+  if(role==='hk_senior_supervisor') return [['distribution','اعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['myname','بياناتي']];
   return [];
 }
 
@@ -606,7 +607,6 @@ function renderTabBody(){
     case 'pest': return renderPest();
     case 'facade': return renderFacade();
     case 'waste': return renderWaste();
-    case 'installs': return renderInstalls();
     case 'tasks': return renderTasksAdmin();
     case 'qrsheet': return renderQrSheet();
     case 'attendance': return renderAttendance();
@@ -628,7 +628,6 @@ function bindTabEvents(){
     case 'pest': bindPest(); break;
     case 'facade': bindFacade(); break;
     case 'waste': bindWaste(); break;
-    case 'installs': bindInstalls(); break;
     case 'tasks': bindTasksAdmin(); break;
     case 'qrsheet': bindQrSheet(); break;
     case 'attendance': bindAttendance(); break;
@@ -656,15 +655,14 @@ function serviceCard(color, icon, label, valueHtml, tabId){
 function renderHome(){
   const role = S.profile.role;
   const roleTabs = tabsForRole(role).map(t=>t[0]);
-  const todayInstalls = S.installs.filter(i=>i.date===S.today);
+  const todayTaskRows = sortedTaskLists().filter(l=>l.active!==false && taskDueToday(l)).map(l=>({l,p:taskProgress(l)})).filter(x=>x.p.run);
 
   const cardDefs = [
-    { id:'deliveries', color:'mint', icon:'truck', label:'وحدات التسليم اليوم', data:S.deliveries, field:'date' },
-    { id:'orders', color:'blue', icon:'droplet', label:'الخدمة المدفوعة اليوم', data:S.orders.filter(orderApproved), field:'scheduled_date' },
+    { id:'deliveries', color:'mint', icon:'keyhand', label:'وحدات التسليم اليوم', data:S.deliveries, field:'date' },
+    { id:'orders', color:'blue', icon:'dollar', label:'الخدمة المدفوعة اليوم', data:S.orders.filter(orderApproved), field:'scheduled_date' },
     { id:'pest', color:'coral', icon:'bug', label:'مكافحة الحشرات اليوم', data:S.pest||[], field:'scheduled_date' },
     { id:'facade', color:'amber', icon:'building', label:'نظافة الواجهات اليوم', data:S.facade||[], field:'date' },
     { id:'waste', color:'ink', icon:'trash2', label:'رفع المخلفات اليوم', data:S.waste||[], field:'date' },
-    { id:'installs', color:'amber', icon:'brick', label:'أعمال التأسيسات اليوم', data:S.installs, field:'date' },
     { id:'tasks', color:'mint', icon:'list', label:'المهمات المجدولة اليوم', data:S.taskRuns||[], field:'date' },
   ];
   const cardsHtml = cardDefs.filter(c=>roleTabs.includes(c.id)).map(c=>{
@@ -673,7 +671,7 @@ function renderHome(){
     return serviceCard(c.color, c.icon, c.label, `${done}/${items.length}`, c.id);
   }).join('');
   const pendingExtra = (role==='admin'||role==='opm') ? S.orders.filter(o=>o.approval_status==='pending').length : 0;
-  const extraCard = pendingExtra ? serviceCard('coral','droplet','طلبات وحدات إضافية بانتظار موافقتك', String(pendingExtra), 'orders') : '';
+  const extraCard = pendingExtra ? serviceCard('coral','dollar','طلبات وحدات إضافية بانتظار موافقتك', String(pendingExtra), 'orders') : '';
   const attendanceCard = roleTabs.includes('attendance') ? (()=>{
     const att=(S.attendance||[]).filter(a=>a.date===S.today);
     return serviceCard('blue','idcard','سجلات حضور اليوم', `${att.length}`, 'attendance');
@@ -691,12 +689,12 @@ function renderHome(){
   ${(role==='admin'||role==='opm')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
   <div class="home-blocks">
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (مهمات مجدولة معتمدة)</h3><canvas id="chartHome" height="180"></canvas></div>
-    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات والمهمات المجدولة على مدار الشهر</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
+    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">المهمات المجدولة على مدار الشهر (المجدولة والمعتمدة)</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
     <div class="card">
-      <h3 style="margin-top:0;font-size:14px;">أعمال التأسيسات اليوم</h3>
-      ${todayInstalls.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th></tr></thead><tbody>
-        ${todayInstalls.map(i=>`<tr><td>${esc(i.description)}</td><td>${SHIFT_LABEL[i.shift]}</td><td>${statusBadge(i.status)}</td></tr>`).join('')}
-      </tbody></table></div>` : `<div class="empty-state" style="padding:20px;"><span class="em">🧱</span>مفيش أعمال تأسيسات مجدولة النهاردة</div>`}
+      <h3 style="margin-top:0;font-size:14px;">المهمات المجدولة اليوم</h3>
+      ${todayTaskRows.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>القائمة</th><th>الوردية</th><th>البنود</th><th>الحالة</th></tr></thead><tbody>
+        ${todayTaskRows.map(({l,p})=>`<tr><td>${esc(l.name)}</td><td>${SHIFT_LABEL[l.shift||'both']}</td><td>${p.done}/${p.total}</td><td>${taskRunBadge(p.run)}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty-state" style="padding:20px;"><span class="em">📋</span>مفيش مهمات مجدولة النهاردة</div>`}
     </div>
   </div>
   <p style="text-align:center;font-size:12px;color:var(--text-dim);">👆 دوس على أي كارت فوق عشان تروح مباشرة لشاشته</p>`;
@@ -716,7 +714,6 @@ function runSystemSearch(q){
     { tab:'pest', label:'مكافحة حشرات', data:S.pest, title:p=>`${esc(p.unit_code||'-')} — ${PEST_TYPE_LABEL[p.service_type]||p.service_type}` },
     { tab:'facade', label:'نظافة واجهات', data:S.facade, title:f=>esc(f.description||f.unit_code||'-') },
     { tab:'waste', label:'رفع مخلفات', data:S.waste, title:w=>esc(w.description||w.unit_code||'-') },
-    { tab:'installs', label:'أعمال تأسيسات', data:S.installs, title:i=>esc(i.description||'-') },
     { tab:'complaints', label:'شكوى', data:S.complaints, title:c=>`${esc(c.unit_code||'-')} — ${esc((c.description||'').slice(0,50))}` },
     { tab:'suppliers', label:'مورد', data:S.suppliers, title:s=>esc(s.name||'-') },
     { tab:'users', label:'مستخدم', data:S.users, title:u=>esc(u.full_name||'-') },
@@ -756,15 +753,15 @@ function drawHomeCharts(){
   const elm=document.getElementById('chartMonthly'); if(elm && typeof Chart!=='undefined'){
     const now=new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-    const labels=[]; const installVals=[]; const checklistVals=[];
+    const labels=[]; const doneVals=[]; const checklistVals=[];
     for(let d=1; d<=daysInMonth; d++){
       const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       labels.push(String(d));
-      installVals.push(S.installs.filter(i=>i.date===ds).length);
+      doneVals.push((S.taskRuns||[]).filter(i=>i.date===ds && i.status==='completed').length);
       checklistVals.push((S.taskRuns||[]).filter(c=>c.date===ds).length);
     }
     new Chart(elm, { type:'bar', data:{ labels, datasets:[
-      { label:'أعمال تأسيسات', data:installVals, backgroundColor:'#DA8B1F' },
+      { label:'معتمدة', data:doneVals, backgroundColor:'#DA8B1F' },
       { label:'مهمات مجدولة', data:checklistVals, backgroundColor:'#1B8A6B' },
     ]}, options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:11,font:{size:10.5}}}}, scales:{ x:{ stacked:false, ticks:{font:{size:9}} }, y:{ beginAtZero:true, ticks:{stepSize:1} } } } });
   }
@@ -1111,33 +1108,6 @@ function bindWaste(){
 async function loadWaste(){ S.waste = (await dbSelect('waste_removal_jobs')) ?? S.waste; }
 
 /* ============================= INSTALLATION WORKS ============================= */
-function renderInstalls(){
-  const role=S.profile.role;
-  const list = S.installs.filter(i=>i.date===S.installsDate);
-  const canUpdate = role==='admin'||role==='opm'||role==='contractor_manager'||role==='hk_senior_supervisor';
-  return `
-  <div class="toolbar">
-    <div class="fgroup"><label>التاريخ</label><input type="date" id="in-date" value="${S.installsDate}"></div>
-    ${(role==='admin'||role==='opm')?`<button class="primary-btn" id="in-add">${ICON.plus()} جدولة عمل جديد</button>`:''}
-  </div>
-  <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>الوردية</th><th>الحالة</th><th>سبب التأجيل</th><th></th></tr></thead><tbody>
-  ${list.length? list.map(i=>`<tr>
-      <td>${esc(i.description)}</td>
-      <td><span class="tag-shift ${i.shift}">${SHIFT_LABEL[i.shift]}</span></td>
-      <td>${statusBadge(i.status)}</td>
-      <td>${esc(i.postpone_reason||'-')}</td>
-      <td>${canUpdate && i.status==='scheduled' ? `<button class="ghost-btn" data-in-done="${i.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-in-postpone="${i.id}">تأجيل</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-in-del="${i.id}">${ICON.trash(12)}</button>`:''}</td>
-    </tr>`).join(''): `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
-  </tbody></table></div>`;
-}
-function bindInstalls(){
-  document.getElementById('in-date').onchange=e=>{ S.installsDate=e.target.value; render(); };
-  const add=document.getElementById('in-add'); if(add) add.onclick=()=>{ S.modal={type:'addInstall'}; render(); };
-  document.querySelectorAll('[data-in-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('installation_works', b.dataset.inDel); await loadInstalls(); render(); toast('تم الحذف',true); });
-  document.querySelectorAll('[data-in-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('installation_works', b.dataset.inDone, {status:'completed', updated_by:S.session.user.id, updated_at:new Date().toISOString()}); await loadInstalls(); render(); toast('تم تسجيل الانتهاء',true); });
-  document.querySelectorAll('[data-in-postpone]').forEach(b=>b.onclick=()=>{ S.modal={type:'postponeInstall', id:b.dataset.inPostpone}; render(); });
-}
-async function loadInstalls(){ S.installs = (await dbSelect('installation_works')) ?? S.installs; }
 
 /* ============================= CHECKLIST DEFINITIONS (admin) ============================= */
 
@@ -1152,8 +1122,39 @@ function taskProgress(list){
   const done = run? items.filter(it=>taskItemDone(run,it.id)).length : 0;
   return { run, total:items.length, done };
 }
+const FREQ_LABEL = { daily:'يومي', weekly:'أسبوعي', monthly:'شهري' };
+const WEEKDAY_OPTIONS = [[6,'السبت'],[0,'الأحد'],[1,'الاثنين'],[2,'الثلاثاء'],[3,'الأربعاء'],[4,'الخميس'],[5,'الجمعة']];
+function taskFreqText(l){
+  const f=l.frequency||'daily';
+  if(f==='weekly'){ const rd=(l.repeat_day==null?6:+l.repeat_day); const d=WEEKDAY_OPTIONS.find(x=>x[0]===rd); return 'أسبوعي · '+(d?d[1]:''); }
+  if(f==='monthly') return 'شهري · يوم '+(l.repeat_day||1);
+  return 'يومي';
+}
+function taskDueOn(l, date){
+  const f=l.frequency||'daily'; if(f==='daily') return true;
+  const d=new Date(date+'T00:00:00');
+  if(f==='weekly') return d.getDay()===(l.repeat_day==null?6:+l.repeat_day);
+  if(f==='monthly'){ const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); return d.getDate()===Math.min(+l.repeat_day||1, dim); }
+  return true;
+}
+function taskDueToday(l){ return taskDueOn(l, S.today); }
+function taskFreqFields(l){
+  const f=(l&&l.frequency)||'daily'; const rd=(l&&l.repeat_day!=null)? +l.repeat_day : null;
+  return `<div class="form-row"><label>تكرار المهمة</label><select id="m-tl-freq">
+      <option value="daily" ${f==='daily'?'selected':''}>يومي</option>
+      <option value="weekly" ${f==='weekly'?'selected':''}>أسبوعي</option>
+      <option value="monthly" ${f==='monthly'?'selected':''}>شهري</option></select></div>
+    <div class="form-row" id="m-tl-weekday-row" style="${f==='weekly'?'':'display:none;'}"><label>يوم الأسبوع</label><select id="m-tl-weekday">${WEEKDAY_OPTIONS.map(([v,n])=>`<option value="${v}" ${(rd==null?6:rd)===v?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-row" id="m-tl-monthday-row" style="${f==='monthly'?'':'display:none;'}"><label>يوم الشهر (1–31)</label><input type="number" min="1" max="31" id="m-tl-monthday" value="${(f==='monthly'&&rd)?rd:1}"></div>`;
+}
+function readTaskFreq(){
+  const f=document.getElementById('m-tl-freq').value;
+  if(f==='weekly') return { frequency:'weekly', repeat_day:+document.getElementById('m-tl-weekday').value };
+  if(f==='monthly'){ let d=parseInt(document.getElementById('m-tl-monthday').value,10); if(!(d>=1&&d<=31)) d=1; return { frequency:'monthly', repeat_day:d }; }
+  return { frequency:'daily', repeat_day:null };
+}
 function sortedTaskLists(){ return (S.taskLists||[]).slice().sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''))); }
-function tasksForShift(shift){ return sortedTaskLists().filter(l=>l.active!==false && (!l.shift || l.shift==='both' || l.shift===shift)); }
+function tasksForShift(shift){ return sortedTaskLists().filter(l=>l.active!==false && taskDueToday(l) && (!l.shift || l.shift==='both' || l.shift===shift)); }
 function taskRunBadge(run){
   if(!run) return '<span class="badge pending"><span class="dot"></span>قيد التجهيز</span>';
   if(run.status==='completed') return '<span class="badge done"><span class="dot"></span>تم اعتمادها</span>';
@@ -1182,7 +1183,7 @@ async function loadTaskRunItems(){
 async function ensureTodayTaskRuns(){
   const date=S.today;
   const existing=(S.taskRuns||[]).filter(r=>r.date===date);
-  const missing=(S.taskLists||[]).filter(l=>l.active!==false && !existing.find(r=>r.list_id===l.id))
+  const missing=(S.taskLists||[]).filter(l=>l.active!==false && taskDueToday(l) && !existing.find(r=>r.list_id===l.id))
     .map(l=>({ id:uid('trun'), date, list_id:l.id, status:'incomplete', supervisor_marked_done:false }));
   if(!missing.length) return;
   const {error}=await sb.from('task_runs').upsert(missing,{onConflict:'list_id,date',ignoreDuplicates:true});
@@ -1195,19 +1196,19 @@ function renderTasksAdmin(){
   const lists=sortedTaskLists();
   return `
   <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button></div>
-  <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك كل يوم للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
+  <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك حسب تكرارها (يومي / أسبوعي / شهري) للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
   ${lists.length? lists.map(l=>{
     const items=taskItemsOf(l.id); const {run,done,total}=taskProgress(l);
     const open=S.openTaskAdmin.has(l.id);
     return `<details class="card" data-tl-open="${l.id}" ${open?'open':''} style="margin-bottom:12px;${l.active===false?'opacity:.65;':''}">
       <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span><b style="font-size:14.5px;">${esc(l.name)}</b> <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span></span>
-        <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text-dim);">${total} بند · اليوم ${done}/${total}</span>${l.active===false?'<span class="badge pending"><span class="dot"></span>موقوفة</span>':taskRunBadge(run)}</span>
+        <span><b style="font-size:14.5px;">${esc(l.name)}</b> <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span> <span class="tag-shift both">${esc(taskFreqText(l))}</span></span>
+        <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text-dim);">${total} بند${taskDueToday(l)?' · اليوم '+done+'/'+total:''}</span>${l.active===false?'<span class="badge pending"><span class="dot"></span>موقوفة</span>':(taskDueToday(l)?taskRunBadge(run):'<span class="badge pending"><span class="dot"></span>مش مجدولة النهاردة</span>')}</span>
       </summary>
       <div style="margin-top:12px;">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
           <button class="ghost-btn" data-tl-qr="${l.id}">${ICON.qr(13)} كود QR</button>
-          <button class="ghost-btn" data-tl-edit="${l.id}">تعديل الاسم / الوردية</button>
+          <button class="ghost-btn" data-tl-edit="${l.id}">تعديل (الاسم / الوردية / التكرار)</button>
           <button class="ghost-btn" data-tl-toggle="${l.id}">${l.active===false?'تفعيل':'إيقاف'}</button>
           <button class="ghost-btn danger" data-tl-del="${l.id}">${ICON.trash(13)} حذف القائمة</button>
         </div>
@@ -1646,7 +1647,7 @@ function renderPresenceSection(){
 }
 
 function renderSeniorSection(){
-  const runs = sortedTaskLists().filter(l=>l.active!==false).map(l=>({ l, run:taskRunOf(l.id), p:taskProgress(l) })).filter(x=>x.run);
+  const runs = sortedTaskLists().filter(l=>l.active!==false && taskDueToday(l)).map(l=>({ l, run:taskRunOf(l.id), p:taskProgress(l) })).filter(x=>x.run);
   return `<div class="card" style="margin-bottom:16px;">
     <h3 style="margin-top:0;">اعتماد المهمات المجدولة</h3>
     <p style="font-size:11.5px;color:var(--text-dim);margin-top:-6px;">القائمة ما بتتقفلش إلا لما تمسح كود الـ QR بتاعها بنفسك بعد ما المشرف يأكد الانتهاء.</p>
@@ -1806,14 +1807,13 @@ function getReportData(){
     pest: (S.pest||[]).filter(p=>inRange(p.scheduled_date)),
     facade: (S.facade||[]).filter(f=>inRange(f.date)),
     waste: (S.waste||[]).filter(w=>inRange(w.date)),
-    installs: S.installs.filter(i=>inRange(i.date)),
     checklist: (S.taskRuns||[]).filter(c=>inRange(c.date)).map(c=>({...c, list_name:((S.taskLists||[]).find(l=>l.id===c.list_id)||{}).name||''})),
     attendance: S.attendance.filter(a=>inRange(a.date)),
   };
 }
 function renderReports(){
   const from=S.reportFrom, to=S.reportTo, type=S.reportType;
-  const { deliv, orders, pest, facade, waste, installs, checklist, attendance } = getReportData();
+  const { deliv, orders, pest, facade, waste, checklist, attendance } = getReportData();
 
   const toolbar = `<div class="toolbar">
     <div class="fgroup"><label>من تاريخ</label><input type="date" id="rp-from" value="${from}"></div>
@@ -1825,7 +1825,6 @@ function renderReports(){
       <option value="pest" ${type==='pest'?'selected':''}>مكافحة الحشرات</option>
       <option value="facade" ${type==='facade'?'selected':''}>نظافة الواجهات</option>
       <option value="waste" ${type==='waste'?'selected':''}>رفع المخلفات</option>
-      <option value="installs" ${type==='installs'?'selected':''}>أعمال التأسيسات</option>
       <option value="checklist" ${type==='checklist'?'selected':''}>المهمات المجدولة</option>
       <option value="attendance" ${type==='attendance'?'selected':''}>الحضور</option>
     </select></div>
@@ -1841,7 +1840,6 @@ function renderReports(){
       <div class="stat coral"><div class="num">${pest.filter(p=>p.status==='completed').length}/${pest.length}</div><div class="lbl">مكافحة حشرات منجزة</div></div>
       <div class="stat amber"><div class="num">${facade.filter(f=>f.status==='completed').length}/${facade.length}</div><div class="lbl">نظافة واجهات منجزة</div></div>
       <div class="stat ink"><div class="num">${waste.filter(w=>w.status==='completed').length}/${waste.length}</div><div class="lbl">رفع مخلفات منجزة</div></div>
-      <div class="stat amber"><div class="num">${installs.filter(i=>i.status==='completed').length}/${installs.length}</div><div class="lbl">أعمال تأسيسات منجزة</div></div>
       <div class="stat ink"><div class="num">${checklist.filter(c=>c.status==='completed').length}/${checklist.length}</div><div class="lbl">مهمات مجدولة منجزة</div></div>
       <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور</div></div>
     </div>`;
@@ -1853,7 +1851,6 @@ function renderReports(){
     pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
-    installs: { rows:installs, cols:[['description','الوصف'],['date','التاريخ'],['shift','الوردية'],['status','الحالة']] },
     checklist: { rows:checklist, cols:[['date','التاريخ'],['list_name','القائمة'],['status','الحالة']] },
     attendance: { rows:attendance, cols:[['date','التاريخ'],['shift','الوردية'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة']] },
   };
@@ -1906,7 +1903,6 @@ function exportReportExcel(){
   addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
-  addSheet(data.installs, 'أعمال التأسيسات', [['description','الوصف'],['date','التاريخ'],['shift','الوردية',shiftFmt],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
   addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',statusFmt]]);
   addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
   if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
@@ -2078,14 +2074,6 @@ function renderModal(){
     <div class="form-row"><label>ملاحظات للمشرف (اختياري)</label><textarea id="m-ord-notes">${esc(o.opm_notes||'')}</textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
-  if(m.type==='addInstall') return modalWrap('جدولة عمل تأسيسات', `
-    <div class="form-row"><label>التاريخ</label><input type="date" id="m-in-date" value="${S.installsDate}"></div>
-    <div class="form-row"><label>الوردية</label><select id="m-in-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="emergency">طوارئ</option></select></div>
-    <div class="form-row"><label>وصف العمل</label><textarea id="m-in-desc"></textarea></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
-  if(m.type==='postponeInstall') return modalWrap('تأجيل العمل', `
-    <div class="form-row"><label>سبب التأجيل</label><textarea id="m-postpone-reason" placeholder="لازم تكتب السبب"></textarea></div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
   if(m.type==='userQr'){
     const u=S.users.find(x=>x.id===m.id); const t=(S.qrTokens||[]).find(x=>x.user_id===m.id);
     if(!u||!t) return '';
@@ -2124,6 +2112,7 @@ function renderModal(){
   if(m.type==='addTaskList') return modalWrap('قائمة مهام جديدة', `
     <div class="form-row"><label>اسم القائمة</label><input id="m-tl-name" placeholder="مثال: YA Tower"></div>
     <div class="form-row"><label>الوردية</label><select id="m-tl-shift"><option value="morning">صباحي</option><option value="evening">مسائي</option><option value="both">الاثنين</option></select></div>
+    ${taskFreqFields(null)}
     <div class="form-row"><label>البنود (اختياري — كل بند في سطر)</label><textarea id="m-tl-items" rows="6" placeholder="الأسانسير&#10;الدور 1&#10;أبواب الشقق"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
   if(m.type==='editTaskList'){
@@ -2135,6 +2124,7 @@ function renderModal(){
       <option value="evening" ${l.shift==='evening'?'selected':''}>مسائي</option>
       <option value="both" ${(!l.shift||l.shift==='both')?'selected':''}>الاثنين</option>
     </select></div>
+    ${taskFreqFields(l)}
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
   if(m.type==='confirmDeleteTaskList'){
@@ -2400,6 +2390,11 @@ function bindModalEvents(){
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
+  const freqSel=document.getElementById('m-tl-freq');
+  if(freqSel) freqSel.onchange=()=>{
+    document.getElementById('m-tl-weekday-row').style.display = freqSel.value==='weekly' ? '' : 'none';
+    document.getElementById('m-tl-monthday-row').style.display = freqSel.value==='monthly' ? '' : 'none';
+  };
   if(S.modal && S.modal.type==='qr') renderQrCanvas();
   if(S.modal && S.modal.type==='userQr') bindUserQrModal();
   if(S.modal && (S.modal.type==='scan')) startScanner();
@@ -2514,17 +2509,6 @@ async function handleModalSave(){
     if(pendingPhoto) patch.payment_photo = pendingPhoto;
     if(await dbUpdate('paid_service_orders', m.id, patch)){ pendingPhoto=null; await loadOrders(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
   }
-  else if(m.type==='addInstall'){
-    const description=document.getElementById('m-in-desc').value.trim();
-    if(!description){ toast('اكتب وصف العمل',false); return; }
-    const row={ id:uid('in'), date:document.getElementById('m-in-date').value, shift:document.getElementById('m-in-shift').value, description, status:'scheduled', created_by:S.session.user.id };
-    if(await dbInsert('installation_works',[row])){ await loadInstalls(); S.modal=null; render(); toast('تمت الجدولة',true); }
-  }
-  else if(m.type==='postponeInstall'){
-    const reason=document.getElementById('m-postpone-reason').value.trim();
-    if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
-    if(await dbUpdate('installation_works', m.id, {status:'postponed', postpone_reason:reason, updated_by:S.session.user.id, updated_at:new Date().toISOString()})){ await loadInstalls(); S.modal=null; render(); toast('تم تسجيل التأجيل',true); }
-  }
   else if(m.type==='confirmChecklist'){
     await submitTaskConfirm();
   }
@@ -2532,7 +2516,7 @@ async function handleModalSave(){
     const name=document.getElementById('m-tl-name').value.trim();
     if(!name){ toast('اكتب اسم القائمة',false); return; }
     const id=uid('tl');
-    const row={ id, name, shift:document.getElementById('m-tl-shift').value, active:true, created_by:S.session.user.id };
+    const row={ id, name, shift:document.getElementById('m-tl-shift').value, ...readTaskFreq(), active:true, created_by:S.session.user.id };
     if(await dbInsert('task_lists',[row])){
       const lines=(document.getElementById('m-tl-items').value||'').split('\n').map(x=>x.trim()).filter(Boolean);
       if(lines.length) await dbInsert('task_items', lines.map((n,i)=>({ id:uid('ti'), list_id:id, name:n, position:i+1, active:true })));
@@ -2542,7 +2526,7 @@ async function handleModalSave(){
   else if(m.type==='editTaskList'){
     const name=document.getElementById('m-tl-name').value.trim();
     if(!name){ toast('اكتب اسم القائمة',false); return; }
-    if(await dbUpdate('task_lists', m.id, { name, shift:document.getElementById('m-tl-shift').value })){ await loadTaskData(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
+    if(await dbUpdate('task_lists', m.id, { name, shift:document.getElementById('m-tl-shift').value, ...readTaskFreq() })){ await loadTaskData(); S.modal=null; render(); toast('تم حفظ التعديل',true); }
   }
   else if(m.type==='confirmDeleteTaskList'){
     if(await dbDelete('task_lists', m.id)){ S.openTaskAdmin.delete(m.id); await loadTaskData(); S.modal=null; render(); toast('تم حذف القائمة',true); }
@@ -2791,7 +2775,6 @@ async function loadRoleData(){
     jobs.unitNotes = dbSelect('unit_notes');
     jobs.units = dbSelect('units_master');
   }
-  if(isMgmt || role==='contractor_manager') jobs.installs = dbSelect('installation_works');
   if(isMgmt || role==='fm_dispatcher') jobs.complaints = dbSelect('complaints');
   if(isMgmt){
     jobs.suppliers = dbSelect('suppliers');
@@ -2814,7 +2797,6 @@ async function loadRoleData(){
   if(data.waste) S.waste = data.waste;
   if(data.deliveries) S.deliveries = data.deliveries;
   if(data.unitNotes) S.unitNotes = data.unitNotes;
-  if(data.installs) S.installs = data.installs;
   if(data.complaints) S.complaints = data.complaints;
   if(data.suppliers) S.suppliers = data.suppliers;
   if(data.supplierKpi) S.supplierKpi = data.supplierKpi;
@@ -2853,7 +2835,6 @@ const NOTIFY_TABLES = {
   pest_control_requests: { module:'مكافحة الحشرات', tab:'pest', field:'assigned_supervisor_id' },
   facade_works: { module:'نظافة الواجهات', tab:'facade', field:null },
   waste_removal_jobs: { module:'رفع المخلفات', tab:'waste', field:'assigned_supervisor_id' },
-  installation_works: { module:'أعمال التأسيسات', tab:'installs', field:null },
   complaints: { module:'شكوى جديدة', tab:'complaints', field:null },
 };
 // جداول بتتغير كتير وبنعمل لها تحديث صامت (بدون صوت/تنبيه) لكل المتصلين، عشان أي حد يشوف أحدث حالة أول بأول
