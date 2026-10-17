@@ -1,32 +1,52 @@
-const CACHE_NAME = 'zedwest-v2';
-const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './qrcode.min.js', './jsQR.js', './chart.umd.min.js', './supabase.js', './xlsx.full.min.js'];
+// Service Worker — Ora Soft Services Operations
+// بيستقبل إشعارات الـ Web Push حتى لو التطبيق مقفول، وبيفتح الشاشة المعنية لما تدوس على الإشعار.
+const SW_VERSION = 'v5';
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)).catch(()=>{}));
-  self.skipWaiting();
+self.addEventListener('install', () => self.skipWaiting());
+
+self.addEventListener('activate', (event) => {
+  // مسح أي كاش قديم عشان النسخة الجديدة من التطبيق تظهر فورًا
+  event.waitUntil((async () => {
+    try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch (e) {}
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch (e) { data = { title: 'إشعار جديد', body: event.data ? event.data.text() : '' }; }
+
+  event.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // لو التطبيق مفتوح قدّام المستخدم: نبلّغ الصفحة (توست + صوت) بدل إشعار النظام
+    if (list.some((c) => c.visibilityState === 'visible')) {
+      list.forEach((c) => c.postMessage({ type: 'push', data }));
+      return;
+    }
+    await self.registration.showNotification(data.title || 'Ora Soft Services', {
+      body: data.body || '',
+      tag: data.tag || undefined,
+      data: { tab: data.tab || null },
+      dir: 'rtl',
+      lang: 'ar',
+      vibrate: [200, 100, 200],
+      requireInteraction: data.kind === 'urgent' || data.kind === 'emergency',
+    });
+  })());
 });
 
-// Network-first for everything: always try to get the freshest file first,
-// and only fall back to the cached copy if the network request fails
-// (e.g. no internet connection). This prevents the app from ever getting
-// stuck showing an old cached version after an update is published.
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    fetch(e.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(e.request, copy)).catch(()=>{});
-        return response;
-      })
-      .catch(() => caches.match(e.request))
-  );
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const tab = (event.notification.data && event.notification.data.tab) || null;
+  event.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (list.length) {
+      const c = list[0];
+      try { await c.focus(); } catch (e) {}
+      c.postMessage({ type: 'open-tab', tab });
+      return;
+    }
+    await self.clients.openWindow('./' + (tab ? '?tab=' + encodeURIComponent(tab) : ''));
+  })());
 });
