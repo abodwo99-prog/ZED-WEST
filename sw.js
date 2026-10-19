@@ -1,6 +1,6 @@
 // Service Worker — Ora Soft Services Operations
 // بيستقبل إشعارات الـ Web Push حتى لو التطبيق مقفول، وبيفتح الشاشة المعنية لما تدوس على الإشعار.
-const SW_VERSION = 'v5';
+const SW_VERSION = 'v6';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -39,14 +39,18 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const tab = (event.notification.data && event.notification.data.tab) || null;
+  const tag = event.notification.tag || null; // ntf-<id>: الصفحة بتعلّم الإشعار ده كمقروء
   event.waitUntil((async () => {
     const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (list.length) {
       const c = list[0];
       try { await c.focus(); } catch (e) {}
-      c.postMessage({ type: 'open-tab', tab });
+      c.postMessage({ type: 'open-tab', tab, tag });
       return;
     }
-    await self.clients.openWindow('./' + (tab ? '?tab=' + encodeURIComponent(tab) : ''));
+    const qs = [];
+    if (tab) qs.push('tab=' + encodeURIComponent(tab));
+    if (tag) qs.push('ntf=' + encodeURIComponent(tag));
+    await self.clients.openWindow('./' + (qs.length ? '?' + qs.join('&') : ''));
   })());
 });

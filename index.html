@@ -306,6 +306,17 @@ body.on-login::after{content:'';position:fixed;inset:0;z-index:-1;background:lin
   table.rtable tr.empty-row td{display:block;text-align:center;border:none;background:transparent !important;margin:0;padding:22px 10px;}
   table.rtable tr.empty-row td::before{display:none;}
 }
+
+/* ===== service lists (facade / pest / waste) ===== */
+.svc-bar{height:12px;border-radius:99px;background:#e6ebe2;overflow:hidden;}
+.svc-bar>div{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--mint));transition:width .4s;}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;}
+.svc-chip{border:1px solid var(--line);border-radius:12px;background:#fff;padding:9px 6px;text-align:center;font-family:inherit;display:flex;flex-direction:column;gap:2px;align-items:center;min-height:54px;justify-content:center;}
+.svc-chip b{font-size:13px;}
+.svc-chip small{font-size:10px;color:var(--text-dim);line-height:1.3;}
+.svc-chip.done{background:var(--mint-light);border-color:var(--brand);}
+.svc-chip.done small:first-of-type{color:var(--mint);font-weight:700;}
+.svc-chip:disabled{opacity:.75;cursor:default;}
 </style>
 </head>
 <body>
@@ -328,7 +339,7 @@ let S = {
   deliveries:[], deliveryDate: todayStr(),
   orders:[], ordersDate:'',
   
-  attEditReqs:[], seenAttEdit:new Set(), emergencies:[], taskLists:[], taskItems:[], taskRuns:[], taskRunItems:[], openTaskAdmin:new Set(), openTaskSup:new Set(), seenExtra:new Set(),
+  attEditReqs:[], seenAttEdit:new Set(), emergencies:[], svcLists:[], svcItems:[], svcPresence:[], openSvc:new Set(), svcManage:new Set(), svcCheckinEdit:null, taskLists:[], taskItems:[], taskRuns:[], taskRunItems:[], openTaskAdmin:new Set(), openTaskSup:new Set(), seenExtra:new Set(),
   attendance:[], attendanceDate: todayStr(),
   availability:[],
   pest:[], facade:[], facadeDate: todayStr(), waste:[], unitNotes:[], units:[], supplierDetailTab:'overview',
@@ -340,7 +351,7 @@ let S = {
   modal:null,
   scanCtx:null, confirmCtx:null, stream:null, stopLoop:null, qrTarget:null,
 };
-const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', contractor_manager:'مدير موقع المقاول', contractor_admin:'المسئول الإداري للمقاول', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK' };
+const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK', facade_sv:'Facade Cleaning SV', pest_sv:'Pest Control SV', waste_sv:'Waste Removal SV' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين', emergency:'طوارئ' };
 const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
 const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
@@ -670,9 +681,10 @@ function tabsForRole(role){
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
+  if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ'],['myname','بياناتي']];
+  if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ'],['myname','بياناتي']];
+  if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ'],['myname','بياناتي']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='contractor_manager') return [['home','الرئيسية'],['attendance','الحضور']];
-  if(role==='contractor_admin') return [['attendance','الحضور']];
   if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['zones','الزونات'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
   if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
   if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
@@ -761,7 +773,7 @@ function renderTopbar(){
       </button>
       <button id="bell-btn" title="الإشعارات" style="position:relative;border:none;background:rgba(255,255,255,.08);color:#C6D9F0;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        ${unread?`<span style="position:absolute;top:-3px;left:-3px;background:var(--coral);color:#fff;font-size:9px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${unread>9?'9+':unread}</span>`:''}
+        ${unread?`<span id="bell-badge" style="position:absolute;top:-3px;left:-3px;background:var(--coral);color:#fff;font-size:9px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${unread>9?'9+':unread}</span>`:''}
       </button>
       ${S.bellOpen? renderBellDropdown() : ''}
       <span class="role-badge">${esc(ROLE_LABEL[S.profile.role]||S.profile.role)}</span>
@@ -798,10 +810,10 @@ function bindGlobalEvents(){
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
   const bb=document.getElementById('bell-btn'); if(bb) bb.onclick=(e)=>{
     e.stopPropagation();
-    S.bellOpen = !S.bellOpen;
-    const wasOpen=S.bellOpen;
+    const opening = !S.bellOpen;
+    S.bellOpen = opening;
     render();
-    if(wasOpen===false && S.bellOpen) markNotificationsRead();
+    if(opening) markNotificationsRead();
   };
   document.querySelectorAll('[data-ntf-goto]').forEach(el=>el.onclick=()=>{
     S.tab = notifTarget(el.dataset.ntfGoto) || S.tab; S.bellOpen=false; render();
@@ -865,7 +877,7 @@ function bindTabEvents(){
   bindModalEvents();
 }
 
-/* ============================= HOME (admin/opm/contractor_manager) ============================= */
+/* ============================= HOME (admin/opm) ============================= */
 function serviceCard(color, icon, label, valueHtml, tabId){
   return `<div class="stat ${color} service-card" data-goto="${tabId}">
     <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1252,7 +1264,7 @@ function updateOrderAvailabilityMsg(date){
 
 /* ============================= PEST CONTROL ============================= */
 const PEST_TYPE_LABEL = { full_service:'خدمة كاملة', inspection:'معاينة', flying_spray:'رش طائر', crawling_spray:'رش زاحف', specialized_spray:'رش متخصص', rodent_control:'مكافحة قوارض' };
-function renderPest(){
+function renderPestOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm'||role==='fm_dispatcher';
   const canAssign = role==='admin'||role==='opm';
@@ -1262,7 +1274,7 @@ function renderPest(){
   <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(p=>{
     const sup=S.users.find(u=>u.id===p.assigned_supervisor_id);
-    const canChangeStatus = role==='admin'||role==='opm'||p.assigned_supervisor_id===S.session.user.id;
+    const canChangeStatus = role==='admin'||role==='opm'||role==='pest_sv'||p.assigned_supervisor_id===S.session.user.id;
     const canManage = role==='admin'||role==='opm';
     return `<tr>
       <td>${esc(p.unit_code)}</td><td>${PEST_TYPE_LABEL[p.service_type]||p.service_type}</td>
@@ -1283,7 +1295,7 @@ function renderPest(){
   }).join(''): `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
   </tbody></table></div>`;
 }
-function bindPest(){
+function bindPestOld(){
   const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
   document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-pest-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestPayment, {payment_status:sel.value}); await loadPest(); render(); toast('تم تحديث حالة الدفع',true); });
@@ -1292,8 +1304,192 @@ function bindPest(){
 }
 async function loadPest(){ S.pest = (await dbSelect('pest_control_requests')) ?? S.pest; }
 
+/* ============================= SERVICE LISTS: نظافة الواجهات / مكافحة الحشرات / رفع المخلفات ============================= */
+// قوائم منفصلة تمامًا عن الزونات والمهمات المجدولة بتاعة الهاوسكيبنج: قائمة كبيرة فيها بنود (حطات / مهام)، وكل بند بيتعلّم عليه بالوقت واليوم
+const SVC = {
+  facade:{ role:'facade_sv', title:'نظافة الواجهات', unit:'حطة' },
+  pest:{ role:'pest_sv', title:'مكافحة الحشرات', unit:'بند' },
+  waste:{ role:'waste_sv', title:'رفع المخلفات', unit:'بند' },
+};
+function svcOfRole(role){ return Object.keys(SVC).find(k=>SVC[k].role===role) || null; }
+function isSvcSV(role){ return !!svcOfRole(role); }
+function svcListsOf(svc){ return (S.svcLists||[]).filter(l=>l.service===svc).sort((a,b)=>(a.position||0)-(b.position||0) || String(a.created_at||'').localeCompare(String(b.created_at||''))); }
+function svcItemsOf(listId){ return (S.svcItems||[]).filter(i=>i.list_id===listId).sort((a,b)=>(a.position||0)-(b.position||0) || String(a.id).localeCompare(String(b.id))); }
+function svcProgress(listId){ const it=svcItemsOf(listId); const done=it.filter(x=>x.done).length; return { done, total:it.length, pct: it.length? Math.round(done*100/it.length) : 0 }; }
+function fmtCairo(iso){ return iso ? new Date(iso).toLocaleString('ar-EG',{ timeZone:'Africa/Cairo', dateStyle:'short', timeStyle:'short' }) : ''; }
+function myCheckin(svc){
+  const me=S.session.user.id;
+  return (S.svcPresence||[]).filter(p=>p.user_id===me && p.service===svc && p.date===S.today).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
+}
+async function loadSvcData(){
+  const d=new Date(); d.setDate(d.getDate()-14); const from=dateStr(d);
+  const [lists, items, pres] = await Promise.all([
+    dbSelect('svc_lists'), dbSelect('svc_items'),
+    sb.from('svc_presence').select('*').gte('date', from).order('created_at',{ascending:false}).limit(400)
+  ]);
+  if(lists) S.svcLists=lists;
+  if(items) S.svcItems=items;
+  if(pres.error){ console.warn('svc_presence', pres.error.message); } else S.svcPresence = pres.data||[];
+}
+async function refreshSvc(){ await loadSvcData(); render(); }
+function renderSvcCheckin(svc){
+  const ci=myCheckin(svc); const editing = !ci || S.svcCheckinEdit===svc;
+  const SH = { morning:'صباحي', evening:'مسائي' };
+  if(!editing) return `<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div><div style="font-size:12px;color:var(--text-dim);">الحاضر دلوقتي</div><b style="font-size:15px;">${esc(ci.person_name)}</b> <span class="tag-shift ${ci.shift==='evening'?'evening':'morning'}">${SH[ci.shift]||''}</span></div>
+    <button class="ghost-btn" id="svc-ci-edit">تغيير الشخص / الشفت</button></div>`;
+  return `<div class="card" style="margin-bottom:14px;border-color:var(--brand);">
+    <h3 style="margin:0 0 8px;font-size:14px;">${ci?'تغيير الحاضر':'سجّل حضورك النهاردة'}</h3>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.7;">اكتب اسمك والشفت اللي حضرت فيه — بيظهر للإدارة و OPM، وبيتسجّل مع أي بند بتعلّم عليه.</p>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+      <div class="form-row"><label>الاسم</label><input id="svc-ci-name" value="${esc((ci&&ci.person_name)||S.profile.full_name||'')}"></div>
+      <div class="form-row"><label>الشفت</label><select id="svc-ci-shift"><option value="morning" ${ci&&ci.shift==='morning'?'selected':''}>صباحي</option><option value="evening" ${ci&&ci.shift==='evening'?'selected':''}>مسائي</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;"><button class="primary-btn" id="svc-ci-save">حفظ</button>${ci?'<button class="ghost-btn" id="svc-ci-cancel">إلغاء</button>':''}</div>
+  </div>`;
+}
+function renderSvcList(svc, l, isMgr, canMark){
+  const items=svcItemsOf(l.id); const p=svcProgress(l.id); const manage=isMgr && S.svcManage.has(l.id);
+  const body = manage ? `
+    ${items.map((it,idx)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+      <span style="min-width:24px;color:var(--text-dim);font-size:12px;">${idx+1}</span>
+      <input data-svc-name="${it.id}" value="${esc(it.label)}" style="flex:1;min-width:130px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sand);">
+      <button class="ghost-btn" data-svc-save="${it.id}">حفظ</button>
+      <button class="ghost-btn danger" data-svc-del="${it.id}">${ICON.trash(12)}</button></div>`).join('') || '<p style="font-size:12.5px;color:var(--text-dim);">القائمة فاضية — ضيف بنود تحت.</p>'}
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+      <input data-svc-new="${l.id}" placeholder="بند جديد" style="flex:1;min-width:150px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sand);">
+      <button class="primary-btn" data-svc-add="${l.id}">${ICON.plus(13)} إضافة</button></div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+      <input type="number" min="1" max="200" data-svc-count="${l.id}" placeholder="عدد" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sand);">
+      <button class="ghost-btn" data-svc-addcount="${l.id}">إضافة عدد من "${SVC[svc].unit}" مرقّمة</button></div>
+    <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--mint);font-weight:700;">إضافة عدة بنود بأسمائها (كل بند في سطر)</summary>
+      <textarea data-svc-bulk="${l.id}" rows="4" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--sand);"></textarea>
+      <button class="ghost-btn" data-svc-bulk-add="${l.id}" style="margin-top:6px;">إضافة البنود</button></details>`
+  : (items.length ? `<div class="svc-grid">${items.map(it=>`<button class="svc-chip ${it.done?'done':''}" data-svc-toggle="${it.id}" ${canMark?'':'disabled'}>
+      <b>${esc(it.label)}</b>${it.done?`<small>✓ ${esc(fmtCairo(it.done_at))}</small><small>${esc(it.done_by_name||'')}${it.done_shift?' · '+(it.done_shift==='evening'?'مسائي':'صباحي'):''}</small>`:''}</button>`).join('')}</div>`
+    : '<p style="font-size:12.5px;color:var(--text-dim);">القائمة لسه فاضية.</p>');
+  return `<details class="card" data-svc-open="${l.id}" ${S.openSvc.has(l.id)?'open':''} style="margin-bottom:12px;">
+    <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14.5px;">${esc(l.name)}</b><span style="font-size:12px;color:var(--text-dim);">${p.done}/${p.total} · <b style="color:var(--mint);">${p.pct}%</b></span></summary>
+    <div style="margin-top:12px;">
+      ${isMgr?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="ghost-btn" data-svc-manage="${l.id}">${manage?'إنهاء التعديل':'تعديل البنود'}</button>
+        <button class="ghost-btn" data-svc-rename="${l.id}">تغيير اسم القائمة</button>
+        <button class="ghost-btn danger" data-svc-dellist="${l.id}">${ICON.trash(13)} حذف القائمة</button></div>`:''}
+      ${body}
+    </div></details>`;
+}
+function renderSvcSection(svc){
+  const cfg=SVC[svc]; const role=S.profile.role;
+  const isMgr = role==='admin'||role==='opm'; const isSV = role===cfg.role;
+  const lists=svcListsOf(svc); const canMark = isMgr || isSV;
+  let tot=0, dn=0; lists.forEach(l=>{ const p=svcProgress(l.id); tot+=p.total; dn+=p.done; });
+  const overall = tot? Math.round(dn*100/tot) : 0;
+  const rows = (S.svcPresence||[]).filter(p=>p.service===svc).slice(0,40);
+  return `
+  ${isSV? renderSvcCheckin(svc) : ''}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 style="margin:0;font-size:14px;">نسبة الإنجاز — ${cfg.title}</h3><b style="color:var(--mint);font-size:16px;">${overall}%</b></div>
+    ${lists.length? lists.map(l=>{ const p=svcProgress(l.id); return `<div style="margin:12px 0;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px;"><span>${esc(l.name)}</span><span>${p.done}/${p.total} · ${p.pct}%</span></div>
+      <div class="svc-bar"><div style="width:${p.pct}%"></div></div></div>`; }).join('') : '<p style="font-size:12.5px;color:var(--text-dim);margin:6px 0 0;">لسه مفيش قوائم'+(isMgr?' — ضيف قائمة جديدة من الزرار تحت.':'.')+'</p>'}
+  </div>
+  ${isMgr? `<div class="toolbar"><button class="primary-btn" id="svc-add-list">${ICON.plus()} قائمة جديدة</button></div>` : ''}
+  ${lists.map(l=>renderSvcList(svc,l,isMgr,canMark)).join('')}
+  ${isMgr? `<div class="card" style="margin:14px 0;"><h3 style="margin:0 0 8px;font-size:14px;">مين كان موجود (حضور مشرف ${cfg.title})</h3>
+    <div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>التاريخ</th><th>الوقت</th><th>الاسم</th><th>الشفت</th><th>الحساب</th></tr></thead><tbody>
+    ${rows.length? rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(fmtCairo(r.created_at).split(/[،,]/).pop().trim())}</td><td>${esc(r.person_name||'-')}</td><td>${r.shift==='evening'?'مسائي':'صباحي'}</td><td>${esc(((S.users.find(u=>u.id===r.user_id)||{}).full_name)||'-')}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-dim);">لسه محدش سجّل حضوره</td></tr>'}
+    </tbody></table></div></div>` : ''}
+  `;
+}
+async function svcAddItems(listId, labels){
+  const items=svcItemsOf(listId); let pos=items.reduce((m,i)=>Math.max(m,i.position||0),0);
+  const l=(S.svcLists||[]).find(x=>x.id===listId);
+  const rows=labels.map(t=>({ id:uid('si'), list_id:listId, service:l.service, label:t, position:++pos }));
+  if(await dbInsert('svc_items',rows)){ S.openSvc.add(listId); S.svcManage.add(listId); await refreshSvc(); toast('تمت إضافة '+rows.length+' بند',true); }
+}
+function bindSvc(svc){
+  const cfg=SVC[svc];
+  const add=document.getElementById('svc-add-list'); if(add) add.onclick=()=>{ S.modal={type:'addSvcList', svc}; render(); };
+  document.querySelectorAll('details[data-svc-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openSvc.add(d.dataset.svcOpen); else S.openSvc.delete(d.dataset.svcOpen); }));
+  const ce=document.getElementById('svc-ci-edit'); if(ce) ce.onclick=()=>{ S.svcCheckinEdit=svc; render(); };
+  const cc=document.getElementById('svc-ci-cancel'); if(cc) cc.onclick=()=>{ S.svcCheckinEdit=null; render(); };
+  const cs=document.getElementById('svc-ci-save'); if(cs) cs.onclick=async ()=>{
+    const name=(document.getElementById('svc-ci-name').value||'').trim(); const shift=document.getElementById('svc-ci-shift').value;
+    if(!name){ toast('اكتب الاسم',false); return; }
+    cs.disabled=true;
+    const row={ id:uid('svp'), date:S.today, service:svc, user_id:S.session.user.id, person_name:name, shift };
+    if(await dbInsert('svc_presence',[row])){ S.svcCheckinEdit=null; await refreshSvc(); toast('تم تسجيل الحضور',true); } else cs.disabled=false;
+  };
+  document.querySelectorAll('[data-svc-toggle]').forEach(b=>b.onclick=()=>svcToggle(b.dataset.svcToggle));
+  document.querySelectorAll('[data-svc-manage]').forEach(b=>b.onclick=()=>{ const id=b.dataset.svcManage; if(S.svcManage.has(id)) S.svcManage.delete(id); else S.svcManage.add(id); S.openSvc.add(id); render(); });
+  document.querySelectorAll('[data-svc-rename]').forEach(b=>b.onclick=()=>{ S.modal={type:'editSvcList', id:b.dataset.svcRename}; render(); });
+  document.querySelectorAll('[data-svc-dellist]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteSvcList', id:b.dataset.svcDellist}; render(); });
+  document.querySelectorAll('[data-svc-add]').forEach(b=>b.onclick=async ()=>{
+    const lid=b.dataset.svcAdd; const inp=document.querySelector(`[data-svc-new="${lid}"]`); const t=(inp.value||'').trim();
+    if(!t){ toast('اكتب اسم البند',false); return; } await svcAddItems(lid,[t]);
+  });
+  document.querySelectorAll('[data-svc-addcount]').forEach(b=>b.onclick=async ()=>{
+    const lid=b.dataset.svcAddcount; const n=parseInt(document.querySelector(`[data-svc-count="${lid}"]`).value,10);
+    if(!(n>=1 && n<=200)){ toast('اكتب عدد من 1 لـ 200',false); return; }
+    const l=S.svcLists.find(x=>x.id===lid); const have=svcItemsOf(lid).length;
+    await svcAddItems(lid, Array.from({length:n},(_,k)=>SVC[l.service].unit+' '+(have+k+1)));
+  });
+  document.querySelectorAll('[data-svc-bulk-add]').forEach(b=>b.onclick=async ()=>{
+    const lid=b.dataset.svcBulkAdd; const names=(document.querySelector(`[data-svc-bulk="${lid}"]`).value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    if(!names.length){ toast('اكتب بند واحد على الأقل',false); return; } await svcAddItems(lid,names);
+  });
+  document.querySelectorAll('[data-svc-save]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.svcSave; const t=(document.querySelector(`[data-svc-name="${id}"]`).value||'').trim();
+    if(!t){ toast('اسم البند مينفعش يبقى فاضي',false); return; }
+    const it=S.svcItems.find(x=>x.id===id); if(it) S.openSvc.add(it.list_id);
+    if(await dbUpdate('svc_items',id,{label:t})){ await refreshSvc(); toast('تم الحفظ',true); }
+  });
+  document.querySelectorAll('[data-svc-del]').forEach(b=>b.onclick=async ()=>{
+    if(!confirm('حذف البند ده؟')) return;
+    const it=S.svcItems.find(x=>x.id===b.dataset.svcDel); if(it) S.openSvc.add(it.list_id);
+    if(await dbDelete('svc_items',b.dataset.svcDel)){ await refreshSvc(); toast('تم الحذف',true); }
+  });
+  // أوردرات الواجهات (الخدمة المدفوعة) لمشرف الواجهات: تغيير الحالة بس
+  document.querySelectorAll('[data-fsv-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.fsvOrd, sel.value, loadOrders));
+}
+async function svcToggle(itemId){
+  const it=(S.svcItems||[]).find(x=>x.id===itemId); if(!it) return;
+  const role=S.profile.role; const isMgr=role==='admin'||role==='opm'; const isSV=role===SVC[it.service].role;
+  let patch;
+  if(!it.done){
+    let name=S.profile.full_name||'', shift=null;
+    if(isSV){ const ci=myCheckin(it.service); if(!ci){ toast('سجّل اسمك والشفت الأول من الكارت اللي فوق',false); return; } name=ci.person_name; shift=ci.shift; }
+    patch={ done:true, done_at:new Date().toISOString(), done_by:S.session.user.id, done_by_name:name, done_shift:shift };
+  } else {
+    if(!isMgr && it.done_by!==S.session.user.id){ toast('مينفعش تلغي علامة حد تاني',false); return; }
+    if(!confirm('إلغاء العلامة على "'+it.label+'"؟')) return;
+    patch={ done:false, done_at:null, done_by:null, done_by_name:null, done_shift:null };
+  }
+  const {data,error}=await sb.from('svc_items').update(patch).eq('id',itemId).select('id');
+  const y=window.scrollY;
+  if(error || !data || !data.length){ toast('التعديل ما اتحفظش'+(error?' — '+error.message:' — مفيش صلاحية'),false); await loadSvcData(); render(); window.scrollTo(0,y); return; }
+  Object.assign(it,patch); S.openSvc.add(it.list_id); render(); window.scrollTo(0,y);
+  toast(it.done?'تم تسجيل الانتهاء — الإدارة و OPM هيوصلهم إشعار':'تم الإلغاء',true);
+}
+function renderFacadeOrdersForSV(){
+  const list=(S.orders||[]).filter(o=>o.order_type==='facade_cleaning' && orderApproved(o)).sort((a,b)=>String(b.scheduled_date).localeCompare(String(a.scheduled_date)));
+  return `<div class="section-title"><h2>أوردرات نظافة الواجهات (الخدمة المدفوعة)</h2></div>
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>التاريخ</th><th>الميعاد</th><th>ملاحظات</th><th>الحالة</th></tr></thead><tbody>
+  ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${esc(o.scheduled_time||'-')}</td><td>${esc(o.opm_notes||'-')}</td>
+    <td><select data-fsv-ord="${o.id}"><option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option></select></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text-dim);">لا توجد أوردرات</td></tr>'}
+  </tbody></table></div>`;
+}
 /* ============================= FACADE CLEANING ============================= */
 function renderFacade(){
+  const role=S.profile.role;
+  return renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '') + '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld();
+}
+function bindFacade(){ bindSvc('facade'); bindFacadeOld(); }
+function renderPest(){ return renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
+function bindPest(){ bindSvc('pest'); bindPestOld(); }
+function renderWaste(){ return renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
+function bindWaste(){ bindSvc('waste'); bindWasteOld(); }
+function renderFacadeOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm';
   const list = S.facade.filter(f=>f.date===S.facadeDate);
@@ -1311,7 +1507,7 @@ function renderFacade(){
   }).join(''): `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
-function bindFacade(){
+function bindFacadeOld(){
   document.getElementById('fc-date').onchange=e=>{ S.facadeDate=e.target.value; render(); };
   const add=document.getElementById('fc-add'); if(add) add.onclick=()=>{ S.modal={type:'addFacade'}; render(); };
   document.querySelectorAll('[data-fc-complete]').forEach(b=>b.onclick=()=>{ S.modal={type:'completeFacade', id:b.dataset.fcComplete}; render(); });
@@ -1319,7 +1515,7 @@ function bindFacade(){
 async function loadFacade(){ S.facade = (await dbSelect('facade_works')) ?? S.facade; }
 
 /* ============================= WASTE REMOVAL ============================= */
-function renderWaste(){
+function renderWasteOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm';
   const list = S.waste.slice().sort((a,b)=> a.date < b.date ? 1 : -1);
@@ -1328,7 +1524,7 @@ function renderWaste(){
   <div class="tbl-wrap"><table><thead><tr><th>الوصف</th><th>التاريخ</th><th>المشرف</th><th>الحالة</th><th>السبب</th><th></th></tr></thead><tbody>
   ${list.length? list.map(w=>{
     const sup=S.users.find(u=>u.id===w.assigned_supervisor_id);
-    const canAct = (role==='admin'||role==='opm'||w.assigned_supervisor_id===S.session.user.id) && w.status==='scheduled';
+    const canAct = (role==='admin'||role==='opm'||role==='waste_sv'||w.assigned_supervisor_id===S.session.user.id) && w.status==='scheduled';
     return `<tr>
       <td>${esc(w.description)}</td><td>${w.date}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
@@ -1339,7 +1535,7 @@ function renderWaste(){
   }).join(''): `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال</td></tr>`}
   </tbody></table></div>`;
 }
-function bindWaste(){
+function bindWasteOld(){
   const add=document.getElementById('wr-add'); if(add) add.onclick=()=>{ S.modal={type:'addWaste'}; render(); };
   document.querySelectorAll('[data-wr-done]').forEach(b=>b.onclick=async ()=>{ await dbUpdate('waste_removal_jobs', b.dataset.wrDone, {status:'completed', updated_at:new Date().toISOString()}); await loadWaste(); render(); toast('تم تسجيل الانتهاء',true); });
   document.querySelectorAll('[data-wr-notdone]').forEach(b=>b.onclick=()=>{ S.modal={type:'markWaste', id:b.dataset.wrNotdone}; render(); });
@@ -1615,6 +1811,13 @@ function renderAttendance(){
   </tr>`; }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد سجلات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
+// توحيد اسم المرحلة: "المرحلة 1" و "Phase 1" و "المرحلة الأولى" كلهم نفس الحاجة
+function normPhase(p){
+  const t=String(p||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[١]/g,'1').replace(/[٢]/g,'2');
+  if(['المرحلة الأولى','المرحلة الاولى','المرحلة 1','phase 1','1','الأولى','الاولى'].includes(t)) return 'المرحلة الأولى';
+  if(['المرحلة الثانية','المرحلة 2','phase 2','2','الثانية'].includes(t)) return 'المرحلة الثانية';
+  return t;
+}
 function bindAttendance(){
   document.getElementById('at-filter-date').onchange=e=>{ S.attendanceDate=e.target.value; render(); };
   const _atSave=document.getElementById('at-save'); if(_atSave) _atSave.onclick=async ()=>{
@@ -1627,9 +1830,10 @@ function bindAttendance(){
       entered_by: S.session.user.id, status: 'approved'
     };
     // مرة واحدة بس لكل (تاريخ + مرحلة + وردية): نتأكد من الداتابيز مباشرة مش من النسخة المحلية
-    const {data:dup,error:dupErr} = await sb.from('attendance_records').select('id').eq('date',row.date).eq('shift',row.shift).ilike('phase',row.phase).limit(1);
+    const {data:dupRows,error:dupErr} = await sb.from('attendance_records').select('id,phase').eq('date',row.date).eq('shift',row.shift);
     if(dupErr){ console.error(dupErr); toast('تعذّر التأكد من تكرار الحضور: '+dupErr.message,false); btn.disabled=false; return; }
-    if(dup && dup.length){ await loadAttendance(); S.attendanceDate=row.date; render(); toast('الحضور ده اتسجّل قبل كده — استخدم "طلب تعديل" من الجدول',false); return; }
+    const dup = (dupRows||[]).filter(r=>normPhase(r.phase)===normPhase(row.phase));
+    if(dup.length){ await loadAttendance(); S.attendanceDate=row.date; render(); toast('الحضور ده اتسجّل قبل كده — استخدم "طلب تعديل" من الجدول',false); return; }
     const ok = await dbInsert('attendance_records', [row]);
     if(ok){ await loadAttendance(); S.attendanceDate=row.date; render(); toast('تم حفظ الحضور', true); } else btn.disabled=false;
   };
@@ -2267,7 +2471,7 @@ function renderUsers(){
       <td><input data-u-name="${u.id}" value="${esc(u.full_name)}" style="width:120px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;">${isSelf?' (أنت)':''}</td>
       <td style="direction:ltr;text-align:right;">${esc(u.email)}</td>
       <td><select data-u-role="${u.id}" ${isSelf?'disabled':''}>
-        ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}
+        ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}${ROLE_LABEL[u.role]?'':`<option value="${esc(u.role||'')}" selected>${esc(u.role||'-')} (دور قديم — غيّره)</option>`}
       </select></td>
       <td><select data-u-active="${u.id}" ${isSelf?'disabled':''}>
         <option value="1" ${u.active?'selected':''}>مفعّل</option>
@@ -2861,6 +3065,17 @@ function renderModal(){
       <a class="primary-btn" style="flex:1;justify-content:center;text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(m.msg||'')}">فتح واتساب واختيار الجروب</a>
       <button class="ghost-btn" id="em-copy">نسخ الرسالة</button>
     </div>`);
+  if(m.type==='addSvcList'){ const cfg=SVC[m.svc]; return modalWrap('قائمة جديدة — '+cfg.title, `
+    <div class="form-row"><label>اسم القائمة</label><input id="m-sl-name" placeholder="${m.svc==='facade'?'مثال: YA':'اسم القائمة'}"></div>
+    <div class="form-row"><label>عدد ال${cfg.unit} (يتعمل ترقيم تلقائي: ${cfg.unit} 1، ${cfg.unit} 2 ...)</label><input type="number" min="0" max="200" id="m-sl-count" placeholder="${m.svc==='facade'?'مثال: 32':'اختياري'}"></div>
+    <div class="form-row"><label>أو اكتب البنود بأسمائها (كل بند في سطر) — لو كتبتها بتتجاهل العدد</label><textarea id="m-sl-items" rows="5"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`); }
+  if(m.type==='editSvcList'){ const l=(S.svcLists||[]).find(x=>x.id===m.id); if(!l) return ''; return modalWrap('تغيير اسم القائمة', `
+    <div class="form-row"><label>اسم القائمة</label><input id="m-sl-name" value="${esc(l.name||'')}"></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`); }
+  if(m.type==='confirmDeleteSvcList'){ const l=(S.svcLists||[]).find(x=>x.id===m.id); return modalWrap('تأكيد الحذف النهائي', `
+    <p style="font-size:13.5px;">هتحذف قائمة <b>${esc(l?l.name:'')}</b> بكل بنودها وعلامات الإنجاز نهائيًا. لا يمكن التراجع.</p>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`); }
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
     <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
@@ -3309,6 +3524,24 @@ async function handleModalSave(){
       if(await dbInsert('attendance_edit_requests',[row])){ await loadAttEditReqs(); S.modal=null; render(); toast('تم إرسال طلب التعديل للإدارة / OPM',true); }
     }
   }
+  else if(m.type==='addSvcList'){
+    const name=(document.getElementById('m-sl-name').value||'').trim(); if(!name){ toast('اكتب اسم القائمة',false); return; }
+    const cfg=SVC[m.svc]; const id=uid('sl'); const pos=svcListsOf(m.svc).length+1;
+    if(await dbInsert('svc_lists',[{ id, service:m.svc, name, unit_label:cfg.unit, position:pos, created_by:S.session.user.id }])){
+      let labels=(document.getElementById('m-sl-items').value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+      const n=parseInt(document.getElementById('m-sl-count').value,10);
+      if(!labels.length && n>=1) labels=Array.from({length:Math.min(n,200)},(_,k)=>cfg.unit+' '+(k+1));
+      if(labels.length) await dbInsert('svc_items', labels.map((t,i)=>({ id:uid('si'), list_id:id, service:m.svc, label:t, position:i+1 })));
+      S.openSvc.add(id); S.modal=null; await refreshSvc(); toast('تمت إضافة القائمة',true);
+    }
+  }
+  else if(m.type==='editSvcList'){
+    const name=(document.getElementById('m-sl-name').value||'').trim(); if(!name){ toast('اكتب اسم القائمة',false); return; }
+    if(await dbUpdate('svc_lists', m.id, { name })){ S.modal=null; await refreshSvc(); toast('تم حفظ التعديل',true); }
+  }
+  else if(m.type==='confirmDeleteSvcList'){
+    if(await dbDelete('svc_lists', m.id)){ S.openSvc.delete(m.id); S.svcManage.delete(m.id); S.modal=null; await refreshSvc(); toast('تم حذف القائمة',true); }
+  }
   else if(m.type==='addPest'){
     const unit_code=document.getElementById('m-pest-unit').value.trim();
     if(!unit_code){ toast('اكتب كود الوحدة',false); return; }
@@ -3558,13 +3791,16 @@ async function loadRoleData(){
     jobs.unitNotes = dbSelect('unit_notes');
     jobs.units = dbSelect('units_master');
   }
+  if(role==='facade_sv'){ jobs.facade = dbSelect('facade_works'); jobs.orders = dbSelect('paid_service_orders'); }
+  if(role==='pest_sv') jobs.pest = dbSelect('pest_control_requests');
+  if(role==='waste_sv') jobs.waste = dbSelect('waste_removal_jobs');
   if(isMgmt || role==='fm_dispatcher') jobs.complaints = dbSelect('complaints');
   if(isMgmt){
     jobs.suppliers = dbSelect('suppliers');
     jobs.supplierKpi = dbSelect('supplier_kpi');
     jobs.supplierInvoices = dbSelect('supplier_invoices');
   }
-  if(isMgmt || role==='contractor_manager' || role==='contractor_admin' || role==='hk_admin' || role==='hk_manager'){ jobs.attendance = dbSelect('attendance_records'); jobs.attEdits = dbSelect('attendance_edit_requests'); }
+  if(isMgmt || role==='hk_admin' || role==='hk_manager'){ jobs.attendance = dbSelect('attendance_records'); jobs.attEdits = dbSelect('attendance_edit_requests'); }
 
   const keys = Object.keys(jobs);
   const results = await Promise.all(keys.map(k=>jobs[k]));
@@ -3591,7 +3827,8 @@ async function loadRoleData(){
   if(['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','supervisor'].includes(role)){ await loadZoneData(); await loadWorkerCounts(); }
   if(role==='admin'||role==='opm') await loadLabor();
   if(urgentRoles().includes(role)) await loadUrgent();
-  if(['admin','opm','fm_dispatcher','supervisor','hk_manager','hk_admin','hk_senior_supervisor'].includes(role)) await loadEmergencies();
+  if(['admin','opm','fm_dispatcher','supervisor','hk_manager','hk_admin','hk_senior_supervisor','facade_sv','pest_sv','waste_sv'].includes(role)) await loadEmergencies();
+  if(isMgmt || isSvcSV(role)) await loadSvcData();
   checkPendingExtras(false);
 }
 
@@ -3611,9 +3848,10 @@ async function bootApp(){
   startUrgentPoll();
   startTimerTick();
   await loadNotifications(true);
-  startNotifPoll(); startDistPoll();
+  startNotifPoll(); startDistPoll(); startSvcPoll();
   ensurePushSubscription();
-  if(_pendingTab){ S.tab=notifTarget(_pendingTab)||S.tab; try{ history.replaceState(null,'',location.pathname); }catch(e){} }
+  if(_pendingNtf){ markNotifReadByTag(_pendingNtf); }
+  if(_pendingTab||_pendingNtf){ if(_pendingTab) S.tab=notifTarget(_pendingTab)||S.tab; try{ history.replaceState(null,'',location.pathname); }catch(e){} }
   render();
 }
 
@@ -3634,7 +3872,7 @@ const NOTIFY_TABLES = {
 };
 // جداول بتتغير كتير وبنعمل لها تحديث صامت (بدون صوت/تنبيه) لكل المتصلين، عشان أي حد يشوف أحدث حالة أول بأول
 const SILENT_REFRESH_TABLES = ['daily_presence','zone_assignments','location_assignments','distribution_sessions','checklist_instances','attendance_records','supplier_invoices'];
-const MGMT_ROLES = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','fm_dispatcher','contractor_manager','contractor_admin'];
+const MGMT_ROLES = ['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','fm_dispatcher'];
 // كل جدول عليه تغيير في السيستم — الإدارة و OPM بس بيشوفوا إشعار بأي تغيير هنا يحصل فيه أيًا كان نوعه
 const ALL_WATCHED_TABLES = {
   ...NOTIFY_TABLES,
@@ -3706,6 +3944,17 @@ async function handleRealtimeEvent(table, payload){
 }
 function checkPendingExtras(){ /* الإشعارات بقت من السيرفر (جدول notifications) وبتتوجّه للشخص المعني بس */ }
 let extraPollStarted = false;
+let svcPollStarted=false;
+function startSvcPoll(){
+  if(svcPollStarted) return; svcPollStarted=true;
+  setInterval(async ()=>{
+    if(!S.session||!S.profile||document.visibilityState!=='visible'||S.modal) return;
+    if(!['facade','pest','waste'].includes(S.tab)) return;
+    const r=S.profile.role; if(!(r==='admin'||r==='opm'||isSvcSV(r))) return;
+    if(hasUnsavedInput()) return;
+    await loadSvcData(); if(!S.modal && !hasUnsavedInput()) render();
+  },30000);
+}
 function startExtraPoll(){
   if(extraPollStarted) return; extraPollStarted = true;
   // تحديث البيانات (من غير إشعارات) للإدارة و OPM: طلبات الحضور والوحدات الإضافية المعلّقة
@@ -3724,7 +3973,8 @@ function startExtraPoll(){
 }
 /* ============================= v5: notifications (mandatory permission + targeted server notifications + web push) ============================= */
 // المفتاح العام لـ Web Push (VAPID). لو فاضي: الإشعارات بتشتغل والتطبيق مفتوح بس.
-const VAPID_PUBLIC_KEY = '';
+const VAPID_PUBLIC_KEY = 'BBsIqmY3Dv-_EmLispyDGx1rGVwCCP-F2ecuDzyOitPFF9ZNq-5JlpuxT-sI3uyEvzmJpFhSG6stLdvMNay6qJE';
+const _pendingNtf = (()=>{ try{ return new URLSearchParams(location.search).get('ntf'); }catch(e){ return null; } })();
 const _pendingTab = (()=>{ try{ return new URLSearchParams(location.search).get('tab'); }catch(e){ return null; } })();
 Object.assign(S,{ notifSeen:new Set(), pushActive:false, pushEndpoint:null, notifSkipUnsupported:false });
 function notifSupported(){ return typeof Notification!=='undefined'; }
@@ -3789,9 +4039,16 @@ async function loadNotifications(initial){
   const changed = sig!==S._ntfSig; S._ntfSig=sig;
   if(!initial && changed && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()) render();
 }
+async function markNotifReadByTag(tag){
+  const id=String(tag||'').replace(/^ntf-/,''); if(!id||!S.session) return;
+  const n=(S.notifications||[]).find(x=>x.id===id); if(n) n.read=true;
+  const {error}=await sb.from('notifications').update({ read:true }).eq('id',id);
+  if(error) console.warn('notification read',error.message);
+}
 async function markNotificationsRead(){
   const ids=(S.notifications||[]).filter(n=>!n.read && n.id).map(n=>n.id);
   (S.notifications||[]).forEach(n=>n.read=true);
+  const bdg=document.getElementById('bell-badge'); if(bdg) bdg.remove();
   if(ids.length){ const {error}=await sb.from('notifications').update({ read:true }).in('id',ids); if(error) console.warn('notifications read',error.message); }
 }
 let notifPollStarted=false;
@@ -3811,7 +4068,7 @@ function startDistPoll(){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
     const d=e.data||{};
-    if(d.type==='open-tab' && S.profile){ S.tab=notifTarget(d.tab); render(); }
+    if(d.type==='open-tab' && S.profile){ S.tab=notifTarget(d.tab); render(); if(d.tag) markNotifReadByTag(d.tag); }
     else if(d.type==='push'){ loadNotifications(false); }
   });
 }
