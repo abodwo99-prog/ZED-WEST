@@ -317,6 +317,15 @@ body.on-login::after{content:'';position:fixed;inset:0;z-index:-1;background:lin
 .svc-chip.done{background:var(--mint-light);border-color:var(--brand);}
 .svc-chip.done small:first-of-type{color:var(--mint);font-weight:700;}
 .svc-chip:disabled{opacity:.75;cursor:default;}
+
+/* ===== home: tasks card + charts ===== */
+.chart-box{position:relative;height:230px;}
+.ht-list{max-height:460px;overflow-y:auto;}
+.ht-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:11px 2px;border-bottom:1px dashed var(--line);}
+.ht-row:last-child{border-bottom:none;}
+.ht-name{flex:1 1 200px;font-weight:800;font-size:13.5px;min-width:0;}
+.ht-bar{flex:1 1 160px;min-width:140px;}
+.ht-badge{flex:0 0 auto;}
 </style>
 </head>
 <body>
@@ -403,7 +412,30 @@ const KPI_SCORING_CRITERIA = [
 function dateStr(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 function todayStr(){ return dateStr(new Date()); }
 function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'}); }
-function fmtTime(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+function fmtTime(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit',hour12:true}); }
+function fmtTimeOld(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+/* ---- 12-hour clock (ص / م) ---- */
+function fmt12(hhmm, empty){
+  const m=/^(\d{1,2}):(\d{2})/.exec(hhmm||''); if(!m) return empty==null?'-':empty;
+  let h=+m[1]; const ap=h>=12?'م':'ص'; h=h%12; if(h===0) h=12; return h+':'+m[2]+' '+ap;
+}
+function time12Input(id, val){
+  const m=/^(\d{1,2}):(\d{2})/.exec(val||''); let h=null, mi=null, ap='AM';
+  if(m){ let H=+m[1]; ap=H>=12?'PM':'AM'; h=H%12; if(h===0) h=12; mi=m[2]; }
+  const mins=['00','05','10','15','20','25','30','35','40','45','50','55']; if(mi && !mins.includes(mi)){ mins.push(mi); mins.sort(); }
+  const st='border:1px solid var(--line);border-radius:8px;padding:8px 6px;background:var(--sand);font-size:14px;';
+  return `<span data-t12="${id}" style="display:flex;gap:6px;direction:ltr;align-items:center;">
+    <select data-t12h style="${st}"><option value="">--</option>${Array.from({length:12},(_,k)=>k+1).map(n=>`<option value="${n}" ${h===n?'selected':''}>${n}</option>`).join('')}</select><b>:</b>
+    <select data-t12m style="${st}">${mins.map(x=>`<option value="${x}" ${mi===x?'selected':''}>${x}</option>`).join('')}</select>
+    <select data-t12p style="${st}"><option value="AM" ${ap==='AM'?'selected':''}>ص</option><option value="PM" ${ap==='PM'?'selected':''}>م</option></select>
+    <input type="hidden" id="${id}" value="${esc(val||'')}"></span>`;
+}
+function t12Sync(w){
+  const h=w.querySelector('[data-t12h]').value, mi=w.querySelector('[data-t12m]').value, p=w.querySelector('[data-t12p]').value, hid=w.querySelector('input[type=hidden]');
+  if(!h){ hid.value=''; return; }
+  let H=(+h)%12; if(p==='PM') H+=12; hid.value=String(H).padStart(2,'0')+':'+(mi||'00');
+}
+function bindTime12(){ document.querySelectorAll('[data-t12]').forEach(w=>w.querySelectorAll('select').forEach(sel=>sel.onchange=()=>t12Sync(w))); }
 function nowTimeStr(){ const d=new Date(); return d.toTimeString().slice(0,5); }
 function uid(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -595,19 +627,25 @@ function zoneOfList(listId){ const x=(S.zoneTasks||[]).find(t=>t.list_id===listI
 function zoneListIds(zoneId){ return (S.zoneTasks||[]).filter(x=>x.zone_id===zoneId).map(x=>x.list_id); }
 function myShiftOf(userId){ const p=presenceOf(userId); return (p && p.present===true) ? (p.shift||'morning') : null; }
 function supAssignOf(userId, shift){ const sh=shift||myShiftOf(userId); return (S.supAssign||[]).find(a=>a.supervisor_id===userId && a.shift===sh) || null; }
+function seniorZonesOf(userId, shift){ const sh=shift||myShiftOf(userId); return (S.zoneAssign||[]).filter(x=>x.senior_id===userId && x.shift===sh).map(x=>zoneById(x.zone_id)).filter(Boolean); }
 function seniorZoneOf(userId, shift){ const sh=shift||myShiftOf(userId); const a=(S.zoneAssign||[]).find(x=>x.senior_id===userId && x.shift===sh); return a? zoneById(a.zone_id):null; }
 function supScopeOf(userId){ const a=supAssignOf(userId); if(a) return a.kind==='units'?'units':'general_areas'; const p=presenceOf(userId); return (p&&p.scope)||'general_areas'; }
 function runAllowedFor(userId, l){ const run=taskRunOf(l.id); return !(run && run.assigned_to && run.assigned_to!==userId); }
 function tasksForSupervisor(userId, shift){
-  const a=supAssignOf(userId, shift); const base=tasksForShift(shift);
+  const sh=shift||myShiftOf(userId); const base=tasksForShift(shift);
+  // المسائية: من غير زونات — كل مهام المسائي لكل الحاضرين (ما عدا مشرف الوحدات)
+  if(sh==='evening') return supScopeOf(userId)==='units' ? [] : base.filter(l=>runAllowedFor(userId,l));
+  const a=supAssignOf(userId, shift);
   if(a && a.kind==='units') return [];
   if(a && a.kind==='zone'){ const ids=zoneListIds(a.zone_id); return base.filter(l=>ids.includes(l.id) && runAllowedFor(userId,l)); }
   const linked=new Set((S.zoneTasks||[]).map(x=>x.list_id));
   return base.filter(l=>!linked.has(l.id) && runAllowedFor(userId,l));
 }
 function tasksForSeniorUser(userId, shift){
-  const z=seniorZoneOf(userId, shift); const base=tasksForShift(shift);
-  if(z){ const ids=zoneListIds(z.id); return base.filter(l=>ids.includes(l.id)); }
+  const sh=shift||myShiftOf(userId); const base=tasksForShift(shift);
+  if(sh==='evening') return base;
+  const zs=seniorZonesOf(userId, shift);
+  if(zs.length){ const ids=zs.flatMap(z=>zoneListIds(z.id)); return base.filter(l=>ids.includes(l.id)); }
   const linked=new Set((S.zoneTasks||[]).map(x=>x.list_id));
   return base.filter(l=>!linked.has(l.id));
 }
@@ -628,8 +666,8 @@ function taskTimerHtml(l){
   const w=taskWindowState(l); const cls = w.state==='open'?'done':(w.state==='before'?'pending':'postponed');
   return `<span class="badge ${cls}" data-countdown="${l.id}" data-cstate="${w.state}">${timerText(w)}</span>`;
 }
-function taskWindowText(l){ if(!l.open_time && !l.close_time) return ''; return `<span class="tag-shift both">تفتح ${esc(l.open_time||'—')} · تقفل ${esc(l.close_time||'—')}</span>`; }
-function taskWindowFields(l){ return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="form-row"><label>تفتح الساعة (اختياري)</label><input type="time" id="m-tl-open" value="${esc((l&&l.open_time)||'')}"></div><div class="form-row"><label>تتقفل الساعة (اختياري)</label><input type="time" id="m-tl-close" value="${esc((l&&l.close_time)||'')}"></div></div>`; }
+function taskWindowText(l){ if(!l.open_time && !l.close_time) return ''; return `<span class="tag-shift both">تفتح ${fmt12(l.open_time,'—')} · تقفل ${fmt12(l.close_time,'—')}</span>`; }
+function taskWindowFields(l){ return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="form-row"><label>تفتح الساعة (اختياري)</label>${time12Input('m-tl-open', esc((l&&l.open_time)||''))}</div><div class="form-row"><label>تتقفل الساعة (اختياري)</label>${time12Input('m-tl-close', esc((l&&l.close_time)||''))}</div></div>`; }
 function readTaskWindow(){ return { open_time: document.getElementById('m-tl-open').value||null, close_time: document.getElementById('m-tl-close').value||null }; }
 let tickStarted=false;
 function startTimerTick(){
@@ -656,7 +694,7 @@ function taskWhoHtml(run){
   return parts.length? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;line-height:1.8;">${parts.join(' · ')}</div>` : '';
 }
 function deliveryExtraHtml(d){
-  return (d.client_arrival_time?`<div style="font-size:12px;">🕒 وصول العميل: <b>${esc(d.client_arrival_time)}</b></div>`:'') + (d.special_instructions?`<div style="font-size:12px;color:var(--coral);">⚠️ تعليمات خاصة: ${esc(d.special_instructions)}</div>`:'');
+  return (d.client_arrival_time?`<div style="font-size:12px;">🕒 وصول العميل: <b>${fmt12(d.client_arrival_time)}</b></div>`:'') + (d.special_instructions?`<div style="font-size:12px;color:var(--coral);">⚠️ تعليمات خاصة: ${esc(d.special_instructions)}</div>`:'');
 }
 /* --- quiet loaders for the new tables --- */
 let newTablesWarned=false;
@@ -677,17 +715,17 @@ const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
-  if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='supervisor') return [['today','قائمة اليوم'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['zones','الزونات'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
-  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['myname','بياناتي']];
+  if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ']];
+  if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
+  if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['zones','الزونات'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
 }
 
@@ -924,15 +962,23 @@ function renderHome(){
   </div>
   <div class="stat-row">${extraCard}${attEditCard}${cardsHtml}${attendanceCard}</div>
   ${(role==='admin'||role==='opm'||role==='hk_manager')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
-  <div class="home-blocks">
-    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (مهمات مجدولة معتمدة)</h3><canvas id="chartHome" height="180"></canvas></div>
-    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">المهمات المجدولة على مدار الشهر (المجدولة والمعتمدة)</h3><canvas id="chartMonthly" height="180"></canvas></div>` : ''}
-    <div class="card">
-      <h3 style="margin-top:0;font-size:14px;">المهمات المجدولة اليوم</h3>
-      ${todayTaskRows.length? `<div class="tbl-wrap" style="box-shadow:none;margin-bottom:0;"><table><thead><tr><th>القائمة</th><th>الوردية</th><th>البنود</th><th>الحالة</th></tr></thead><tbody>
-        ${todayTaskRows.map(({l,p})=>`<tr><td>${esc(l.name)}</td><td>${SHIFT_LABEL[l.shift||'both']}</td><td>${p.done}/${p.total}</td><td>${taskRunBadge(p.run)}${taskWhoHtml(p.run)}</td></tr>`).join('')}
-      </tbody></table></div>` : `<div class="empty-state" style="padding:20px;"><span class="em">📋</span>مفيش مهمات مجدولة النهاردة</div>`}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <h3 style="margin:0;font-size:14.5px;">المهمات المجدولة اليوم</h3>
+      <span style="display:flex;gap:6px;flex-wrap:wrap;">
+        <span class="badge done"><span class="dot"></span>معتمدة ${todayTaskRows.filter(x=>x.p.run.status==='completed').length}</span>
+        <span class="badge progress"><span class="dot"></span>بانتظار الاعتماد ${todayTaskRows.filter(x=>x.p.run.status!=='completed' && x.p.run.supervisor_marked_done).length}</span>
+        <span class="badge pending"><span class="dot"></span>قيد التنفيذ ${todayTaskRows.filter(x=>x.p.run.status!=='completed' && !x.p.run.supervisor_marked_done).length}</span>
+      </span>
     </div>
+    ${todayTaskRows.length? `<div class="ht-list">${todayTaskRows.map(({l,p})=>{ const pct=p.total?Math.round(p.done*100/p.total):0; return `<div class="ht-row">
+      <div class="ht-name">${esc(l.name)} <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span>${taskWhoHtml(p.run)}</div>
+      <div class="ht-bar"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-bottom:3px;"><span>${p.done}/${p.total} بند</span><b>${pct}%</b></div><div class="svc-bar"><div style="width:${pct}%"></div></div></div>
+      <div class="ht-badge">${taskRunBadge(p.run)}</div></div>`; }).join('')}</div>` : `<div class="empty-state" style="padding:20px;"><span class="em">📋</span>مفيش مهمات مجدولة النهاردة</div>`}
+  </div>
+  <div class="home-blocks">
+    <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (مهمات مجدولة معتمدة)</h3><div class="chart-box"><canvas id="chartHome"></canvas></div></div>
+    ${(role==='admin'||role==='opm')? `<div class="card"><h3 style="margin-top:0;font-size:14px;">المهمات المجدولة على مدار الشهر</h3><div class="chart-box"><canvas id="chartMonthly"></canvas></div></div>` : ''}
   </div>
   <p style="text-align:center;font-size:12px;color:var(--text-dim);">👆 دوس على أي كارت فوق عشان تروح مباشرة لشاشته</p>`;
 }
@@ -979,6 +1025,7 @@ function bindHome(){
   if(searchInput) searchInput.oninput=()=>renderSystemSearchResults(searchInput.value);
 }
 function drawHomeCharts(){
+  if(typeof Chart!=='undefined' && Chart.defaults) Chart.defaults.maintainAspectRatio=false;
   const el=document.getElementById('chartHome'); if(el && typeof Chart!=='undefined'){
     const days=[]; const vals=[];
     for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=dateStr(d);
@@ -1020,10 +1067,10 @@ function renderOrgChart(){
     const used=new Set();
     const col=(head,members)=>`<div style="display:flex;flex-direction:column;align-items:center;margin:4px 8px;">${head}${members.length? vline+members.join('') : ''}</div>`;
     const cols=seniors.map(p=>{
-      const z=seniorZoneOf(p.user_id,sh);
-      const mem=sups.filter(v=>{ const a=asg(v.user_id); return a && a.kind==='zone' && z && a.zone_id===z.id; });
+      const zs=seniorZonesOf(p.user_id,sh);
+      const mem=sups.filter(v=>{ const a=asg(v.user_id); return a && a.kind==='zone' && zs.some(z=>z.id===a.zone_id); });
       mem.forEach(v=>used.add(v.user_id));
-      return col(`<div style="${box('var(--paper)','var(--ink)','var(--mint)')}">👤 مشرف أول<span style="font-weight:500;font-size:11px;">${esc(shownName(p.user_id))}</span><span style="font-weight:800;font-size:11px;color:var(--mint);">${z?esc(z.name):'بدون زون'}</span></div>`, mem.map(v=>supBox(v.user_id,sh,'مشرف أماكن '+(z?z.name:''))));
+      return col(`<div style="${box('var(--paper)','var(--ink)','var(--mint)')}">👤 مشرف أول<span style="font-weight:500;font-size:11px;">${esc(shownName(p.user_id))}</span><span style="font-weight:800;font-size:11px;color:var(--mint);">${zs.length?esc(zs.map(x=>x.name).join(' + ')):(sh==='evening'?'بدون زونات':'بدون زون')}</span></div>`, mem.map(v=>supBox(v.user_id,sh,'مشرف أماكن '+(z?z.name:''))));
     });
     const units=sups.filter(v=>{ const a=asg(v.user_id); return a && a.kind==='units'; }); units.forEach(v=>used.add(v.user_id));
     if(units.length) cols.push(col(`<div style="${box('var(--blue-light)','var(--blue)','var(--blue)')}">🔑 مشرفو وحدات</div>`, units.map(v=>supBox(v.user_id,sh,''))));
@@ -1059,7 +1106,7 @@ function renderDeliveries(){
     const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
     return `<tr>
       <td>${esc(d.unit_code)}</td>
-      <td>${esc(d.client_arrival_time||'-')}</td>
+      <td>${fmt12(d.client_arrival_time,'-')}</td>
       <td style="white-space:normal;min-width:150px;">${esc(d.special_instructions||'-')}</td>
       <td>${canChangeStatus? `<select data-dv-status="${d.id}">
         <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
@@ -1144,7 +1191,7 @@ function renderOrders(){
         <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
       </select>${o.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>`}
       <td>${o.scheduled_date}</td>
-      <td>${esc(o.scheduled_time||'-')}</td>
+      <td>${fmt12(o.scheduled_time,'-')}</td>
       <td>${esc(o.opm_notes||'-')}</td>
       <td>${statusCell}</td>
       <td>${(canManage||role==='fm_dispatcher')?`<button class="ghost-btn" data-ord-edit="${o.id}">تعديل</button>`:''}${canManage?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
@@ -1283,7 +1330,7 @@ function renderPestOld(){
         <option value="unpaid" ${p.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
         <option value="paid" ${p.payment_status==='paid'?'selected':''}>مدفوع</option>
       </select>${p.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="pest|${p.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
-      <td>${p.scheduled_date}</td><td>${esc(p.scheduled_time||'-')}</td>
+      <td>${p.scheduled_date}</td><td>${fmt12(p.scheduled_time,'-')}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${canChangeStatus? `<select data-pest-status="${p.id}">
         <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
@@ -1316,7 +1363,9 @@ function isSvcSV(role){ return !!svcOfRole(role); }
 function svcListsOf(svc){ return (S.svcLists||[]).filter(l=>l.service===svc).sort((a,b)=>(a.position||0)-(b.position||0) || String(a.created_at||'').localeCompare(String(b.created_at||''))); }
 function svcItemsOf(listId){ return (S.svcItems||[]).filter(i=>i.list_id===listId).sort((a,b)=>(a.position||0)-(b.position||0) || String(a.id).localeCompare(String(b.id))); }
 function svcProgress(listId){ const it=svcItemsOf(listId); const done=it.filter(x=>x.done).length; return { done, total:it.length, pct: it.length? Math.round(done*100/it.length) : 0 }; }
-function fmtCairo(iso){ return iso ? new Date(iso).toLocaleString('ar-EG',{ timeZone:'Africa/Cairo', dateStyle:'short', timeStyle:'short' }) : ''; }
+function fmtCairo(iso){
+  return iso ? new Date(iso).toLocaleString('ar-EG',{ timeZone:'Africa/Cairo', year:'2-digit', month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) : '';
+}
 function myCheckin(svc){
   const me=S.session.user.id;
   return (S.svcPresence||[]).filter(p=>p.user_id===me && p.service===svc && p.date===S.today).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
@@ -1475,7 +1524,7 @@ function renderFacadeOrdersForSV(){
   const list=(S.orders||[]).filter(o=>o.order_type==='facade_cleaning' && orderApproved(o)).sort((a,b)=>String(b.scheduled_date).localeCompare(String(a.scheduled_date)));
   return `<div class="section-title"><h2>أوردرات نظافة الواجهات (الخدمة المدفوعة)</h2></div>
   <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>التاريخ</th><th>الميعاد</th><th>ملاحظات</th><th>الحالة</th></tr></thead><tbody>
-  ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${esc(o.scheduled_time||'-')}</td><td>${esc(o.opm_notes||'-')}</td>
+  ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${fmt12(o.scheduled_time,'-')}</td><td>${esc(o.opm_notes||'-')}</td>
     <td><select data-fsv-ord="${o.id}"><option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option></select></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text-dim);">لا توجد أوردرات</td></tr>'}
   </tbody></table></div>`;
 }
@@ -2094,7 +2143,7 @@ function cairoMinutes(){
 }
 // الصباحية: مفتوحة من أول اليوم وتتقفل 12 الظهر ومتفتحش تاني — المسائية: تفتح 3 العصر وتتقفل 5 (بتوقيت القاهرة)
 const PRES_WINDOWS = {
-  morning:{ from:0,   to:720,  name:'الصباحية', openTxt:'', closeTxt:'12:00 ظهرًا' },
+  morning:{ from:480, to:600, name:'الصباحية', openTxt:'8:00 صباحًا', closeTxt:'10:00 صباحًا' },
   evening:{ from:900, to:1020, name:'المسائية', openTxt:'3:00 عصرًا', closeTxt:'5:00 عصرًا' },
 };
 function presWindowState(sh){ const w=PRES_WINDOWS[sh], t=cairoMinutes(); return t<w.from ? 'before' : (t>=w.to ? 'closed' : 'open'); }
@@ -2251,13 +2300,19 @@ function renderAssignmentSection(){
   const roleOf=id=>((S.users||[]).find(u=>u.id===id)||{}).role;
   const selStyle='border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;';
   const part=sh=>{
+    if(sh==='evening'){
+      const ev=(S.presence||[]).filter(p=>p.present===true && (p.shift||'morning')==='evening');
+      return `<div style="margin-top:12px;"><b style="font-size:13.5px;">الوردية المسائية</b><p style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin:6px 0 0;">من غير زونات: كل المهام المجدولة للوردية المسائية بتنزل لكل المشرفين الأوائل والمشرفين الحاضرين (مشرف الوحدات حسب نوعه في الحضور). الحاضرون: ${ev.length? ev.map(p=>esc(shownName(p.user_id))).join('، ') : 'لسه محدش'}</p></div>`;
+    }
     const rows=(S.presence||[]).filter(p=>p.present===true && (p.shift||'morning')===sh);
     const seniors=rows.filter(p=>roleOf(p.user_id)==='hk_senior_supervisor');
     const sups=rows.filter(p=>roleOf(p.user_id)==='supervisor');
     const takenBy=zid=>(S.zoneAssign||[]).find(a=>a.shift===sh && a.zone_id===zid);
     const senRow=p=>{
-      const a=(S.zoneAssign||[]).find(x=>x.shift===sh && x.senior_id===p.user_id); const z=a?zoneById(a.zone_id):null;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;"><span style="font-size:13px;">${esc(shownName(p.user_id))}</span>${isMgr? `<select data-zone-sen="${sh}|${p.user_id}" style="${selStyle}"><option value="">— بدون زون —</option>${zones.map(zz=>{ const t=takenBy(zz.id); const mine=t&&t.senior_id===p.user_id; return `<option value="${zz.id}" ${mine?'selected':''} ${(t&&!mine)?'disabled':''}>${esc(zz.name)}${(t&&!mine)?' (محجوز)':''}</option>`; }).join('')}</select>` : `<b style="font-size:12.5px;">${z?esc(z.name):'لم يُحدد'}</b>`}</div>`;
+      const mine=(S.zoneAssign||[]).filter(x=>x.shift===sh && x.senior_id===p.user_id).map(x=>x.zone_id);
+      const chips=zones.map(z=>{ const own=mine.includes(z.id); const t=takenBy(z.id); const other=t && t.senior_id!==p.user_id;
+        return `<label style="display:inline-flex;align-items:center;gap:4px;border:1px solid ${own?'var(--brand)':'var(--line)'};background:${own?'var(--mint-light)':'#fff'};border-radius:999px;padding:3px 9px;font-size:12px;margin:2px;${other?'opacity:.5;':''}"><input type="checkbox" data-zone-tog="${sh}|${p.user_id}|${z.id}" ${own?'checked':''} ${(!isMgr||other)?'disabled':''}>${esc(z.name)}${other?' <small>('+esc(shownName(t.senior_id))+')</small>':''}</label>`; }).join('');
+      return `<div style="padding:7px 0;border-bottom:1px dashed var(--line);"><div style="font-size:13px;font-weight:700;margin-bottom:3px;">${esc(shownName(p.user_id))}</div><div>${chips||'<span style="font-size:12px;color:var(--text-dim);">مفيش زونات</span>'}</div></div>`;
     };
     const supRow=p=>{
       const a=(S.supAssign||[]).find(x=>x.shift===sh && x.supervisor_id===p.user_id);
@@ -2278,12 +2333,13 @@ function renderAssignmentSection(){
 function renderSeniorZoneSection(){
   const me=S.session.user.id; const sh=myShiftOf(me);
   if(!sh) return `<div class="card" style="margin-bottom:16px;"><h3 style="margin-top:0;">زوني ومشرفيني</h3><p style="font-size:13px;color:var(--text-dim);margin:0;">لسه ما اتسجّلش حضورك النهاردة.</p></div>`;
-  const z=seniorZoneOf(me,sh);
-  if(!z) return `<div class="card" style="margin-bottom:16px;"><h3 style="margin-top:0;">زوني ومشرفيني</h3><p style="font-size:13px;color:var(--text-dim);margin:0;">مدير الموقع لسه ما حدّدش الزون بتاعك.</p></div>`;
-  const sups=(S.supAssign||[]).filter(a=>a.shift===sh && a.kind==='zone' && a.zone_id===z.id);
+  const zs=seniorZonesOf(me,sh); const z=zs[0]||null;
+  if(!z && sh!=='evening') return `<div class="card" style="margin-bottom:16px;"><h3 style="margin-top:0;">زوني ومشرفيني</h3><p style="font-size:13px;color:var(--text-dim);margin:0;">مدير الموقع لسه ما حدّدش الزون بتاعك.</p></div>`;
+  const sups = sh==='evening' ? (S.presence||[]).filter(p=>p.present===true && (p.shift||'morning')==='evening' && ((S.users||[]).find(u=>u.id===p.user_id)||{}).role==='supervisor').map(p=>({supervisor_id:p.user_id}))
+    : (S.supAssign||[]).filter(a=>a.shift===sh && a.kind==='zone' && zs.some(x=>x.id===a.zone_id));
   const lists=tasksForSeniorUser(me,sh);
   return `<div class="card" style="margin-bottom:16px;">
-    <h3 style="margin-top:0;">زوني: ${esc(z.name)} <span class="tag-shift ${sh}">${SHIFT_LABEL[sh]}</span></h3>
+    <h3 style="margin-top:0;">${sh==='evening'?'المسائية — من غير زونات':'زوني: '+esc(zs.map(x=>x.name).join(' + '))} <span class="tag-shift ${sh}">${SHIFT_LABEL[sh]}</span></h3>
     <div style="font-size:13px;margin-bottom:10px;"><b>المشرفون اللي معايا:</b> ${sups.length? sups.map(a=>esc(shownName(a.supervisor_id))).join('، ') : '<span style="color:var(--text-dim);">لسه مدير الموقع ما ضمّش مشرفين ليك</span>'}</div>
     <h4 style="font-size:13.5px;margin:12px 0 6px;">توزيع المهمات على مشرفيني</h4>
     ${lists.length? lists.map(l=>{ const run=taskRunOf(l.id); if(!run) return ''; const locked=run.status==='completed';
@@ -2312,15 +2368,20 @@ function renderLaborSection(){
 }
 function bindDistributionExtra(){
   bindTaskReviewControls();
-  document.querySelectorAll('[data-zone-sen]').forEach(sel=>sel.onchange=async ()=>{
-    const [sh,userId]=sel.dataset.zoneSen.split('|'); const zid=sel.value; sel.disabled=true;
-    const del=await sb.from('hk_zone_assignments').delete().eq('date',S.today).eq('shift',sh).eq('senior_id',userId);
-    if(del.error){ toast('حصل خطأ: '+del.error.message,false); sel.disabled=false; return; }
-    if(zid){ const ok=await dbInsert('hk_zone_assignments',[{ id:uid('hza'), date:S.today, shift:sh, zone_id:zid, senior_id:userId, assigned_by:S.session.user.id }]); if(!ok){ await loadZoneData(); render(); return; } }
-    await loadZoneData(); render(); toast('تم تحديد الزون',true);
+  document.querySelectorAll('[data-zone-tog]').forEach(cb=>cb.onchange=async ()=>{
+    const [sh,userId,zid]=cb.dataset.zoneTog.split('|'); cb.disabled=true;
+    if(presWindowState(sh)!=='open'){ toast('التوزيع للوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); render(); return; }
+    if(cb.checked){
+      if(!(await dbInsert('hk_zone_assignments',[{ id:uid('hza'), date:S.today, shift:sh, zone_id:zid, senior_id:userId, assigned_by:S.session.user.id }]))){ await loadZoneData(); render(); return; }
+    } else {
+      const del=await sb.from('hk_zone_assignments').delete().eq('date',S.today).eq('shift',sh).eq('senior_id',userId).eq('zone_id',zid);
+      if(del.error){ toast('حصل خطأ: '+del.error.message,false); await loadZoneData(); render(); return; }
+    }
+    await loadZoneData(); render(); toast('تم تحديث زونات المشرف الأول',true);
   });
   document.querySelectorAll('[data-sup-asg]').forEach(sel=>sel.onchange=async ()=>{
     const [sh,userId]=sel.dataset.supAsg.split('|'); const v=sel.value; sel.disabled=true;
+    if(presWindowState(sh)!=='open'){ toast('التوزيع للوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); render(); return; }
     const del=await sb.from('hk_supervisor_assignments').delete().eq('date',S.today).eq('shift',sh).eq('supervisor_id',userId);
     if(del.error){ toast('حصل خطأ: '+del.error.message,false); sel.disabled=false; return; }
     if(v){ const ok=await dbInsert('hk_supervisor_assignments',[{ id:uid('hsa'), date:S.today, shift:sh, supervisor_id:userId, kind:(v==='units'?'units':'zone'), zone_id:(v==='units'?null:v), assigned_by:S.session.user.id }]); if(!ok){ await loadZoneData(); render(); return; } }
@@ -2753,7 +2814,7 @@ function exportReportExcel(){
   const statusFmt = v => STATUS_LABEL[v]||v;
   const shiftFmt = v => SHIFT_LABEL[v]||v;
   addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة',statusFmt],['notes','ملاحظات']]);
-  addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد'],['status','الحالة',statusFmt]]);
+  addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt]]);
   addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
@@ -2832,7 +2893,7 @@ function renderSupervisorToday(){
     }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة</p>`}`;
     html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${esc(o.scheduled_time||'')}
+      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${fmt12(o.scheduled_time,'')}
         ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
       </div>
       <select data-my-ord="${o.id}">
@@ -2920,7 +2981,7 @@ function renderModal(){
   if(m.type==='addDelivery') return modalWrap('إضافة وحدة تسليم', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-unit-code"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-unit-date" value="${S.deliveryDate}"></div>
-    <div class="form-row"><label>ميعاد وصول العميل</label><input type="time" id="m-unit-arrival"></div>
+    <div class="form-row"><label>ميعاد وصول العميل</label>${time12Input('m-unit-arrival', '')}</div>
     <div class="form-row"><label>تعليمات خاصة</label><textarea id="m-unit-instr" placeholder="أي تعليمات خاصة بالوحدة أو العميل"></textarea></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="m-unit-notes"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ</button>`);
@@ -2929,7 +2990,7 @@ function renderModal(){
     return modalWrap('تعديل وحدة تسليم', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-unit-code" value="${esc(d.unit_code||'')}"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-unit-date" value="${d.date||''}"></div>
-    <div class="form-row"><label>ميعاد وصول العميل</label><input type="time" id="m-unit-arrival" value="${esc(d.client_arrival_time||'')}"></div>
+    <div class="form-row"><label>ميعاد وصول العميل</label>${time12Input('m-unit-arrival', fmt12(d.client_arrival_time,''))}</div>
     <div class="form-row"><label>تعليمات خاصة</label><textarea id="m-unit-instr">${esc(d.special_instructions||'')}</textarea></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="m-unit-notes">${esc(d.notes||'')}</textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
@@ -2955,7 +3016,7 @@ function renderModal(){
     <div id="ord-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>السعر (يدوي، لو محتاج تعدّله)</label><input type="number" id="m-ord-price-override" value="${o.price!=null?o.price:''}"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${o.scheduled_date||''}"></div>
-    <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time" value="${o.scheduled_time||''}"></div>
+    <div class="form-row"><label>الميعاد</label>${time12Input('m-ord-time', o.scheduled_time||'')}</div>
     <div class="form-row"><label>رقم Sales Force (اختياري)</label><input id="m-ord-client" value="${esc(o.client_info||'')}"></div>
     <div class="form-row"><label>حالة الدفع</label><select id="m-ord-payment">
       <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
@@ -2993,7 +3054,7 @@ function renderModal(){
     <div id="ord-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-ord-date" value="${S.today}"></div>
     ${ex?'':'<div id="ord-availability-msg" style="font-size:12px;margin:-4px 0 10px;"></div>'}
-    <div class="form-row"><label>الميعاد</label><input type="time" id="m-ord-time"></div>
+    <div class="form-row"><label>الميعاد</label>${time12Input('m-ord-time', '')}</div>
     <div class="form-row"><label>رقم Sales Force (اختياري)</label><input id="m-ord-client"></div>
     ${ex?'<div class="form-row"><label>سبب الطلب الإضافي</label><textarea id="m-ord-extra-reason" placeholder="مثال: العميل طلب موعد عاجل"></textarea></div>':''}
     <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="m-ord-notes"></textarea></div>
@@ -3082,7 +3143,7 @@ function renderModal(){
     <div class="form-row"><label>نوع الخدمة</label><select id="m-pest-type">${Object.keys(PEST_TYPE_LABEL).filter(k=>k!=='inspection').map(k=>`<option value="${k}">${PEST_TYPE_LABEL[k]}</option>`).join('')}</select></div>
     <div id="pest-price-msg" style="font-size:12px;margin:-4px 0 10px;"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-pest-date" value="${S.today}"></div>
-    <div class="form-row"><label>الميعاد</label><input type="time" id="m-pest-time"></div>
+    <div class="form-row"><label>الميعاد</label>${time12Input('m-pest-time', '')}</div>
     <div class="form-row"><label>حالة الدفع</label><select id="m-pest-payment"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع</option></select></div>
     <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} إثبات الدفع (اختياري)<input type="file" accept="image/*" id="cf-photo"></label>
     <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
@@ -3326,6 +3387,7 @@ function supervisorOptions(){
 }
 
 function bindModalEvents(){
+  bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
