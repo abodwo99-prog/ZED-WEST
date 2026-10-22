@@ -326,6 +326,13 @@ body.on-login::after{content:'';position:fixed;inset:0;z-index:-1;background:lin
 .ht-name{flex:1 1 200px;font-weight:800;font-size:13.5px;min-width:0;}
 .ht-bar{flex:1 1 160px;min-width:140px;}
 .ht-badge{flex:0 0 auto;}
+
+/* ===== coloured status dropdowns ===== */
+select.st-sel{border-radius:999px !important;font-weight:800 !important;padding:7px 12px !important;border:1.5px solid transparent !important;}
+select.st-scheduled,select.st-pending{background:#FDF1D8 !important;color:#9A6200 !important;border-color:#E3A21A !important;}
+select.st-in_progress{background:#E3EEFF !important;color:#1B55C4 !important;border-color:#3B7BE6 !important;}
+select.st-completed,select.st-done{background:#E1F5E6 !important;color:#17803A !important;border-color:#3FAE5E !important;}
+select.st-postponed{background:#FDE6E3 !important;color:#C2352A !important;border-color:#E2574B !important;}
 </style>
 </head>
 <body>
@@ -436,6 +443,12 @@ function t12Sync(w){
   let H=(+h)%12; if(p==='PM') H+=12; hid.value=String(H).padStart(2,'0')+':'+(mi||'00');
 }
 function bindTime12(){ document.querySelectorAll('[data-t12]').forEach(w=>w.querySelectorAll('select').forEach(sel=>sel.onchange=()=>t12Sync(w))); }
+function parseLooseTime(t){
+  const m=/(\d{1,2})\s*[:.]\s*(\d{2})\s*([صمSsAaPp]?)/.exec(String(t||'')); if(!m) return null;
+  let h=+m[1]; const mi=m[2]; const ap=(m[3]||'').toLowerCase();
+  if(ap==='م'||ap==='p'){ if(h<12) h+=12; } else if(ap==='ص'||ap==='a'){ if(h===12) h=0; }
+  if(h>23||+mi>59) return null; return String(h).padStart(2,'0')+':'+mi;
+}
 function nowTimeStr(){ const d=new Date(); return d.toTimeString().slice(0,5); }
 function uid(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -488,6 +501,7 @@ async function _doSignUpDisabled(){
   if(error){ S.authError=translateAuthError(error.message); render(); return; }
   await refreshSession(); await bootApp();
 }
+function logLoginEvent(method){ try{ sb.rpc('log_login',{ p_method:method }).then(()=>{},()=>{}); }catch(e){} }
 async function doSignIn(){
   const email=document.getElementById('auth-email').value.trim();
   const password=document.getElementById('auth-password').value;
@@ -496,7 +510,7 @@ async function doSignIn(){
   const {error} = await sb.auth.signInWithPassword({ email, password });
   S.authBusy=false;
   if(error){ S.authError=translateAuthError(error.message); render(); return; }
-  await refreshSession(); await bootApp();
+  await refreshSession(); await bootApp(); logLoginEvent('password');
 }
 async function doSignOut(){
   try{ if(S.pushEndpoint) await sb.rpc('unregister_push',{ p_endpoint:S.pushEndpoint }); }catch(e){}
@@ -521,7 +535,7 @@ async function qrLoginWithToken(token){
     if(r.error) r = await sb.auth.verifyOtp({ token_hash:data.token_hash, type:'email' });
     if(r.error) throw new Error('الكود اتقرى بس تسجيل الدخول فشل، جرّب تاني');
     S.authBusy=false; S.authInfo='';
-    await refreshSession(); await bootApp();
+    await refreshSession(); await bootApp(); logLoginEvent('qr');
   }catch(e){
     S.authBusy=false; S.authInfo=''; S.authError=(e && e.message) || 'تعذّر تسجيل الدخول بالكود'; render();
   }
@@ -723,7 +737,7 @@ function tabsForRole(role){
   if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
   if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['zones','الزونات'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
@@ -832,6 +846,7 @@ function renderBellDropdown(){
 }
 
 function bindGlobalEvents(){
+  paintStatusSelects();
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
@@ -841,6 +856,13 @@ function bindGlobalEvents(){
     if(k==='ord'){ const o=S.orders.find(x=>x.id===id); src=o&&o.payment_photo; }
     else if(k==='pest'){ const p=S.pest.find(x=>x.id===id); src=p&&p.payment_photo; }
     else if(k==='inv'){ const i=S.supplierInvoices.find(x=>x.id===id); src=i&&i.photo; }
+    else if(k==='urg'){
+      sb.from('urgent_tasks').select('status_photo').eq('id',id).maybeSingle().then(({data,error})=>{
+        if(error||!data||!data.status_photo){ toast('مفيش صورة',false); return; }
+        S.modal={ type:'viewPhoto', src:data.status_photo, title:'صورة التنفيذ', back:null }; render();
+      });
+      return;
+    }
     if(!src) return;
     S.modal={ type:'viewPhoto', src, title: k==='inv'?'صورة الفاتورة':'إثبات الدفع', back:(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null };
     render();
@@ -1098,7 +1120,7 @@ function renderDeliveries(){
   return `
   <div class="toolbar">
     ${todayOnly? '<span style="font-size:13px;font-weight:800;">وحدات تسليم اليوم — للعلم فقط</span>' : `<div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>`}
-    ${canWrite?`<button class="primary-btn" id="dv-add">${ICON.plus()} إضافة وحدة</button>`:''}
+    ${canWrite?`<button class="primary-btn" id="dv-add">${ICON.plus()} إضافة وحدة</button><button class="ghost-btn" id="dv-bulk">${ICON.plus(13)} إضافة وحدات دفعة واحدة</button>`:''}
     ${(!canWrite && !canChangeStatus)?'<span style="font-size:12px;color:var(--text-dim);">عرض فقط — بدون إضافة أو تعديل أو حذف</span>':''}
   </div>
   <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>ميعاد وصول العميل</th><th>تعليمات خاصة</th><th>الحالة</th><th>ملاحظات</th><th>بلاغات المشرف</th><th></th></tr></thead><tbody>
@@ -1133,6 +1155,7 @@ async function handleStatusSelectChange(table, id, value, reload){
 function bindDeliveries(){
   const _dvDate=document.getElementById('dv-date'); if(_dvDate) _dvDate.onchange=e=>{ S.deliveryDate=e.target.value; loadDeliveries().then(render); };
   const _dvAdd=document.getElementById('dv-add'); if(_dvAdd) _dvAdd.onclick=()=>{ S.modal={type:'addDelivery'}; render(); };
+  const _dvBulk=document.getElementById('dv-bulk'); if(_dvBulk) _dvBulk.onclick=()=>{ S.modal={type:'bulkDelivery'}; render(); };
   document.querySelectorAll('[data-dv-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editDelivery', id:b.dataset.dvEdit}; render(); });
   document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.dvStatus, sel.value, loadDeliveries));
   document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
@@ -2116,7 +2139,7 @@ function bindDistribution(){
   };
   document.querySelectorAll('[data-save-presence]').forEach(btn=>btn.onclick=async ()=>{
     const sh=btn.dataset.savePresence;
-    if(!presCanEdit(sh)){ toast('تسجيل حضور الوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); render(); return; }
+    if(!windowGate(sh,'تسجيل حضور')){ render(); return; }
     const card=document.getElementById('presence-part-'+sh);
     const rows=[], ids=[];
     card.querySelectorAll('[data-presence-select]').forEach(sel=>{
@@ -2146,11 +2169,26 @@ const PRES_WINDOWS = {
   morning:{ from:480, to:600, name:'الصباحية', openTxt:'8:00 صباحًا', closeTxt:'10:00 صباحًا' },
   evening:{ from:900, to:1020, name:'المسائية', openTxt:'3:00 عصرًا', closeTxt:'5:00 عصرًا' },
 };
+const ST_SELECTORS='select[data-dv-status],select[data-ord-status],select[data-my-dv],select[data-my-ord],select[data-fsv-ord],select[data-pest-status],select[data-my-pest],select[data-urg-status]';
+function paintStatusSelects(){
+  document.querySelectorAll(ST_SELECTORS).forEach(sel=>{
+    const paint=()=>{ sel.classList.remove('st-scheduled','st-pending','st-in_progress','st-completed','st-done','st-postponed'); sel.classList.add('st-sel','st-'+sel.value); };
+    paint(); sel.addEventListener('change',paint);
+  });
+}
+function windowGate(sh, what){
+  // مفتوح للكل؟ — وإلا: الأدمن و OPM يقدروا يعدّلوا (مع رسالة)، وباقي المستخدمين لأ
+  if(presWindowState(sh)==='open') return true;
+  const r=S.profile.role;
+  if(r==='admin'||r==='opm'){ toast(what+' الوردية '+PRES_WINDOWS[sh].name+' مقفول على المستخدمين — إنت (الإدارة) بتعدّل برغم الإقفال',true); return true; }
+  toast(what+' الوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); return false;
+}
 function presWindowState(sh){ const w=PRES_WINDOWS[sh], t=cairoMinutes(); return t<w.from ? 'before' : (t>=w.to ? 'closed' : 'open'); }
 function presCanEdit(sh){ const r=S.profile.role; return r==='admin'||r==='opm'||presWindowState(sh)==='open'; }
 function presWindowBadge(sh){
-  const w=PRES_WINDOWS[sh], st=presWindowState(sh);
+  const w=PRES_WINDOWS[sh], st=presWindowState(sh); const adm=S.profile && (S.profile.role==='admin'||S.profile.role==='opm');
   if(st==='open') return `<span class="badge done"><span class="dot"></span>مفتوح — بيتقفل ${w.closeTxt}${sh==='morning'?' ومش بيفتح تاني':''}</span>`;
+  if(adm) return `<span class="badge postponed"><span class="dot"></span>${st==='before'?'لسه ما اتفتحش (بيفتح '+w.openTxt+')':'مقفول (اتقفل '+w.closeTxt+')'} على المستخدمين — الإدارة تقدر تعدّل</span>`;
   if(st==='before') return `<span class="badge pending"><span class="dot"></span>هيفتح الساعة ${w.openTxt}</span>`;
   return `<span class="badge postponed"><span class="dot"></span>مقفول (اتقفل ${w.closeTxt})</span>`;
 }
@@ -2295,7 +2333,7 @@ function bindTasksManager(){ bindTaskReviewControls(); }
 /* ============================= v4: zones / assignments / workers / labor ============================= */
 function renderAssignmentSection(){
   if(!S.distSession) return '';
-  const isMgr=S.profile.role==='hk_manager';
+  const isMgr=['hk_manager','admin','opm'].includes(S.profile.role);
   const zones=S.hkZones||[];
   const roleOf=id=>((S.users||[]).find(u=>u.id===id)||{}).role;
   const selStyle='border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;';
@@ -2370,7 +2408,7 @@ function bindDistributionExtra(){
   bindTaskReviewControls();
   document.querySelectorAll('[data-zone-tog]').forEach(cb=>cb.onchange=async ()=>{
     const [sh,userId,zid]=cb.dataset.zoneTog.split('|'); cb.disabled=true;
-    if(presWindowState(sh)!=='open'){ toast('التوزيع للوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); render(); return; }
+    if(!windowGate(sh,'التوزيع')){ render(); return; }
     if(cb.checked){
       if(!(await dbInsert('hk_zone_assignments',[{ id:uid('hza'), date:S.today, shift:sh, zone_id:zid, senior_id:userId, assigned_by:S.session.user.id }]))){ await loadZoneData(); render(); return; }
     } else {
@@ -2381,7 +2419,7 @@ function bindDistributionExtra(){
   });
   document.querySelectorAll('[data-sup-asg]').forEach(sel=>sel.onchange=async ()=>{
     const [sh,userId]=sel.dataset.supAsg.split('|'); const v=sel.value; sel.disabled=true;
-    if(presWindowState(sh)!=='open'){ toast('التوزيع للوردية '+PRES_WINDOWS[sh].name+' مقفول دلوقتي',false); render(); return; }
+    if(!windowGate(sh,'التوزيع')){ render(); return; }
     const del=await sb.from('hk_supervisor_assignments').delete().eq('date',S.today).eq('shift',sh).eq('supervisor_id',userId);
     if(del.error){ toast('حصل خطأ: '+del.error.message,false); sel.disabled=false; return; }
     if(v){ const ok=await dbInsert('hk_supervisor_assignments',[{ id:uid('hsa'), date:S.today, shift:sh, supervisor_id:userId, kind:(v==='units'?'units':'zone'), zone_id:(v==='units'?null:v), assigned_by:S.session.user.id }]); if(!ok){ await loadZoneData(); render(); return; } }
@@ -2440,7 +2478,7 @@ function urgentVisible(){
 function urgentSignature(){ return urgentVisible().map(t=>t.id+':'+t.status).join('|'); }
 function urgentBadge(st){ const m={pending:'pending',in_progress:'progress',done:'done'}; return `<span class="badge ${m[st]||'pending'}"><span class="dot"></span>${URGENT_STATUS[st]||st}</span>`; }
 async function loadUrgent(){
-  const {data,error}=await sb.from('urgent_tasks').select('*').eq('date',S.today).order('created_at',{ascending:false});
+  const {data,error}=await sb.from('urgent_tasks').select('id,date,created_at,created_by,creator_name,kind,title,details,target_shift,status,status_by,status_by_name,status_at,status_note,has_photo').eq('date',S.today).order('created_at',{ascending:false});
   if(error){ console.warn('urgent_tasks',error.message); return false; }
   S.urgent=data||[]; return true;
 }
@@ -2473,7 +2511,9 @@ function renderUrgent(){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
       <div><b style="font-size:14px;">${esc(t.title||t.kind)}</b> <span class="tag-shift both">${esc(t.kind||'')}</span> <span class="tag-shift ${t.target_shift||'both'}">${SHIFT_LABEL[t.target_shift]||''}</span>
         ${t.details?`<div style="font-size:13px;margin-top:4px;white-space:pre-wrap;">${esc(t.details)}</div>`:''}
-        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">من: ${esc(t.creator_name||'-')} — ${t.created_at?esc(fmtTime(t.created_at)):''}${t.status_by_name?` · آخر تحديث: ${esc(t.status_by_name)} ${t.status_at?esc(fmtTime(t.status_at)):''}`:''}</div></div>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">من: ${esc(t.creator_name||'-')} — ${t.created_at?esc(fmtTime(t.created_at)):''}${t.status_by_name?` · آخر تحديث: ${esc(t.status_by_name)} ${t.status_at?esc(fmtTime(t.status_at)):''}`:''}</div>
+        ${t.status_note?`<div style="font-size:12px;margin-top:3px;">ملاحظة: ${esc(t.status_note)}</div>`:''}
+        ${t.has_photo?`<div style="margin-top:6px;"><button class="ghost-btn" style="padding:3px 10px;font-size:11.5px;" data-view-photo="urg|${t.id}">📷 صورة التنفيذ</button></div>`:''}</div>
       <div style="display:flex;gap:6px;align-items:center;">${canEdit? `<select data-urg-status="${t.id}"><option value="pending" ${t.status==='pending'?'selected':''}>جديدة</option><option value="in_progress" ${t.status==='in_progress'?'selected':''}>جاري التنفيذ</option><option value="done" ${t.status==='done'?'selected':''}>تم التنفيذ</option></select>` : urgentBadge(t.status)}${canCreate?` <button class="ghost-btn danger" data-urg-del="${t.id}">${ICON.trash(12)}</button>`:''}</div>
     </div></div>`).join('') : `<div class="empty-state"><span class="em">✅</span>مفيش تاسكات مستعجلة النهاردة</div>`}`;
 }
@@ -2493,9 +2533,16 @@ function bindUrgent(){
     } else send.disabled=false;
   };
   document.querySelectorAll('[data-urg-status]').forEach(sel=>sel.onchange=async ()=>{
-    sel.disabled=true;
-    const patch={ status:sel.value, status_by:S.session.user.id, status_by_name:S.profile.full_name||'', status_at:new Date().toISOString() };
-    if(await dbUpdate('urgent_tasks', sel.dataset.urgStatus, patch)){ await loadUrgent(); S.urgentSig=urgentSignature(); render(); toast('تم تحديث الحالة',true); } else sel.disabled=false;
+    const id=sel.dataset.urgStatus; const t=(S.urgent||[]).find(x=>x.id===id); const v=sel.value; const r=S.profile.role;
+    if(r==='admin'||r==='opm'){
+      sel.disabled=true;
+      const patch={ status:v, status_by:S.session.user.id, status_by_name:S.profile.full_name||'', status_at:new Date().toISOString() };
+      if(await dbUpdate('urgent_tasks', id, patch)){ await loadUrgent(); S.urgentSig=urgentSignature(); render(); toast('تم تحديث الحالة',true); } else sel.disabled=false;
+      return;
+    }
+    // باقي المستخدمين: لازم صورة قبل تغيير الحالة
+    if(t) sel.value=t.status; paintStatusSelects();
+    pendingPhoto=null; S.modal={ type:'urgentStatus', id, value:v }; render();
   });
   document.querySelectorAll('[data-urg-del]').forEach(b=>b.onclick=async ()=>{ if(!confirm('حذف التاسك ده؟')) return; if(await dbDelete('urgent_tasks', b.dataset.urgDel)){ await loadUrgent(); S.urgentSig=urgentSignature(); render(); } });
 }
@@ -3137,6 +3184,20 @@ function renderModal(){
   if(m.type==='confirmDeleteSvcList'){ const l=(S.svcLists||[]).find(x=>x.id===m.id); return modalWrap('تأكيد الحذف النهائي', `
     <p style="font-size:13.5px;">هتحذف قائمة <b>${esc(l?l.name:'')}</b> بكل بنودها وعلامات الإنجاز نهائيًا. لا يمكن التراجع.</p>
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`); }
+  if(m.type==='urgentStatus'){ const t=(S.urgent||[]).find(x=>x.id===m.id); return modalWrap('صورة قبل تغيير الحالة', `
+    <p style="font-size:13px;line-height:1.8;margin-top:0;">عشان تغيّر حالة التاسك <b>${esc(t?(t.title||t.kind):'')}</b> لـ <b>${esc(URGENT_STATUS[m.value]||m.value)}</b> لازم ترفع صورة الأول.</p>
+    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:8px;">${ICON.camera(14)} التقاط / اختيار صورة<input type="file" accept="image/*" id="cf-photo"></label>
+    <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:200px;margin-bottom:8px;">
+    <div class="form-row"><label>ملاحظة (اختياري)</label><textarea id="m-urg-note"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد وتغيير الحالة</button>`); }
+  if(m.type==='bulkDelivery') return modalWrap('إضافة وحدات تسليم دفعة واحدة', `
+    <p style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:0;">اكتب (أو الصق من Excel) وحدة في كل سطر. ممكن تكتب بعد الكود ميعاد الوصول وبعده تعليمات، مفصولين بـ <b>|</b> أو Tab — مثال: <span dir="ltr" style="unicode-bidi:embed;">A-101 | 2:30 م | العميل بيوصل بسيارة</span>. الميعاد والتعليمات اللي فوق بتتطبّق على الوحدات اللي من غيرهم.</p>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="m-bd-date" value="${S.deliveryDate}"></div>
+    <div class="form-row"><label>أكواد الوحدات</label><textarea id="m-bd-codes" rows="8" style="font-size:14px;" placeholder="A-101&#10;A-102&#10;B-205 | 3:00 م"></textarea></div>
+    <div class="form-row"><label>ميعاد وصول العميل (لكل الوحدات — اختياري)</label>${time12Input('m-bd-arrival','')}</div>
+    <div class="form-row"><label>تعليمات خاصة (لكل الوحدات — اختياري)</label><textarea id="m-bd-instr"></textarea></div>
+    <div id="m-bd-info" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إضافة الوحدات</button>`);
   if(m.type==='addPest') return modalWrap('طلب مكافحة حشرات جديد', `
     <div class="form-row"><label>كود الوحدة</label><input id="m-pest-unit" list="units-datalist" placeholder="اكتب كود الوحدة"></div>
     <datalist id="units-datalist">${S.units.map(u=>`<option value="${esc(u.unit_code)}">${esc(u.unit_type)} — ${u.bua} م²</option>`).join('')}</datalist>
@@ -3603,6 +3664,29 @@ async function handleModalSave(){
   }
   else if(m.type==='confirmDeleteSvcList'){
     if(await dbDelete('svc_lists', m.id)){ S.openSvc.delete(m.id); S.svcManage.delete(m.id); S.modal=null; await refreshSvc(); toast('تم حذف القائمة',true); }
+  }
+  else if(m.type==='urgentStatus'){
+    if(!pendingPhoto){ toast('لازم ترفع صورة الأول',false); return; }
+    const note=((document.getElementById('m-urg-note')||{value:''}).value||'').trim();
+    const patch={ status:m.value, status_by:S.session.user.id, status_by_name:S.profile.full_name||'', status_at:new Date().toISOString(), status_note:note||null, status_photo:pendingPhoto, has_photo:true };
+    if(await dbUpdate('urgent_tasks', m.id, patch)){ pendingPhoto=null; S.modal=null; await loadUrgent(); S.urgentSig=urgentSignature(); render(); toast('تم تحديث الحالة',true); }
+  }
+  else if(m.type==='bulkDelivery'){
+    const date=document.getElementById('m-bd-date').value; if(!date){ toast('اختار التاريخ',false); return; }
+    const defArr=document.getElementById('m-bd-arrival').value||null; const defInstr=(document.getElementById('m-bd-instr').value||'').trim()||null;
+    const lines=(document.getElementById('m-bd-codes').value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    const seen=new Set((S.deliveries||[]).filter(d=>d.date===date).map(d=>String(d.unit_code).trim().toLowerCase()));
+    const rows=[]; let dup=0;
+    lines.forEach(line=>{
+      const parts=line.split(/\t|\|/).map(x=>x.trim());
+      const code=parts[0]; if(!code) return;
+      const key=code.toLowerCase(); if(seen.has(key)){ dup++; return; } seen.add(key);
+      rows.push({ id:uid('dv'), unit_code:code, date, notes:'', client_arrival_time:(parseLooseTime(parts[1])||defArr), special_instructions:((parts[2]||'').trim()||defInstr), status:'scheduled', created_by:S.session.user.id });
+    });
+    if(!rows.length){ toast(dup?'كل الأكواد دي موجودة قبل كده في اليوم ده':'اكتب كود واحد على الأقل',false); return; }
+    const btn=document.getElementById('m-save'); btn.disabled=true;
+    let ok=true; for(let k=0;k<rows.length && ok;k+=100){ ok=await dbInsert('delivery_units', rows.slice(k,k+100)); }
+    if(ok){ S.deliveryDate=date; await loadDeliveries(); S.modal=null; render(); toast(`تمت إضافة ${rows.length} وحدة${dup?' — اتخطّى '+dup+' مكررة':''}`,true); } else { await loadDeliveries(); btn.disabled=false; }
   }
   else if(m.type==='addPest'){
     const unit_code=document.getElementById('m-pest-unit').value.trim();
