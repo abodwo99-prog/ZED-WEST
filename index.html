@@ -702,9 +702,9 @@ function taskWhoHtml(run){
   const doers=Array.from(new Set((S.taskRunItems||[]).filter(x=>x.run_id===run.id && x.done && x.done_by).map(x=>x.done_by)));
   if(run.marked_by && !doers.includes(run.marked_by)) doers.push(run.marked_by);
   const parts=[];
-  if(run.assigned_to) parts.push('🎯 مُسندة لـ: '+esc(userName(run.assigned_to)||'-'));
-  if(doers.length) parts.push('👷 نفّذ: '+doers.map(id=>esc(userName(id)||'-')).join('، '));
-  if(run.status==='completed' && run.verified_by) parts.push('✅ اعتمدها: '+esc(userName(run.verified_by)||'-'));
+  if(run.assigned_to) parts.push('🎯 مُسندة لـ: '+esc(shownName(run.assigned_to)||'-'));
+  if(doers.length) parts.push('👷 نفّذ: '+doers.map(id=>esc(shownName(id)||'-')).join('، '));
+  if(run.status==='completed' && run.verified_by) parts.push('✅ اعتمدها: '+esc(shownName(run.verified_by)||'-'));
   return parts.length? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;line-height:1.8;">${parts.join(' · ')}</div>` : '';
 }
 function deliveryExtraHtml(d){
@@ -725,21 +725,21 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
   if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ']];
   if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
   if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
-  if(role==='supervisor') return [['today','قائمة اليوم'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['cards','استلام الكروت'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
 }
 
@@ -847,7 +847,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
@@ -899,6 +899,7 @@ function renderTabBody(){
     case 'tasks': return S.profile.role==='hk_manager' ? renderTasksManager() : renderTasksAdmin();
     case 'zones': return renderZones();
     case 'cards': return renderCards();
+    case 'violations': return renderViolations();
     case 'urgent': return renderUrgent();
     case 'emergency': return renderEmergency();
     case 'qrsheet': return renderQrSheet();
@@ -924,6 +925,7 @@ function bindTabEvents(){
     case 'tasks': if(S.profile.role==='hk_manager') bindTasksManager(); else bindTasksAdmin(); break;
     case 'zones': bindZones(); break;
     case 'cards': bindCards(); break;
+    case 'violations': bindViolations(); break;
     case 'urgent': bindUrgent(); break;
     case 'emergency': bindEmergency(); break;
     case 'qrsheet': bindQrSheet(); break;
@@ -2307,7 +2309,7 @@ function renderApprovalCard(l){
   const z=zoneOfList(l.id);
   const itemsHtml=items.map(it=>{
     const x=(S.taskRunItems||[]).find(r2=>r2.run_id===run.id && r2.item_id===it.id); const ok=!!(x&&x.done);
-    return `<div style="display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12.5px;${ok?'':'color:var(--coral);'}"><span>${ok?'✅':'⬜'}</span><span style="flex:1;">${esc(it.name)}</span><span style="font-size:11px;color:var(--text-dim);">${ok&&x.done_at? fmtTime(x.done_at)+' · '+esc(userName(x.done_by)||'') : 'لم يُنفَّذ'}</span></div>`;
+    return `<div style="display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12.5px;${ok?'':'color:var(--coral);'}"><span>${ok?'✅':'⬜'}</span><span style="flex:1;">${esc(it.name)}</span><span style="font-size:11px;color:var(--text-dim);">${ok&&x.done_at? fmtTime(x.done_at)+' · '+esc(shownName(x.done_by)||'') : 'لم يُنفَّذ'}</span></div>`;
   }).join('');
   return `<div class="card" style="margin:0;${marked&&!isDone?'border-color:var(--mint);':''}">
     <div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;"><b style="font-size:13px;">${esc(l.name)}</b><span><span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span>${z?` <span class="tag-shift both">${esc(z.name)}</span>`:''}</span></div>
@@ -2505,6 +2507,181 @@ function bindCards(){
     if(dels.length){ const r=await sb.from('card_handover').delete().in('user_id',dels); if(r.error){ console.error(r.error); toast('حصل خطأ: '+r.error.message,false); btn.disabled=false; return; } }
     await loadCardHolders(); render(); toast('تم حفظ مستلمي الكروت',true);
   };
+}
+
+
+/* ============================= CLIENT VIOLATIONS (مخالفات العملاء) ============================= */
+Object.assign(S,{ violations:[], violPhotos:{}, violOpen:new Set(), violDraft:null });
+let violWarned=false, violPurged=false;
+const VIOL_PHASES=['المرحلة الأولى','المرحلة الثانية'];
+async function loadViolations(){
+  if(!violPurged){ violPurged=true; try{ await sb.rpc('purge_old_violations'); }catch(e){} }
+  const {data,error}=await sb.from('client_violations').select('*').order('created_at',{ascending:false});
+  if(error){ console.warn('client_violations',error.message); if(!violWarned){ violWarned=true; toast('جداول المخالفات ناقصة في Supabase — شغّل ملف update_v12.sql',false); } return; }
+  S.violations=data||[];
+}
+async function loadViolPhotos(vid){
+  const {data,error}=await sb.from('client_violation_photos').select('*').eq('violation_id',vid).order('sort_order');
+  if(error){ toast('تعذّر تحميل الصور: '+error.message,false); return []; }
+  S.violPhotos[vid]=data||[]; return S.violPhotos[vid];
+}
+function violLocation(v){
+  const parts=[]; if(v.phase) parts.push(v.phase); if(v.building) parts.push('عمارة '+v.building); if(v.floor_no) parts.push('الدور '+v.floor_no); if(v.apartment) parts.push('شقة '+v.apartment);
+  return parts.length? parts.join(' · ') : 'موقع غير محدد';
+}
+function compressImage(file, maxW, q){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=(e)=>{ const img=new Image(); img.onload=()=>{
+        const sc=Math.min(1,(maxW||900)/img.width); const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height); resolve(c.toDataURL('image/jpeg',q||0.55)); };
+      img.onerror=()=>resolve(null); img.src=e.target.result; };
+    reader.onerror=()=>resolve(null); reader.readAsDataURL(file);
+  });
+}
+function renderViolations(){
+  const isAdmin=S.profile.role==='admin';
+  const list=S.violations||[];
+  const cards=list.map(v=>{
+    const open=S.violOpen.has(v.id);
+    const photos=S.violPhotos[v.id]||null;
+    return `<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+        <div><div style="font-weight:800;font-size:14px;">${esc(violLocation(v))}</div>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">${esc(shownName(v.created_by)||'')} · ${esc(fmtCairo(v.created_at))}</div></div>
+        <span style="font-size:11.5px;font-weight:700;color:var(--blue);">📷 ${v.photo_count||0}</span>
+      </div>
+      ${v.note?`<div style="font-size:13px;margin-top:8px;line-height:1.8;white-space:pre-wrap;">${esc(v.note)}</div>`:''}
+      ${open? (photos? (photos.length? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px;">${photos.map(p=>`<div><img src="${p.photo}" data-viol-view="${p.id}|${v.id}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer;">${p.caption?`<div style="font-size:11.5px;margin-top:3px;line-height:1.6;">${esc(p.caption)}</div>`:''}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">مفيش صور.</div>') : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">جارٍ تحميل الصور...</div>') : ''}
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        ${(v.photo_count||0)>0?`<button class="ghost-btn" data-viol-toggle="${v.id}">${open?'إخفاء الصور':'عرض الصور'}</button>`:''}
+        <button class="ghost-btn" data-viol-edit="${v.id}">✏️ تعديل</button>
+        <button class="ghost-btn danger" data-viol-del="${v.id}">${ICON.trash(14)} حذف</button>
+      </div>
+    </div>`; }).join('');
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="primary-btn" id="viol-add">${ICON.plus(14)} إضافة مخالفة</button>
+      ${isAdmin?`<button class="ghost-btn" id="viol-report">${ICON.printer(14)} سحب تقرير</button>`:''}
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;line-height:1.8;">كل البيانات اختيارية. المخالفات بتتمسح تلقائيًا بعد 7 أيام من تسجيلها.</p>
+    ${list.length? cards : '<div class="empty-state"><span class="em">📋</span>مفيش مخالفات مسجّلة</div>'}`;
+}
+function bindViolations(){
+  const add=document.getElementById('viol-add'); if(add) add.onclick=()=>{ S.violDraft={ id:null, phase:'', building:'', floor_no:'', apartment:'', note:'', photos:[], removedIds:[] }; S.modal={type:'violForm'}; render(); };
+  const rep=document.getElementById('viol-report'); if(rep) rep.onclick=violationReport;
+  document.querySelectorAll('[data-viol-toggle]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.violToggle;
+    if(S.violOpen.has(id)){ S.violOpen.delete(id); render(); return; }
+    S.violOpen.add(id); render(); await loadViolPhotos(id); render();
+  });
+  document.querySelectorAll('[data-viol-view]').forEach(im=>im.onclick=()=>{
+    const [pid,vid]=im.dataset.violView.split('|'); const p=(S.violPhotos[vid]||[]).find(x=>x.id===pid); if(!p) return;
+    S.modal={type:'viewPhoto', src:p.photo, title:p.caption||'صورة المخالفة'}; render();
+  });
+  document.querySelectorAll('[data-viol-edit]').forEach(b=>b.onclick=async ()=>{
+    const v=(S.violations||[]).find(x=>x.id===b.dataset.violEdit); if(!v) return;
+    const photos=(v.photo_count||0)>0 ? await loadViolPhotos(v.id) : [];
+    S.violDraft={ id:v.id, phase:v.phase||'', building:v.building||'', floor_no:v.floor_no||'', apartment:v.apartment||'', note:v.note||'', photos:photos.map(p=>({id:p.id,photo:p.photo,caption:p.caption||''})), removedIds:[] };
+    S.modal={type:'violForm'}; render();
+  });
+  document.querySelectorAll('[data-viol-del]').forEach(b=>b.onclick=async ()=>{
+    if(!confirm('تحذف المخالفة دي بصورها؟')) return;
+    const {error}=await sb.from('client_violations').delete().eq('id',b.dataset.violDel);
+    if(error){ toast('حصل خطأ: '+error.message,false); return; }
+    delete S.violPhotos[b.dataset.violDel]; await loadViolations(); render(); toast('تم حذف المخالفة',true);
+  });
+}
+function renderViolForm(){
+  const d=S.violDraft; if(!d) return '';
+  return modalWrap(d.id?'تعديل مخالفة':'إضافة مخالفة', `
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">كل الخانات اختيارية.</p>
+    <div class="form-row"><label>المرحلة</label><select id="v-phase"><option value="">— غير محدد —</option>${VIOL_PHASES.map(p=>`<option value="${p}" ${d.phase===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div class="form-row"><label>رقم العمارة</label><input id="v-building" value="${esc(d.building)}"></div>
+      <div class="form-row"><label>الدور</label><input id="v-floor" value="${esc(d.floor_no)}"></div>
+      <div class="form-row"><label>الشقة</label><input id="v-apt" value="${esc(d.apartment)}"></div>
+    </div>
+    <div class="form-row"><label>ملاحظة عامة</label><textarea id="v-note">${esc(d.note)}</textarea></div>
+    <div class="form-row"><label>الصور (${d.photos.length})</label>
+      ${d.photos.map((p,i)=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;"><img src="${p.photo}" style="width:84px;height:84px;object-fit:cover;border-radius:8px;"><div style="flex:1;"><input data-vcap="${i}" value="${esc(p.caption||'')}" placeholder="شرح الصورة (اختياري)"><button class="ghost-btn danger" style="margin-top:6px;" data-vrm="${i}">${ICON.trash(14)} حذف الصورة</button></div></div>`).join('')}
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صور<input type="file" accept="image/*" multiple id="viol-files"></label>
+    </div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ</button>`, 'wide');
+}
+function syncViolDraft(){
+  const d=S.violDraft; if(!d) return;
+  const g=(id)=>{ const el=document.getElementById(id); return el? el.value : null; };
+  if(g('v-phase')!==null) d.phase=g('v-phase'); if(g('v-building')!==null) d.building=g('v-building').trim(); if(g('v-floor')!==null) d.floor_no=g('v-floor').trim();
+  if(g('v-apt')!==null) d.apartment=g('v-apt').trim(); if(g('v-note')!==null) d.note=g('v-note').trim();
+  document.querySelectorAll('[data-vcap]').forEach(inp=>{ const p=d.photos[+inp.dataset.vcap]; if(p) p.caption=inp.value.trim(); });
+}
+function bindViolModal(){
+  const f=document.getElementById('viol-files');
+  if(f) f.onchange=async ()=>{
+    syncViolDraft(); const files=Array.from(f.files||[]); if(!files.length) return;
+    toast('جارٍ تجهيز الصور...',true);
+    for(const file of files){ const data=await compressImage(file,900,0.55); if(data) S.violDraft.photos.push({ id:null, photo:data, caption:'' }); }
+    render();
+  };
+  document.querySelectorAll('[data-vrm]').forEach(b=>b.onclick=()=>{
+    syncViolDraft(); const i=+b.dataset.vrm; const p=S.violDraft.photos[i]; if(p && p.id) S.violDraft.removedIds.push(p.id);
+    S.violDraft.photos.splice(i,1); render();
+  });
+}
+async function saveViolation(){
+  syncViolDraft(); const d=S.violDraft; const btn=document.getElementById('m-save'); if(btn) btn.disabled=true;
+  const id=d.id||uid('vio');
+  const meta={ phase:d.phase||null, building:d.building||null, floor_no:d.floor_no||null, apartment:d.apartment||null, note:d.note||null, photo_count:d.photos.length };
+  const fail=(e)=>{ console.error(e); toast('حصل خطأ: '+(e.message||e),false); if(btn) btn.disabled=false; };
+  if(d.id){ const {error}=await sb.from('client_violations').update(meta).eq('id',id); if(error) return fail(error); }
+  else { const {error}=await sb.from('client_violations').insert([Object.assign({ id, created_by:S.session.user.id }, meta)]); if(error) return fail(error); }
+  if(d.removedIds.length){ const {error}=await sb.from('client_violation_photos').delete().in('id',d.removedIds); if(error) return fail(error); }
+  const newRows=[];
+  for(let i=0;i<d.photos.length;i++){
+    const p=d.photos[i];
+    if(p.id){ const {error}=await sb.from('client_violation_photos').update({ caption:p.caption||null, sort_order:i }).eq('id',p.id); if(error) return fail(error); }
+    else newRows.push({ id:uid('vph'), violation_id:id, photo:p.photo, caption:p.caption||null, sort_order:i });
+  }
+  for(let i=0;i<newRows.length;i+=2){ const {error}=await sb.from('client_violation_photos').insert(newRows.slice(i,i+2)); if(error) return fail(error); }
+  delete S.violPhotos[id]; S.violOpen.delete(id);
+  S.modal=null; S.violDraft=null; await loadViolations(); render(); toast('تم حفظ المخالفة',true);
+}
+async function violationReport(){
+  if(S.profile.role!=='admin') return;
+  toast('جارٍ تجهيز التقرير...',true);
+  await loadViolations();
+  const vs=(S.violations||[]).slice();
+  if(!vs.length){ toast('مفيش مخالفات للتقرير',false); return; }
+  const photos={};
+  for(let i=0;i<vs.length;i+=8){
+    const ids=vs.slice(i,i+8).map(v=>v.id);
+    const {data,error}=await sb.from('client_violation_photos').select('*').in('violation_id',ids).order('sort_order');
+    if(error){ toast('تعذّر تحميل الصور: '+error.message,false); return; }
+    (data||[]).forEach(p=>{ (photos[p.violation_id]=photos[p.violation_id]||[]).push(p); });
+  }
+  const cmp=(a,b)=>String(a||'\uFFFF').localeCompare(String(b||'\uFFFF'),'ar',{numeric:true});
+  vs.sort((a,b)=>cmp(a.phase,b.phase)||cmp(a.building,b.building)||cmp(a.floor_no,b.floor_no)||cmp(a.apartment,b.apartment)||String(a.created_at).localeCompare(String(b.created_at)));
+  const totalPhotos=Object.values(photos).reduce((n,a)=>n+a.length,0);
+  let body='', lastPhase=null;
+  vs.forEach(v=>{
+    const ph=v.phase||'مرحلة غير محددة';
+    if(ph!==lastPhase){ body+=`<h2 style="margin:22px 0 8px;padding:6px 10px;background:#eef3ec;border-right:5px solid #549C42;font-size:17px;">${esc(ph)}</h2>`; lastPhase=ph; }
+    const loc=[v.building?'عمارة '+v.building:'', v.floor_no?'الدور '+v.floor_no:'', v.apartment?'شقة '+v.apartment:''].filter(Boolean).join(' · ') || 'موقع غير محدد';
+    const ps=photos[v.id]||[];
+    body+=`<div style="border:1px solid #ccc;border-radius:8px;padding:10px;margin:0 0 12px;">
+      <div style="font-weight:800;font-size:15px;">${esc(loc)}</div>
+      <div style="font-size:11px;color:#666;margin:3px 0 6px;">${esc(shownName(v.created_by)||'')} · ${esc(fmtCairo(v.created_at))}</div>
+      ${v.note?`<div style="font-size:13px;line-height:1.8;white-space:pre-wrap;margin-bottom:6px;">${esc(v.note)}</div>`:''}
+      ${ps.length?`<div style="display:flex;flex-wrap:wrap;gap:8px;">${ps.map(p=>`<div style="width:48%;break-inside:avoid;page-break-inside:avoid;"><img src="${p.photo}" style="width:100%;max-height:260px;object-fit:contain;border:1px solid #ddd;border-radius:6px;">${p.caption?`<div style="font-size:12px;margin-top:3px;">${esc(p.caption)}</div>`:''}</div>`).join('')}</div>`:''}
+    </div>`;
+  });
+  let holder=document.getElementById('kpi-print-area');
+  if(!holder){ holder=document.createElement('div'); holder.id='kpi-print-area'; holder.className='print-sheet'; document.body.appendChild(holder); }
+  holder.innerHTML=`<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;color:#111;padding:14px;">
+    <h1 style="margin:0 0 4px;font-size:22px;">تقرير مخالفات العملاء — Zed West</h1>
+    <div style="font-size:12px;color:#555;margin-bottom:10px;">تاريخ السحب: ${esc(fmtCairo(new Date().toISOString()))} · عدد المخالفات: ${vs.length} · عدد الصور: ${totalPhotos}</div>
+    ${body}</div>`;
+  setTimeout(()=>window.print(),300);
 }
 
 function renderZones(){
@@ -3204,6 +3381,7 @@ function renderModal(){
     <p style="font-size:13.5px;">هتحذف قائمة <b>${esc(l?l.name:'')}</b> بكل بنودها وسجلات تنفيذها القديمة نهائيًا. لا يمكن التراجع.</p>
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
+  if(m.type==='violForm') return renderViolForm();
   if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
     <img src="${m.src}" style="max-width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:var(--sand);">
     <div style="margin-top:10px;"><a class="ghost-btn" href="${m.src}" download="photo.jpg" style="display:inline-block;text-decoration:none;">تحميل الصورة</a></div></div>`, 'wide');
@@ -3537,6 +3715,7 @@ function supervisorOptions(){
 function bindModalEvents(){
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
+  if(S.modal && S.modal.type==='violForm') bindViolModal();
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
   const rejBtn=document.getElementById('m-reject'); if(rejBtn) rejBtn.onclick=rejectTaskRun;
@@ -3890,6 +4069,7 @@ async function handleModalSave(){
     const patch={ name, category:document.getElementById('m-sup-cat').value, service_description:document.getElementById('m-sup-desc').value.trim(), budget:+document.getElementById('m-sup-budget').value||0, contract_photo:(pendingPhoto||oldSup.contract_photo||null) };
     if(await dbUpdate('suppliers', m.id, patch)){ await loadSuppliers(); pendingPhoto=null; S.modal={type:'supplierDetail', id:m.id}; render(); toast('تم حفظ تعديل المورد',true); }
   }
+  else if(m.type==='violForm'){ await saveViolation(); }
   else if(m.type==='addSupplier'){
     const name=document.getElementById('m-sup-name').value.trim();
     if(!name){ toast('اكتب اسم المورد',false); return; }
