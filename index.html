@@ -2104,7 +2104,7 @@ async function refreshAssignments(){
     dbSelect('daily_presence', { date: S.today }),
     isDist ? dbSelect('distribution_sessions', { date: S.today }) : Promise.resolve(null),
   ]);
-  if(pres) S.presence = pres;
+  if(pres) S.presence = withMoved(pres);
   if(ses) S.distSession = ses[0] || null;
   await loadZoneData(); await loadWorkerCounts();
   if(role==='admin'||role==='opm') await loadLabor();
@@ -2122,8 +2122,17 @@ function hasUnsavedInput(){
 async function loadDistData(){
   const sessionsRes = await dbSelect('distribution_sessions', { date: S.today });
   if(sessionsRes) S.distSession = sessionsRes[0] || null;
-  S.presence = (await dbSelect('daily_presence', { date: S.today })) ?? S.presence;
+  { const _pr = await dbSelect('daily_presence', { date: S.today }); if(_pr) S.presence = withMoved(_pr); }
   await loadZoneData();
+}
+// مرحّل للمسائية: صف الصباحية (غائب + moved_to_evening) بيتحوّل لصف مسائي افتراضي حاضر
+function withMoved(rows){
+  const all=rows||[]; const out=all.slice();
+  all.forEach(p=>{
+    if(p.moved_to_evening && (p.shift||'morning')==='morning' && p.present!==true && !all.some(x=>x.user_id===p.user_id && (x.shift||'morning')==='evening'))
+      out.push(Object.assign({},p,{ id:(p.id||'')+'_ev', shift:'evening', present:true, virtual:true }));
+  });
+  return out;
 }
 function presenceOf(userId){
   const rows=(S.presence||[]).filter(x=>x.user_id===userId);
@@ -2160,9 +2169,10 @@ function bindDistribution(){
       const userId=sel.dataset.presenceSelect; ids.push(userId);
       const scopeSel=card.querySelector(`[data-presence-scope="${userId}"]`);
       const nameInput=card.querySelector(`[data-presence-name="${userId}"]`);
-      rows.push({ id:uid('pres'), date:S.today, user_id:userId, present:sel.value==='1', scope:scopeSel?scopeSel.value:'general_areas', actual_name:nameInput?nameInput.value.trim():null, marked_by:S.session.user.id, shift:sh });
+      rows.push({ _mv:sel.value==='2', id:uid('pres'), date:S.today, user_id:userId, present:sel.value==='1', scope:scopeSel?scopeSel.value:'general_areas', actual_name:nameInput?nameInput.value.trim():null, marked_by:S.session.user.id, shift:sh });
     });
     if(!rows.length){ toast('مفيش حد يتسجّل',false); return; }
+    { const anyMv=rows.some(r=>r._mv); rows.forEach(r=>{ if(anyMv && sh==='morning') r.moved_to_evening=!!r._mv; delete r._mv; }); }
     btn.disabled=true;
     const del=await sb.from('daily_presence').delete().eq('date',S.today).eq('shift',sh).in('user_id',ids);
     if(del.error){ console.error(del.error); toast('حصل خطأ: '+del.error.message,false); btn.disabled=false; return; }
@@ -2258,19 +2268,21 @@ function renderPresencePart(sh){
   const shiftOf = p => p.shift||'morning';
   const row=(u, isSup)=>{
     const mine = (S.presence||[]).find(p=>p.user_id===u.id && shiftOf(p)===sh);
-    const inOther = (S.presence||[]).find(p=>p.user_id===u.id && shiftOf(p)===other && p.present===true);
-    const val = mine ? (mine.present?'1':'0') : (sh==='morning' ? '1' : '0');
+    const inOther = (S.presence||[]).find(p=>p.user_id===u.id && shiftOf(p)===other && p.present===true && !p.virtual);
+    const val = mine ? (mine.present?'1':(sh==='morning' && mine.moved_to_evening?'2':'0')) : (sh==='morning' ? '1' : '0');
+    const selCol = val==='1'?'var(--mint)':(val==='2'?'var(--amber)':'var(--coral)');
     const scope = (mine && mine.scope) || (inOther && inOther.scope) || 'general_areas';
     const holder = cardHolderOf(u.id);
     const actualName = (mine && mine.actual_name) || holder || '';
     const lock = !!inOther;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;${lock?'opacity:.55;':''}">
-      <span style="font-size:13px;">${esc(u.full_name)}${holder?` <span style="font-size:11px;color:var(--mint);font-weight:700;">🪪 ${esc(holder)}</span>`:''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}</span>
+      <span style="font-size:13px;">${esc(u.full_name)}${holder?` <span style="font-size:11px;color:var(--mint);font-weight:700;">🪪 ${esc(holder)}</span>`:''}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" ${lock?'disabled':dis} style="${selStyle}width:130px;">
-        <select data-presence-select="${u.id}" ${lock?'disabled':dis} style="border:1px solid ${val==='1'?'var(--mint)':'var(--coral)'};color:${val==='1'?'var(--mint)':'var(--coral)'};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
+        <select data-presence-select="${u.id}" ${lock?'disabled':dis} style="border:1px solid ${selCol};color:${selCol};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
           <option value="1" ${val==='1'?'selected':''}>حاضر</option>
           <option value="0" ${val==='0'?'selected':''}>غائب</option>
+          ${sh==='morning'?`<option value="2" ${val==='2'?'selected':''}>مرحّل للمسائية</option>`:''}
         </select>
       </div>
     </div>`;
@@ -4038,7 +4050,7 @@ async function loadRoleData(){
 
   S.users = data.users || S.users;
   if(data.sessions) S.distSession = data.sessions[0] || null;
-  if(data.presence) S.presence = data.presence;
+  if(data.presence) S.presence = withMoved(data.presence);
   if(data.orders) S.orders = data.orders;
   if(data.pest) S.pest = data.pest;
   if(data.units) S.units = data.units;
