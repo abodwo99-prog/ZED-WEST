@@ -847,7 +847,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
@@ -2684,6 +2684,51 @@ async function violationReport(){
   setTimeout(()=>window.print(),300);
 }
 
+
+/* ============================= DAILY REPORTS (التقارير اليومية) ============================= */
+Object.assign(S,{ dailyReports:[] });
+let dailyWarned=false;
+const DR_SLOT_LABEL={ afternoon:'تقرير 2:30 م', night:'تقرير 10:00 م', manual:'تقرير يدوي' };
+async function loadDailyReports(){
+  const {data,error}=await sb.from('daily_reports').select('id,report_date,slot,subject,email_status,created_at').order('created_at',{ascending:false}).limit(30);
+  if(error){ console.warn('daily_reports',error.message); if(!dailyWarned){ dailyWarned=true; toast('جدول التقارير اليومية ناقص — شغّل update_v13.sql',false); } return; }
+  S.dailyReports=data||[];
+}
+function renderReports(){
+  const isAdmin=S.profile.role==='admin';
+  const rows=(S.dailyReports||[]).map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;">
+      <div><b style="font-size:13px;">${esc(r.report_date)} — ${esc(DR_SLOT_LABEL[r.slot]||r.slot)}</b>
+      <div style="font-size:11px;color:var(--text-dim);">${esc(fmtCairo(r.created_at))} · ${r.email_status==='sent'?'📧 اتبعت على الإيميل':(r.email_status==='failed'?'⚠️ فشل الإرسال':'محفوظ بدون إرسال')}</div></div>
+      <button class="ghost-btn" data-dr-view="${r.id}">عرض</button></div>`).join('');
+  const card=`<div class="card" style="margin-bottom:14px;">
+    <h3 style="margin-top:0;">التقارير اليومية</h3>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.8;">بتتبعت تلقائي على الإيميل الساعة 2:30 م و10:00 م، وبتتحفظ هنا 30 يوم. فيها الهيكل والحضور والغياب والمهام والتسليمات والخدمة المدفوعة والآفات والواجهات.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <button class="primary-btn" id="dr-gen">🔄 توليد تقرير دلوقتي</button>
+      ${isAdmin?'<button class="ghost-btn" id="dr-send">📧 إرسال تجربة للإيميلات</button>':''}
+    </div>
+    ${rows||'<div style="font-size:12.5px;color:var(--text-dim);">مفيش تقارير محفوظة لسه.</div>'}
+  </div>`;
+  return card + renderReportsMain();
+}
+async function runDailyReport(send){
+  toast(send?'جارٍ التوليد والإرسال...':'جارٍ توليد التقرير...',true);
+  const {data,error}=await sb.functions.invoke('daily-report',{ body:{ send:!!send } });
+  if(error || (data && data.error)){ toast('تعذّر: '+((data&&data.error)||error.message||'خطأ'),false); return; }
+  await loadDailyReports(); render();
+  toast(send? (data.email_status==='sent'?'اتبعت التقرير على الإيميلات':'اتحفظ التقرير لكن الإرسال فشل: '+(data.email_error||'')) : 'تم توليد التقرير',data.email_status!=='failed');
+}
+function bindReports(){
+  bindReportsMain();
+  const g=document.getElementById('dr-gen'); if(g) g.onclick=()=>runDailyReport(false);
+  const sd=document.getElementById('dr-send'); if(sd) sd.onclick=()=>{ if(confirm('تبعت تقرير تجربة للإيميلين دلوقتي؟')) runDailyReport(true); };
+  document.querySelectorAll('[data-dr-view]').forEach(b=>b.onclick=async ()=>{
+    const {data,error}=await sb.from('daily_reports').select('html,report_date,slot').eq('id',b.dataset.drView).maybeSingle();
+    if(error||!data){ toast('تعذّر فتح التقرير',false); return; }
+    S.modal={ type:'dailyReportView', html:data.html, title:data.report_date+' — '+(DR_SLOT_LABEL[data.slot]||data.slot) }; render();
+  });
+}
+
 function renderZones(){
   const zones=S.hkZones||[];
   if(!zones.length) return `<div class="card"><h3 style="margin-top:0;">الزونات</h3><p style="font-size:13px;color:var(--text-dim);">لسه مفيش زونات متعرّفة.</p><button class="primary-btn" id="zn-seed">إنشاء الزونات من 1 لـ 7</button></div>`;
@@ -3018,7 +3063,7 @@ function getReportData(){
     attendance: S.attendance.filter(a=>inRange(a.date)),
   };
 }
-function renderReports(){
+function renderReportsMain(){
   const from=S.reportFrom, to=S.reportTo, type=S.reportType;
   const { deliv, orders, pest, facade, waste, checklist, attendance } = getReportData();
 
@@ -3080,7 +3125,7 @@ function renderReports(){
   }).join('')}</tr>`).join('') : `<tr><td colspan="${t.cols.length}" style="text-align:center;padding:20px;color:var(--text-dim);">لا توجد سجلات في هذه الفترة</td></tr>`}
   </tbody></table></div>`;
 }
-function bindReports(){
+function bindReportsMain(){
   document.getElementById('rp-go').onclick=()=>{
     S.reportFrom=document.getElementById('rp-from').value;
     S.reportTo=document.getElementById('rp-to').value;
@@ -3088,37 +3133,53 @@ function bindReports(){
     render();
   };
   document.getElementById('rp-export').onclick=exportReportExcel;
+  ['rp-from','rp-to','rp-type'].forEach(id=>{ const el=document.getElementById(id); if(el) el.onchange=()=>document.getElementById('rp-go').click(); });
 }
 function exportReportExcel(){
   if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل', false); return; }
+  // خُد القيم الحالية من الخانات (مش لازم تدوس تحديث الأول)
+  { const f=document.getElementById('rp-from'), t=document.getElementById('rp-to'), ty=document.getElementById('rp-type');
+    if(f&&f.value) S.reportFrom=f.value; if(t&&t.value) S.reportTo=t.value; if(ty) S.reportType=ty.value; }
+  const type=S.reportType||'all';
+  const want=(k)=> type==='all' || type===k;
   const data = getReportData();
   const wb = XLSX.utils.book_new();
+  const EXTRA_LABEL={ notes:'ملاحظات', postpone_reason:'سبب التأجيل', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', client_info:'بيانات العميل', opm_notes:'ملاحظات OPM', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', description:'الوصف', reason:'السبب', scheduled_time:'الميعاد' };
+  const SKIP=/^(id|created_by|created_at|updated_at|list_name)$|_id$|_ids$|photo/i;
   const addSheet=(rows, name, colMap)=>{
     if(!rows.length) return;
+    const used=new Set(colMap.map(c=>c[0])); const extra=[];
+    rows.forEach(r=>Object.keys(r).forEach(k=>{
+      if(used.has(k)||SKIP.test(k)||extra.includes(k)) return;
+      const v=r[k]; if(v===null||v===undefined||typeof v==='object') return;
+      if(typeof v==='string' && (v.startsWith('data:')||v.length>400)) return;
+      extra.push(k);
+    }));
     const mapped = rows.map(r=>{
       const o={};
       colMap.forEach(([key,label,fmt])=>{ o[label] = fmt? fmt(r[key]) : (r[key]!=null? r[key] : ''); });
+      extra.forEach(k=>{ let v=r[k]; if(k==='approval_status') v=({approved:'معتمد',pending:'بانتظار الاعتماد',rejected:'مرفوض'})[v]||v; o[EXTRA_LABEL[k]||k]= v!=null? v : ''; });
       return o;
     });
-    const ws = XLSX.utils.json_to_sheet(mapped);
-    XLSX.utils.book_append_sheet(wb, ws, name);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mapped), name);
   };
   const statusFmt = v => STATUS_LABEL[v]||v;
   const shiftFmt = v => SHIFT_LABEL[v]||v;
-  addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة',statusFmt],['notes','ملاحظات']]);
-  addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt]]);
-  addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',v=>PAYMENT_STATUS_LABEL[v]||'غير مدفوع'],['scheduled_date','التاريخ'],['status','الحالة',statusFmt]]);
-  addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
-  addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
-  addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',statusFmt]]);
-  addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
+  const payFmt = v => PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
+  if(want('deliveries')) addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['client_arrival_time','ميعاد وصول العميل',v=>fmt12(v,'')],['special_instructions','تعليمات خاصة'],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['notes','ملاحظات']]);
+  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
+  if(want('pest')) addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt]]);
+  if(want('facade')) addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
+  if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
+  if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',v=>v==='completed'?'تم اعتمادها':'قيد التنفيذ'],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
+  if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
   if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
   const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
   const blob = new Blob([wbout], { type:'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `تقرير_${S.reportFrom}_${S.reportTo}.xlsx`;
+  a.download = `تقرير_${type==='all'?'كل_الخدمات':type}_${S.reportFrom}_${S.reportTo}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -3133,6 +3194,7 @@ function supExtras(){
   return (openU? `<div class="card" style="margin-bottom:14px;border-color:var(--coral);background:var(--coral-light);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b style="color:var(--coral);">🚨 عندك ${openU} تاسك مستعجل</b><button class="primary-btn" data-goto-urgent style="background:var(--coral);">افتح</button></div>` : '')
   + `<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b style="font-size:13.5px;">معايا كام عامل النهاردة للتشغيل الميداني؟</b><input type="number" min="0" id="wc-input" value="${wc?wc.workers:''}" placeholder="العدد" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;"><button class="primary-btn" id="wc-save">حفظ</button></div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">العدد بس — من غير أسماء.</div></div>`;
 }
+function addDaysStr(ds,n){ const d=new Date(ds+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function renderSupervisorToday(){
   const uidMe = S.session.user.id;
   const myPresence = presenceOf(uidMe);
@@ -3156,20 +3218,22 @@ function renderSupervisorToday(){
   }
 
   if(myScope==='units'){
-    const myDeliv = S.deliveries.filter(d=>d.date===S.today);
+    const lastDay = addDaysStr(S.today,2);
+    const myDelivAll = S.deliveries.filter(d=>d.date>=S.today && d.date<=lastDay).sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.client_arrival_time||'').localeCompare(String(b.client_arrival_time||'')));
+    const myDeliv = myDelivAll.filter(d=>d.date===S.today);
     const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && orderApproved(o));
     const doneOf = arr => arr.filter(x=>x.status==='completed').length;
-    let html = head('أنت النهاردة مشرف وحدات — كل وحدات اليوم نازلة لك أوتوماتيك.') + supExtras();
+    let html = head('أنت النهاردة مشرف وحدات — كل وحدات اليوم واليومين الجايين نازلة لك أوتوماتيك، وتقدر تغيّر حالتها لو خلصتها بدري.') + supExtras();
     html += `<div class="stat-row">
       <div class="stat mint"><div class="num">${doneOf(myDeliv)}/${myDeliv.length}</div><div class="lbl">وحدات تسليم</div></div>
       <div class="stat blue"><div class="num">${doneOf(myOrders)}/${myOrders.length}</div><div class="lbl">أوردرات خدمة مدفوعة</div></div>
     </div>`;
-    html += `<div class="section-title"><h2>وحدات التسليم</h2></div>
-    ${myDeliv.length? myDeliv.map(d=>{
+    html += `<div class="section-title"><h2>وحدات التسليم (اليوم + يومين)</h2></div>
+    ${myDelivAll.length? myDelivAll.map(d=>{
       const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
       return `<div class="card" style="margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <div><b>${esc(d.unit_code)}</b>${deliveryExtraHtml(d)} ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
+          <div><b>${esc(d.unit_code)}</b>${d.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${d.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(d.date)}</span>`:''}${deliveryExtraHtml(d)} ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
           <select data-my-dv="${d.id}">
             <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
             <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
@@ -3182,7 +3246,7 @@ function renderSupervisorToday(){
           ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
         </div>
       </div>`;
-    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة</p>`}`;
+    }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة ولا في اليومين الجايين</p>`}`;
     html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${fmt12(o.scheduled_time,'')}
@@ -3382,6 +3446,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='violForm') return renderViolForm();
+  if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="overflow-x:auto;">${m.html}</div>`, 'full');
   if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
     <img src="${m.src}" style="max-width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:var(--sand);">
     <div style="margin-top:10px;"><a class="ghost-btn" href="${m.src}" download="photo.jpg" style="display:inline-block;text-decoration:none;">تحميل الصورة</a></div></div>`, 'wide');
@@ -4485,6 +4550,7 @@ function startDistPoll(){
     if(hasUnsavedInput()) return;
     await refreshAssignments();
     if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
+    if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
     if(!S.modal && !hasUnsavedInput()) render();
   },30000);
 }
