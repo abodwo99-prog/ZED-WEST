@@ -645,7 +645,15 @@ function seniorZonesOf(userId, shift){ const sh=shift||myShiftOf(userId); return
 function seniorZoneOf(userId, shift){ const sh=shift||myShiftOf(userId); const a=(S.zoneAssign||[]).find(x=>x.senior_id===userId && x.shift===sh); return a? zoneById(a.zone_id):null; }
 function supScopeOf(userId){ const a=supAssignOf(userId); if(a) return a.kind==='units'?'units':'general_areas'; const p=presenceOf(userId); return (p&&p.scope)||'general_areas'; }
 function runAllowedFor(userId, l){ const run=taskRunOf(l.id); return !(run && run.assigned_to && run.assigned_to!==userId); }
+// أي قائمة السنيور أسندها له صراحةً لازم تظهر عنده، حتى لو القائمة تابعة لزون تاني
+function explicitTasksFor(userId){
+  return sortedTaskLists().filter(l=>l.active!==false && (S.taskRuns||[]).some(r=>r.list_id===l.id && r.date===S.today && r.assigned_to===userId));
+}
 function tasksForSupervisor(userId, shift){
+  const baseList=tasksForSupervisorBase(userId, shift); const have=new Set(baseList.map(l=>l.id));
+  return baseList.concat(explicitTasksFor(userId).filter(l=>!have.has(l.id)));
+}
+function tasksForSupervisorBase(userId, shift){
   const sh=shift||myShiftOf(userId); const base=tasksForShift(sh);
   // المسائية: من غير زونات — كل مهام المسائي لكل الحاضرين (ما عدا مشرف الوحدات)
   if(sh==='evening') return supScopeOf(userId)==='units' ? [] : base.filter(l=>runAllowedFor(userId,l));
