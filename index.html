@@ -1415,7 +1415,23 @@ function myCheckin(svc){
   const me=S.session.user.id;
   return (S.svcPresence||[]).filter(p=>p.user_id===me && p.service===svc && p.date===S.today).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
 }
+let svcResetCalled=false;
+const FACADE_RESET_DAYS=60;
+function facadeCycleInfo(l){
+  if(!l || !l.completed_at) return null;
+  const end=new Date(l.completed_at).getTime()+FACADE_RESET_DAYS*86400000;
+  const left=Math.max(0,Math.ceil((end-Date.now())/86400000));
+  return { left, endDate:new Date(end).toLocaleDateString('ar-EG',{ timeZone:'Africa/Cairo', day:'numeric', month:'numeric', year:'numeric' }) };
+}
+function facadeFinishHtml(svc,l){
+  if(svc!=='facade') return '';
+  const role=S.profile.role; const isMgr=role==='admin'||role==='opm'; const canAct=isMgr||role==='facade_sv';
+  const info=facadeCycleInfo(l);
+  if(info) return `<div style="font-size:11.5px;margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><span style="color:var(--mint);font-weight:800;">✅ تم الانتهاء من البرج — هيتصفّر بعد ${info.left} يوم (${esc(info.endDate)})</span>${isMgr?`<button class="ghost-btn" style="padding:3px 10px;font-size:11px;" data-svc-unfinish="${l.id}">إلغاء الانتهاء</button>`:''}</div>`;
+  return canAct? `<div style="margin-top:6px;"><button class="ghost-btn" style="padding:5px 12px;font-size:12px;" data-svc-finish="${l.id}">✅ تم الانتهاء من البرج</button></div>` : '';
+}
 async function loadSvcData(){
+  if(!svcResetCalled){ svcResetCalled=true; try{ await sb.rpc('reset_facade_cycles'); }catch(e){} }
   const d=new Date(); d.setDate(d.getDate()-14); const from=dateStr(d);
   const [lists, items, pres] = await Promise.all([
     dbSelect('svc_lists'), dbSelect('svc_items'),
@@ -1463,7 +1479,7 @@ function renderSvcList(svc, l, isMgr, canMark){
       <b>${esc(it.label)}</b>${it.done?`<small>✓ ${esc(fmtCairo(it.done_at))}</small><small>${esc(it.done_by_name||'')}${it.done_shift?' · '+(it.done_shift==='evening'?'مسائي':'صباحي'):''}</small>`:''}</button>`).join('')}</div>`
     : '<p style="font-size:12.5px;color:var(--text-dim);">القائمة لسه فاضية.</p>');
   return `<details class="card" data-svc-open="${l.id}" ${S.openSvc.has(l.id)?'open':''} style="margin-bottom:12px;">
-    <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14.5px;">${esc(l.name)}</b><span style="font-size:12px;color:var(--text-dim);">${p.done}/${p.total} · <b style="color:var(--mint);">${p.pct}%</b></span></summary>
+    <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14.5px;">${esc(l.name)}</b><span style="font-size:12px;color:var(--text-dim);">${(svc==='facade'&&l.completed_at)?`<span style="color:var(--mint);font-weight:800;">⏳ ${facadeCycleInfo(l).left} يوم</span> · `:''}${p.done}/${p.total} · <b style="color:var(--mint);">${p.pct}%</b></span></summary>
     <div style="margin-top:12px;">
       ${isMgr?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
         <button class="ghost-btn" data-svc-manage="${l.id}">${manage?'إنهاء التعديل':'تعديل البنود'}</button>
@@ -1485,7 +1501,7 @@ function renderSvcSection(svc){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 style="margin:0;font-size:14px;">نسبة الإنجاز — ${cfg.title}</h3><b style="color:var(--mint);font-size:16px;">${overall}%</b></div>
     ${lists.length? lists.map(l=>{ const p=svcProgress(l.id); return `<div style="margin:12px 0;">
       <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px;"><span>${esc(l.name)}</span><span>${p.done}/${p.total} · ${p.pct}%</span></div>
-      <div class="svc-bar"><div style="width:${p.pct}%"></div></div></div>`; }).join('') : '<p style="font-size:12.5px;color:var(--text-dim);margin:6px 0 0;">لسه مفيش قوائم'+(isMgr?' — ضيف قائمة جديدة من الزرار تحت.':'.')+'</p>'}
+      <div class="svc-bar"><div style="width:${p.pct}%"></div></div>${facadeFinishHtml(svc,l)}</div>`; }).join('') : '<p style="font-size:12.5px;color:var(--text-dim);margin:6px 0 0;">لسه مفيش قوائم'+(isMgr?' — ضيف قائمة جديدة من الزرار تحت.':'.')+'</p>'}
   </div>
   ${isMgr? `<div class="toolbar"><button class="primary-btn" id="svc-add-list">${ICON.plus()} قائمة جديدة</button></div>` : ''}
   ${lists.map(l=>renderSvcList(svc,l,isMgr,canMark)).join('')}
@@ -1545,6 +1561,21 @@ function bindSvc(svc){
   });
   // أوردرات الواجهات (الخدمة المدفوعة) لمشرف الواجهات: تغيير الحالة بس
   document.querySelectorAll('[data-fsv-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.fsvOrd, sel.value, loadOrders));
+  document.querySelectorAll('[data-svc-finish]').forEach(b=>b.onclick=async ()=>{
+    const l=(S.svcLists||[]).find(x=>x.id===b.dataset.svcFinish); if(!l) return;
+    if(!confirm('تأكيد إنك خلّصت "'+l.name+'"؟\nالعداد هيبدأ دلوقتي، وبعد '+FACADE_RESET_DAYS+' يوم نسبة الإنجاز بتاعته هتتصفّر أوتوماتيك.')) return;
+    b.disabled=true;
+    const {error}=await sb.rpc('complete_facade_tower',{ p_list_id:l.id });
+    if(error){ toast('حصل خطأ: '+error.message,false); b.disabled=false; return; }
+    await refreshSvc(); toast('تم تسجيل الانتهاء من البرج — العداد بدأ',true);
+  });
+  document.querySelectorAll('[data-svc-unfinish]').forEach(b=>b.onclick=async ()=>{
+    const l=(S.svcLists||[]).find(x=>x.id===b.dataset.svcUnfinish); if(!l) return;
+    if(!confirm('تلغي "الانتهاء" من "'+l.name+'" وتوقف العداد؟')) return;
+    const {error}=await sb.rpc('cancel_facade_tower_completion',{ p_list_id:l.id });
+    if(error){ toast('حصل خطأ: '+error.message,false); return; }
+    await refreshSvc(); toast('تم إلغاء الانتهاء',true);
+  });
 }
 async function svcToggle(itemId){
   const it=(S.svcItems||[]).find(x=>x.id===itemId); if(!it) return;
@@ -1576,9 +1607,9 @@ function renderFacadeOrdersForSV(){
 /* ============================= FACADE CLEANING ============================= */
 function renderFacade(){
   const role=S.profile.role;
-  return renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '') + '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld();
+  return renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld());
 }
-function bindFacade(){ bindSvc('facade'); bindFacadeOld(); }
+function bindFacade(){ bindSvc('facade'); if(S.profile.role!=='facade_sv') bindFacadeOld(); }
 function renderPest(){ return renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
 function bindPest(){ bindSvc('pest'); bindPestOld(); }
 function renderWaste(){ return renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
