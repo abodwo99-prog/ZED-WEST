@@ -1431,7 +1431,7 @@ function facadeFinishHtml(svc,l){
   return canAct? `<div style="margin-top:6px;"><button class="ghost-btn" style="padding:5px 12px;font-size:12px;" data-svc-finish="${l.id}">✅ تم الانتهاء من البرج</button></div>` : '';
 }
 async function loadSvcData(){
-  if(!svcResetCalled){ svcResetCalled=true; try{ await sb.rpc('reset_facade_cycles'); }catch(e){} }
+  if(!svcResetCalled){ svcResetCalled=true; try{ await sb.rpc('reset_facade_cycles'); }catch(e){} try{ await sb.rpc('reset_waste_daily'); }catch(e){} }
   const d=new Date(); d.setDate(d.getDate()-14); const from=dateStr(d);
   const [lists, items, pres] = await Promise.all([
     dbSelect('svc_lists'), dbSelect('svc_items'),
@@ -1612,8 +1612,8 @@ function renderFacade(){
 function bindFacade(){ bindSvc('facade'); if(S.profile.role!=='facade_sv') bindFacadeOld(); }
 function renderPest(){ return renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
 function bindPest(){ bindSvc('pest'); bindPestOld(); }
-function renderWaste(){ return renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
-function bindWaste(){ bindSvc('waste'); bindWasteOld(); }
+function renderWaste(){ const isMgrW=(S.profile.role==='admin'||S.profile.role==='opm'); return (isMgrW?'<div class="toolbar" style="margin-bottom:10px;"><button class="primary-btn" id="waste-report">📊 تقارير رفع المخلفات (يوم بيوم)</button></div>':'') + renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
+function bindWaste(){ bindSvc('waste'); bindWasteOld(); const wr=document.getElementById('waste-report'); if(wr) wr.onclick=()=>{ S.modal={type:'wasteReport'}; S.wasteRep={ date:S.today, loading:true, rows:[], pres:[] }; loadWasteReport(S.today); }; }
 function renderFacadeOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm';
@@ -2798,6 +2798,66 @@ function bindReports(){
   });
 }
 
+
+/* ============================= WASTE DAILY REPORT ============================= */
+Object.assign(S,{ wasteRep:null });
+async function loadWasteReport(date){
+  S.wasteRep={ date, loading:true, rows:[], pres:[] }; render();
+  const [lg,pr]=await Promise.all([
+    sb.from('svc_item_log').select('*').eq('service','waste').eq('log_date',date).order('done_at'),
+    sb.from('svc_presence').select('*').eq('service','waste').eq('date',date).order('created_at')
+  ]);
+  if(lg.error){ toast('تعذّر تحميل التقرير — شغّل update_v16.sql ('+lg.error.message+')',false); S.wasteRep={ date, loading:false, rows:[], pres:[] }; render(); return; }
+  S.wasteRep={ date, loading:false, rows:lg.data||[], pres:pr.data||[] }; render();
+}
+function wasteTime(iso){ return iso? new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit', hour12:true }) : ''; }
+function wasteReportModel(){
+  const r=S.wasteRep||{}; const rows=r.rows||[];
+  const groups=svcListsOf('waste').map(l=>{
+    const items=svcItemsOf(l.id);
+    const done=rows.filter(x=>x.list_id===l.id);
+    const doneIds=new Set(done.map(x=>x.item_id));
+    return { name:l.name, total:items.length, done, notDone:items.filter(i=>!doneIds.has(i.id)).map(i=>i.label) };
+  });
+  const known=new Set(svcListsOf('waste').map(l=>l.id));
+  const orphan=rows.filter(x=>!known.has(x.list_id));
+  if(orphan.length) groups.push({ name:'قوائم محذوفة', total:orphan.length, done:orphan, notDone:[] });
+  return groups;
+}
+function renderWasteReportModal(){
+  const r=S.wasteRep||{ date:S.today }; const groups=wasteReportModel();
+  const totalAll=groups.reduce((n,g)=>n+g.total,0), doneAll=groups.reduce((n,g)=>n+g.done.length,0);
+  const shiftLbl=v=>v==='evening'?'مسائي':(v==='morning'?'صباحي':'-');
+  const body = r.loading ? '<p style="color:var(--text-dim);">جارٍ التحميل...</p>' : `
+    <div class="stat-row"><div class="stat mint"><div class="num">${doneAll}</div><div class="lbl">اتنفّذ</div></div><div class="stat amber"><div class="num">${Math.max(0,totalAll-doneAll)}</div><div class="lbl">ما اتنفّذش</div></div></div>
+    ${groups.map(g=>`<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;"><b>${esc(g.name)}</b><span style="font-size:12.5px;"><b style="color:var(--mint);">${g.total?Math.round(g.done.length*100/g.total):0}%</b> · ${g.done.length}/${g.total}</span></div>
+      ${g.done.length? `<div style="margin-top:8px;">${g.done.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);"><span><b>${esc(x.label)}</b></span><span style="color:var(--text-dim);">${esc(wasteTime(x.done_at))} · ${esc(x.done_by_name||'-')} · ${shiftLbl(x.done_shift)}</span></div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">ما اتنفّذش حاجة في اليوم ده.</div>'}
+      ${g.notDone.length? `<div style="font-size:12px;margin-top:8px;line-height:1.8;"><b style="color:var(--amber);">ما اتنفّذش:</b> ${g.notDone.map(esc).join('، ')}</div>`:''}
+    </div>`).join('')}
+    <div class="card"><b>حضور مشرفي رفع المخلفات</b>
+      ${(r.pres||[]).length? (r.pres||[]).map(p=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);"><span>${esc(p.person_name||'-')}</span><span style="color:var(--text-dim);">${shiftLbl(p.shift)} · ${esc(wasteTime(p.created_at))}</span></div>`).join('') : '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">محدش سجّل حضور في اليوم ده.</div>'}
+    </div>
+    <button class="ghost-btn" id="wr-export" style="margin-top:10px;">📥 تصدير Excel لليوم ده</button>`;
+  return modalWrap('تقرير رفع المخلفات', `<div class="form-row"><label>اختار اليوم</label><input type="date" id="wr-date" value="${esc(r.date||S.today)}"></div>${body}`, 'wide');
+}
+function bindWasteReport(){
+  const d=document.getElementById('wr-date'); if(d) d.onchange=()=>{ if(d.value) loadWasteReport(d.value); };
+  const ex=document.getElementById('wr-export'); if(ex) ex.onclick=()=>{
+    if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل',false); return; }
+    const r=S.wasteRep||{}; const groups=wasteReportModel(); const wb=XLSX.utils.book_new();
+    const doneRows=[]; const notRows=[];
+    groups.forEach(g=>{ g.done.forEach(x=>doneRows.push({ 'القائمة':g.name, 'الغرفة':x.label, 'الوقت':wasteTime(x.done_at), 'المنفذ':x.done_by_name||'', 'الشفت':x.done_shift==='evening'?'مسائي':(x.done_shift==='morning'?'صباحي':'') })); g.notDone.forEach(l=>notRows.push({ 'القائمة':g.name, 'الغرفة':l })); });
+    if(doneRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doneRows), 'اتنفّذ');
+    if(notRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notRows), 'ما اتنفّذش');
+    if((r.pres||[]).length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((r.pres||[]).map(p=>({ 'الاسم':p.person_name||'', 'الشفت':p.shift==='evening'?'مسائي':'صباحي', 'الوقت':wasteTime(p.created_at) }))), 'الحضور');
+    if(!wb.SheetNames.length){ toast('مفيش بيانات لليوم ده',false); return; }
+    const blob=new Blob([XLSX.write(wb,{ bookType:'xlsx', type:'array' })],{ type:'application/octet-stream' });
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='رفع_المخلفات_'+(r.date||S.today)+'.xlsx'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),3000);
+    toast('تم تصدير الملف',true);
+  };
+}
+
 function renderZones(){
   const zones=S.hkZones||[];
   if(!zones.length) return `<div class="card"><h3 style="margin-top:0;">الزونات</h3><p style="font-size:13px;color:var(--text-dim);">لسه مفيش زونات متعرّفة.</p><button class="primary-btn" id="zn-seed">إنشاء الزونات من 1 لـ 7</button></div>`;
@@ -3515,6 +3575,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='violForm') return renderViolForm();
+  if(m.type==='wasteReport') return renderWasteReportModal();
   if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><button class="primary-btn" id="dr-modal-mail">📧 افتح الإيميل مع التقرير مرفق</button><button class="ghost-btn" id="dr-modal-print">🖨 طباعة / حفظ PDF</button></div><div style="overflow-x:auto;">${m.html}</div>`, 'full');
   if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
     <img src="${m.src}" style="max-width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:var(--sand);">
@@ -3850,6 +3911,7 @@ function bindModalEvents(){
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
+  if(S.modal && S.modal.type==='wasteReport') bindWasteReport();
   if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
