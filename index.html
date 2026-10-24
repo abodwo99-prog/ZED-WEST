@@ -2728,43 +2728,73 @@ async function violationReport(){
 Object.assign(S,{ dailyReports:[] });
 let dailyWarned=false;
 const DR_SLOT_LABEL={ afternoon:'تقرير 2:30 م', night:'تقرير 10:00 م', manual:'تقرير يدوي' };
+function drLabel(r){
+  if(r.slot && r.slot.startsWith('manual_')){ const t=r.created_at? new Date(r.created_at).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit', hour12:true }) : ''; return 'تقرير '+t; }
+  return DR_SLOT_LABEL[r.slot]||r.slot;
+}
 async function loadDailyReports(){
-  const {data,error}=await sb.from('daily_reports').select('id,report_date,slot,subject,email_status,created_at').order('created_at',{ascending:false}).limit(30);
+  const {data,error}=await sb.from('daily_reports').select('id,report_date,slot,subject,created_at').order('created_at',{ascending:false}).limit(30);
   if(error){ console.warn('daily_reports',error.message); if(!dailyWarned){ dailyWarned=true; toast('جدول التقارير اليومية ناقص — شغّل update_v13.sql',false); } return; }
   S.dailyReports=data||[];
 }
 function renderReports(){
-  const isAdmin=S.profile.role==='admin';
   const rows=(S.dailyReports||[]).map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;">
-      <div><b style="font-size:13px;">${esc(r.report_date)} — ${esc(DR_SLOT_LABEL[r.slot]||r.slot)}</b>
-      <div style="font-size:11px;color:var(--text-dim);">${esc(fmtCairo(r.created_at))} · ${r.email_status==='sent'?'📧 اتبعت على الإيميل':(r.email_status==='failed'?'⚠️ فشل الإرسال':'محفوظ بدون إرسال')}</div></div>
+      <div><b style="font-size:13px;">${esc(r.report_date)} — ${esc(drLabel(r))}</b></div>
       <button class="ghost-btn" data-dr-view="${r.id}">عرض</button></div>`).join('');
   const card=`<div class="card" style="margin-bottom:14px;">
-    <h3 style="margin-top:0;">التقارير اليومية</h3>
-    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.8;">بتتبعت تلقائي على الإيميل الساعة 2:30 م و10:00 م، وبتتحفظ هنا 30 يوم. فيها الهيكل والحضور والغياب والمهام والتسليمات والخدمة المدفوعة والآفات والواجهات.</p>
+    <h3 style="margin-top:0;">التقرير التشغيلي</h3>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.8;">بتطلّع تقرير بحالة اللحظة دي: الهيكل والحضور والغياب والمهام والتسليمات والخدمة المدفوعة والآفات والواجهات. بعدها تقدر تبعته من إيميلك لأي حد وقت ما تحتاج. التقارير بتتحفظ هنا 30 يوم.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
       <button class="primary-btn" id="dr-gen">🔄 توليد تقرير دلوقتي</button>
-      ${isAdmin?'<button class="ghost-btn" id="dr-send">📧 إرسال تجربة للإيميلات</button>':''}
+      <button class="ghost-btn" id="dr-mail">📧 إرسال بالإيميل (مرفق)</button>
     </div>
     ${rows||'<div style="font-size:12.5px;color:var(--text-dim);">مفيش تقارير محفوظة لسه.</div>'}
   </div>`;
   return card + renderReportsMain();
 }
-async function runDailyReport(send){
-  toast(send?'جارٍ التوليد والإرسال...':'جارٍ توليد التقرير...',true);
-  const {data,error}=await sb.functions.invoke('daily-report',{ body:{ send:!!send } });
-  if(error || (data && data.error)){ toast('تعذّر: '+((data&&data.error)||error.message||'خطأ'),false); return; }
-  await loadDailyReports(); render();
-  toast(send? (data.email_status==='sent'?'اتبعت التقرير على الإيميلات':'اتحفظ التقرير لكن الإرسال فشل: '+(data.email_error||'')) : 'تم توليد التقرير',data.email_status!=='failed');
+async function generateDailyReport(openAfter){
+  toast('جارٍ توليد التقرير...',true);
+  const {data,error}=await sb.functions.invoke('daily-report',{ body:{} });
+  if(error || !data || data.error){ toast('تعذّر: '+((data&&data.error)||(error&&error.message)||'خطأ'),false); return; }
+  await loadDailyReports();
+  S.modal={ type:'dailyReportView', html:data.html, title:data.subject, subject:data.subject };
+  render();
+}
+function reportDocHtml(m){
+  return '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'+esc(m.subject||m.title||'تقرير')+'</title></head><body style="margin:0;">'+m.html+'</body></html>';
+}
+async function shareReportByMail(m){
+  const subject=m.subject||m.title||'تقرير ZED West';
+  const name='ZedWest_Report_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.html';
+  const file=new File([reportDocHtml(m)], name, { type:'text/html' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
+    try{ await navigator.share({ files:[file], title:subject, text:subject }); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  // مفيش مشاركة ملفات في المتصفح ده: نزّل الملف وافتح الإيميل برسالة جاهزة
+  const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('اتحمّل ملف التقرير — أرفقه في الإيميل',true);
+  setTimeout(()=>{ window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent('مرفق '+subject); },600);
+}
+function printReportHtml(m){
+  let holder=document.getElementById('kpi-print-area');
+  if(!holder){ holder=document.createElement('div'); holder.id='kpi-print-area'; holder.className='print-sheet'; document.body.appendChild(holder); }
+  holder.innerHTML=m.html; setTimeout(()=>window.print(),300);
+}
+function bindDailyReportModal(){
+  const m=S.modal;
+  const mail=document.getElementById('dr-modal-mail'); if(mail) mail.onclick=()=>shareReportByMail(m);
+  const pr=document.getElementById('dr-modal-print'); if(pr) pr.onclick=()=>printReportHtml(m);
 }
 function bindReports(){
   bindReportsMain();
-  const g=document.getElementById('dr-gen'); if(g) g.onclick=()=>runDailyReport(false);
-  const sd=document.getElementById('dr-send'); if(sd) sd.onclick=()=>{ if(confirm('تبعت تقرير تجربة للإيميلين دلوقتي؟')) runDailyReport(true); };
+  const g=document.getElementById('dr-gen'); if(g) g.onclick=()=>generateDailyReport();
+  const ml=document.getElementById('dr-mail'); if(ml) ml.onclick=()=>generateDailyReport();
   document.querySelectorAll('[data-dr-view]').forEach(b=>b.onclick=async ()=>{
-    const {data,error}=await sb.from('daily_reports').select('html,report_date,slot').eq('id',b.dataset.drView).maybeSingle();
+    const {data,error}=await sb.from('daily_reports').select('html,subject,report_date,slot,created_at').eq('id',b.dataset.drView).maybeSingle();
     if(error||!data){ toast('تعذّر فتح التقرير',false); return; }
-    S.modal={ type:'dailyReportView', html:data.html, title:data.report_date+' — '+(DR_SLOT_LABEL[data.slot]||data.slot) }; render();
+    S.modal={ type:'dailyReportView', html:data.html, title:data.subject||(data.report_date+' — '+drLabel(data)), subject:data.subject }; render();
   });
 }
 
@@ -3485,7 +3515,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='violForm') return renderViolForm();
-  if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="overflow-x:auto;">${m.html}</div>`, 'full');
+  if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><button class="primary-btn" id="dr-modal-mail">📧 افتح الإيميل مع التقرير مرفق</button><button class="ghost-btn" id="dr-modal-print">🖨 طباعة / حفظ PDF</button></div><div style="overflow-x:auto;">${m.html}</div>`, 'full');
   if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
     <img src="${m.src}" style="max-width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:var(--sand);">
     <div style="margin-top:10px;"><a class="ghost-btn" href="${m.src}" download="photo.jpg" style="display:inline-block;text-decoration:none;">تحميل الصورة</a></div></div>`, 'wide');
@@ -3820,6 +3850,7 @@ function bindModalEvents(){
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
+  if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
   const saveBtn=document.getElementById('m-save');
   if(saveBtn) saveBtn.onclick=handleModalSave;
   const rejBtn=document.getElementById('m-reject'); if(rejBtn) rejBtn.onclick=rejectTaskRun;
