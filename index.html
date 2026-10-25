@@ -2594,15 +2594,15 @@ function renderViolations(){
       ${open? (photos? (photos.length? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px;">${photos.map(p=>`<div><img src="${p.photo}" data-viol-view="${p.id}|${v.id}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer;">${p.caption?`<div style="font-size:11.5px;margin-top:3px;line-height:1.6;">${esc(p.caption)}</div>`:''}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">مفيش صور.</div>') : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">جارٍ تحميل الصور...</div>') : ''}
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
         ${(v.photo_count||0)>0?`<button class="ghost-btn" data-viol-toggle="${v.id}">${open?'إخفاء الصور':'عرض الصور'}</button>`:''}
-        <button class="ghost-btn" data-viol-edit="${v.id}">✏️ تعديل</button>
-        <button class="ghost-btn danger" data-viol-del="${v.id}">${ICON.trash(14)} حذف</button>
+        ${v.created_by===S.session.user.id? `<button class="ghost-btn" data-viol-edit="${v.id}">✏️ تعديل</button>
+        <button class="ghost-btn danger" data-viol-del="${v.id}">${ICON.trash(14)} حذف</button>` : ''}
       </div>
     </div>`; }).join('');
   return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <button class="primary-btn" id="viol-add">${ICON.plus(14)} إضافة مخالفة</button>
       ${isAdmin?`<button class="ghost-btn" id="viol-report">${ICON.printer(14)} سحب تقرير</button>`:''}
     </div>
-    <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;line-height:1.8;">كل البيانات اختيارية. المخالفات بتتمسح تلقائيًا بعد 7 أيام من تسجيلها.</p>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;line-height:1.8;">كل البيانات اختيارية. كل واحد بيعدّل ويحذف مخالفاته هو بس. المخالفات بتتمسح تلقائيًا بعد 7 أيام من تسجيلها.</p>
     ${list.length? cards : '<div class="empty-state"><span class="em">📋</span>مفيش مخالفات مسجّلة</div>'}`;
 }
 function bindViolations(){
@@ -2619,11 +2619,13 @@ function bindViolations(){
   });
   document.querySelectorAll('[data-viol-edit]').forEach(b=>b.onclick=async ()=>{
     const v=(S.violations||[]).find(x=>x.id===b.dataset.violEdit); if(!v) return;
+    if(v.created_by!==S.session.user.id){ toast('مينفعش تعدّل مخالفة حد تاني',false); return; }
     const photos=(v.photo_count||0)>0 ? await loadViolPhotos(v.id) : [];
     S.violDraft={ id:v.id, phase:v.phase||'', building:v.building||'', floor_no:v.floor_no||'', apartment:v.apartment||'', note:v.note||'', photos:photos.map(p=>({id:p.id,photo:p.photo,caption:p.caption||''})), removedIds:[] };
     S.modal={type:'violForm'}; render();
   });
   document.querySelectorAll('[data-viol-del]').forEach(b=>b.onclick=async ()=>{
+    { const vv=(S.violations||[]).find(x=>x.id===b.dataset.violDel); if(!vv || vv.created_by!==S.session.user.id){ toast('مينفعش تحذف مخالفة حد تاني',false); return; } }
     if(!confirm('تحذف المخالفة دي بصورها؟')) return;
     const {error}=await sb.from('client_violations').delete().eq('id',b.dataset.violDel);
     if(error){ toast('حصل خطأ: '+error.message,false); return; }
