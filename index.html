@@ -1002,13 +1002,14 @@ function renderHome(){
       <span style="display:flex;gap:6px;flex-wrap:wrap;">
         <span class="badge done"><span class="dot"></span>معتمدة ${todayTaskRows.filter(x=>x.p.run.status==='completed').length}</span>
         <span class="badge progress"><span class="dot"></span>بانتظار الاعتماد ${todayTaskRows.filter(x=>x.p.run.status!=='completed' && x.p.run.supervisor_marked_done).length}</span>
-        <span class="badge pending"><span class="dot"></span>قيد التنفيذ ${todayTaskRows.filter(x=>x.p.run.status!=='completed' && !x.p.run.supervisor_marked_done).length}</span>
+        <span class="badge pending"><span class="dot"></span>قيد التنفيذ ${todayTaskRows.filter(x=>x.p.run.status!=='completed' && !x.p.run.supervisor_marked_done && !taskMissed(x.l,x.p.run)).length}</span>
+        <span class="badge postponed"><span class="dot"></span>أُغلقت قبل الإنجاز ${todayTaskRows.filter(x=>taskMissed(x.l,x.p.run)).length}</span>
       </span>
     </div>
     ${todayTaskRows.length? `<div class="ht-list">${todayTaskRows.map(({l,p})=>{ const pct=p.total?Math.round(p.done*100/p.total):0; return `<div class="ht-row">
       <div class="ht-name">${esc(l.name)} <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span>${taskWhoHtml(p.run)}</div>
       <div class="ht-bar"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-bottom:3px;"><span>${p.done}/${p.total} بند</span><b>${pct}%</b></div><div class="svc-bar"><div style="width:${pct}%"></div></div></div>
-      <div class="ht-badge">${taskRunBadge(p.run)}</div></div>`; }).join('')}</div>` : `<div class="empty-state" style="padding:20px;"><span class="em">📋</span>مفيش مهمات مجدولة النهاردة</div>`}
+      <div class="ht-badge">${taskMissed(l,p.run)?MISSED_BADGE:taskRunBadge(p.run)}</div></div>`; }).join('')}</div>` : `<div class="empty-state" style="padding:20px;"><span class="em">📋</span>مفيش مهمات مجدولة النهاردة</div>`}
   </div>
   <div class="home-blocks">
     <div class="card"><h3 style="margin-top:0;font-size:14px;">نشاط آخر 7 أيام (مهمات مجدولة معتمدة)</h3><div class="chart-box"><canvas id="chartHome"></canvas></div></div>
@@ -1716,6 +1717,13 @@ function readTaskFreq(){
 }
 function sortedTaskLists(){ return (S.taskLists||[]).slice().sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''))); }
 function tasksForShift(shift){ return sortedTaskLists().filter(l=>l.active!==false && taskDueToday(l) && (!l.shift || l.shift==='both' || l.shift===shift)); }
+// المهمة اتقفلت (عدّى ميعاد القفل) وما اتأكدتش من المشرف
+function taskMissed(l,run){
+  if(!l||!run||run.status==='completed'||run.supervisor_marked_done) return false;
+  if(run.date && run.date<S.today) return true;
+  return !!l.close_time && taskWindowState(l).state==='closed';
+}
+const MISSED_BADGE='<span class="badge postponed"><span class="dot"></span>⛔ أُغلقت قبل الإنجاز</span>';
 function taskRunBadge(run){
   if(!run) return '<span class="badge pending"><span class="dot"></span>قيد التجهيز</span>';
   if(run.status==='completed') return '<span class="badge done"><span class="dot"></span>تم اعتمادها</span>';
@@ -3288,7 +3296,7 @@ function exportReportExcel(){
     }));
     const mapped = rows.map(r=>{
       const o={};
-      colMap.forEach(([key,label,fmt])=>{ o[label] = fmt? fmt(r[key]) : (r[key]!=null? r[key] : ''); });
+      colMap.forEach(([key,label,fmt])=>{ o[label] = fmt? fmt(r[key], r) : (r[key]!=null? r[key] : ''); });
       extra.forEach(k=>{ let v=r[k]; if(k==='approval_status') v=({approved:'معتمد',pending:'بانتظار الاعتماد',rejected:'مرفوض'})[v]||v; o[EXTRA_LABEL[k]||k]= v!=null? v : ''; });
       return o;
     });
@@ -3302,7 +3310,7 @@ function exportReportExcel(){
   if(want('pest')) addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt]]);
   if(want('facade')) addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
-  if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',v=>v==='completed'?'تم اعتمادها':'قيد التنفيذ'],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
+  if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',(v,r)=>v==='completed'?'تم اعتمادها':(r.supervisor_marked_done?'بانتظار اعتماد المشرف الأول':((r.date<S.today || taskMissed((S.taskLists||[]).find(l=>l.id===r.list_id),r))?'أُغلقت قبل الإنجاز':'قيد التنفيذ'))],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
   if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
   if(!wb.SheetNames.length){ toast('لا توجد بيانات في هذه الفترة',false); return; }
   const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
