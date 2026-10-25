@@ -855,7 +855,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
@@ -1611,8 +1611,8 @@ function renderFacade(){
   return renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld());
 }
 function bindFacade(){ bindSvc('facade'); if(S.profile.role!=='facade_sv') bindFacadeOld(); }
-function renderPest(){ return renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
-function bindPest(){ bindSvc('pest'); bindPestOld(); }
+function renderPest(){ return renderPestSched() + renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
+function bindPest(){ bindPestSched(); bindSvc('pest'); bindPestOld(); }
 function renderWaste(){ const isMgrW=(S.profile.role==='admin'||S.profile.role==='opm'); return (isMgrW?'<div class="toolbar" style="margin-bottom:10px;"><button class="primary-btn" id="waste-report">📊 تقارير رفع المخلفات (يوم بيوم)</button></div>':'') + renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
 function bindWaste(){ bindSvc('waste'); bindWasteOld(); const wr=document.getElementById('waste-report'); if(wr) wr.onclick=()=>{ S.modal={type:'wasteReport'}; S.wasteRep={ date:S.today, loading:true, rows:[], pres:[] }; loadWasteReport(S.today); }; }
 function renderFacadeOld(){
@@ -2868,6 +2868,299 @@ function bindWasteReport(){
   };
 }
 
+/* ============================= PEST DAILY SCHEDULE (جدول مكافحة الحشرات اليومي) ============================= */
+// 0=السبت ... 6=الجمعة. كل بند: [اليوم, من, إلى, البرنامج] — الأوقات زي ما هي في الجدول الأصلي
+const PS_SEED = {
+  E1: {
+    morning: [
+      [0,'8:00','11:00','معاملة غرف الرابش بالادوار (J,K,L)'],
+      [0,'11:00','12:00','بوابات الامن ( حشرات طائرة)'],
+      [0,'2:00','3:00','مرور على المصائد البيولوجية ( غسيل )'],
+      [0,'4:00','5:00','معاملة صرف المطر'],
+      [1,'8:00','11:00','معاملة غرف الرابش بالادوار (A,B,C,D,E)'],
+      [1,'11:00','12:00','مرور على جحور النمل بالبلازا'],
+      [1,'1:00','2:00','مرور على البيت ستيشن B1'],
+      [1,'2:00','2:40','معاملة بلاعات الصرف بجراج العمائر'],
+      [1,'2:45','4:30','دهانات على بوابات الامن و مداخل العمائر'],
+      [2,'8:00','11:00','معاملة غرف الرابش بالادوار (F,G,H,I)'],
+      [2,'11:00','11:40','مرور على المصائد البيولوجية ( تنشيط )'],
+      [2,'1:00','2:00','مرور على البيت ستيشن B2'],
+      [2,'2:00','2:40','معاملة بلاعات الصرف بجراج الابراج'],
+      [2,'2:45','4:30','معاملة مداخل اسانسيرات العمائر'],
+      [3,'8:00','11:00','معاملة غرف الرابش بالادوار (J,K,L)'],
+      [3,'11:00','12:00','معاملة بلاعات الصرف بجراج الابراج'],
+      [3,'1:00','2:00','معاملة مداخل جراج العمائر'],
+      [3,'2:00','3:30','مرور على المحطات الفخارية من بوابة 5 حتى بوابة 6'],
+      [3,'3:30','4:30','معاملة صرف المطر'],
+      [4,'8:00','11:00','معاملة غرف الرابش بالادوار (YA,YB,YC,YD)'],
+      [4,'11:00','11:40','مرور على المصائد البيولوجية ( تنشيط )'],
+      [4,'1:00','2:00','مرور على المحطات الفخارية بمناور العمائر'],
+      [4,'2:00','4:00','معاملة مداخل العمائر (جحور نمل )'],
+      [5,'8:00','11:00','معاملة غرف الرابش بالادوار (A,B,C,D,E)'],
+      [5,'11:00','12:00','مرور على البيت ستيشن B1'],
+      [5,'1:00','2:00','بوابات الامن ( حشرات طائرة)'],
+      [5,'2:00','4:00','مرور على المحطات الفخارية حول العمائر'],
+      [6,'8:00','11:00','معاملة غرف الرابش بالادوار (F,G,H,I)'],
+      [6,'11:00','11:40','معاملة جحور نمل البلازا'],
+      [6,'1:00','2:00','مرور على البيت ستيشن B1'],
+      [6,'2:00','2:45','مرور على البيت ستيشن B2']
+    ],
+    evening: [
+      [0,'1:00','2:00','معاملة غرف الرابش بالادوار (YA,YB,YC,YD)'],
+      [0,'2:00','3:00','مرور على المحطات الفخارية من بوابة 5 حتى بوابة 6'],
+      [0,'4:00','5:30','مرور على المحطات الفخارية بمناور العمائر'],
+      [0,'7:00','9:00','معاملة مداخل جراج العمائر'],
+      [1,'1:00','2:30','مرور على المحطات الفخارية حول العمائر'],
+      [1,'2:30','4:00','معاملة غرف الرابش الرئيسية ( YA,YB,YC,YD )'],
+      [1,'5:00','6:00','معاملة غرف الرابش الرئيسية (A,B,C,D,E,F,G,H,I,J,K,L)'],
+      [1,'6:00','7:00','معاملة مداخل الاسانسيرات'],
+      [1,'7:00','9:00','معاملة مداخل العمائر (حشرات طائرة)'],
+      [2,'1:00','2:30','معاملة مداخل العمائر ( حشرات زاحفة )'],
+      [2,'2:30','4:00','مرور على المحطات الفخارية بمناور العمائر'],
+      [2,'5:00','6:30','معاملة غرف الرابش الرئيسية (A,B,C,D,E,F,G,H,I,J,K,L)'],
+      [2,'6:30','7:30','معاملة النافورة ( في حالة عدم تشغيلها )'],
+      [2,'7:30','9:00','مرور على طعوم القوارض بغرف الميكانيكا بالعمائر'],
+      [3,'1:00','2:00','مرور على البيت ستيشن B1'],
+      [3,'2:00','3:30','معاملة بلاعات الصرف بجراج العمائر'],
+      [3,'4:30','6:00','معاملة غرف الرابش الرئيسية (A,B,C,D,E,F,G,H,I,J,K,L)'],
+      [3,'6:00','6:30','معاملة مداخل الاسانسيرات'],
+      [3,'7:00','9:00','معاملة مداخل العمائر (حشرات طائرة)'],
+      [4,'1:00','2:00','مرور على البيت ستيشن B2'],
+      [4,'2:00','3:30','دهانات على بوابات الامن و مداخل العمائر'],
+      [4,'4:30','6:00','معاملة غرف الرابش الرئيسية ( YA,YB,YC,YD )'],
+      [4,'7:00','8:00','معاملة بلاعات الصرف بجراج الابراج'],
+      [5,'1:00','2:30','معاملة صرف المطر'],
+      [5,'2:30','3:30','معاملة غرف الرابش الرئيسية (A,B,C,D,E,F,G,H,I,J,K,L)'],
+      [5,'4:30','5:30','معاملة مداخل اسانسيرات العمائر'],
+      [5,'7:00','8:00','معاملة مداخل جراج العمائر'],
+      [6,'3:00','4:00','دهانات على بوابات الامن و مداخل العمائر'],
+      [6,'5:00','6:30','معاملة غرف الرابش الرئيسية (A,B,C,D,E,F,G,H,I,J,K,L)'],
+      [6,'6:30','7:30','معاملة بلاعات الصرف بجراج العمائر'],
+      [6,'7:30','9:00','معاملة مداخل العمائر ( جهاز )']
+    ]
+  },
+  E2: {
+    morning: [
+      [0,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [0,'9:30','1:30','معاملة غرف الرابش بالادوار (A,B,E,F)'],
+      [0,'2:30','3:30','مرور على المصائد البيولوجية (غسيل)'],
+      [0,'3:45','5:00','مرور على المحطات الفخارية'],
+      [1,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [1,'9:30','11:30','معاملة غرف الرابش بالادوار (G,H,I)'],
+      [1,'12:30','1:30','معاملة بلاعات الصرف بالجراج'],
+      [1,'2:30','4:00','معاملة مداخل العمائر ( حشرات طائرة )'],
+      [2,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [2,'9:30','11:30','معاملة غرف الرابش بالادوار (J,K,L)'],
+      [2,'12:30','1:30','مرور على المصائد البيولوجية (تنشيط)'],
+      [2,'2:30','4:00','مرور على المحطات الفخارية'],
+      [3,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [3,'9:30','11:30','معاملة غرف الرابش بالادوار (A,B,E,F)'],
+      [3,'12:30','1:30','معاملة بلاعات الصرف بالجراج'],
+      [3,'2:30','4:00','مرور على البيت ستيشن'],
+      [4,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [4,'9:30','11:30','معاملة غرف الرابش بالادوار (G,H,I)'],
+      [4,'12:30','1:30','مرور على المصائد البيولوجية (تنشيط)'],
+      [4,'2:30','4:00','معاملة مداخل العمائر ( حشرات زاحفة )'],
+      [5,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [5,'9:30','11:30','معاملة غرف الرابش بالادوار (J,K,L)'],
+      [5,'12:30','1:30','معاملة مداخل الاسانسيرات ( حشرات زاحفة )'],
+      [5,'2:30','4:00','مرور على المحطات الفخارية'],
+      [6,'8:00','9:00','مرور على طعوم غرف الميكانيكا ( قوارض )'],
+      [6,'9:30','11:30','معاملة غرف الرابش بالادوار ( I,J,K,L,A )'],
+      [6,'12:30','1:30','مرور على المصائد البيولوجية (تنشيط)'],
+      [6,'2:30','4:00','معاملة بلاعات الصرف بالجراج']
+    ],
+    evening: [
+      [0,'1:00','2:00','معاملة مداخل العمائر (حشرات زاحفة)'],
+      [0,'2:00','3:00','معاملة النافورة ( في حالة عدم تشغيلها )'],
+      [0,'4:00','5:30','مرور على البيت ستيشن'],
+      [0,'7:00','9:00','معاملة مداخل العمائر (حشرات طائرة)'],
+      [1,'6:00','7:00','معاملة غرف الرابش الرئيسية'],
+      [1,'7:30','8:30','معاملة مداخل الاسانسيرات ( حشرات زاحفة )'],
+      [1,'8:30','9:30','معاملة مداخل الجراج ( حشرات زاحفة )'],
+      [1,'9:30','10:30','مرور على المحطات الفخارية بالمناور'],
+      [2,'6:00','7:00','معاملة مداخل العمائر (حشرات زاحفة)'],
+      [2,'7:30','8:30','معاملة مداخل العمائر (حشرات طائرة)'],
+      [2,'8:30','9:30','تجديد طعوم القوارض بغرف الميكانيكا'],
+      [2,'9:30','10:30','معاملة مصادر المياه الراقدة بالجراج'],
+      [3,'6:00','7:00','معاملة غرف الرابش الرئيسية'],
+      [3,'7:30','8:30','معاملة مداخل الاسانسيرات ( حشرات زاحفة )'],
+      [3,'8:30','9:30','مرور على المحطات الفخارية بالمناور'],
+      [3,'9:30','10:30','معاملة مداخل العمائر ( حشرات طائرة )'],
+      [4,'6:00','7:00','معاملة النافورة ( في حالة عدم تشغيلها )'],
+      [4,'7:30','8:30','معاملة مصادر المياه الراقدة بالجراج'],
+      [4,'8:30','9:30','مرور على البيت ستيشن'],
+      [4,'9:30','10:30','معاملة بلاعات الصرف بالجراج'],
+      [5,'6:00','7:00','معاملة مداخل الجراج ( حشرات زاحفة )'],
+      [5,'7:30','8:30','معاملة مداخل العمائر ( حشرات طائرة )'],
+      [5,'8:30','9:30','مرور على المحطات الفخارية بالمناور'],
+      [5,'9:30','10:30','مرور على البيت ستيشن'],
+      [6,'6:00','7:00','معاملة مداخل العمائر ( حشرات طائرة )'],
+      [6,'7:30','8:30','معاملة النافورة ( في حالة عدم تشغيلها )'],
+      [6,'8:30','9:30','مرور على البيت ستيشن'],
+      [6,'9:30','10:30','معاملة مصادر المياه الراقدة بالجراج']
+    ]
+  }
+};
+
+Object.assign(S,{ pestSched:[], pestSchedDone:[], pestSchedPhase:'E1', pestSchedDate:null, pestSchedView:'day', pestSchedEdit:false, pestSchedLoaded:false, psDraft:null });
+let psLoading=false, psWarned=false;
+const PS_DAYS=['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+const PS_COLORS=['#5b9bd5','#92d050','#ffff00','#c55a11','#ff0000','#ffc000','#808080'];
+const PS_PHASE_LABEL={ E1:'المرحلة الأولى (E1)', E2:'المرحلة الثانية (E2)' };
+const PS_SHIFT_LABEL={ morning:'الشيفت الصباحي', evening:'الشيفت المسائي' };
+function psWeekdayOf(ds){ return (new Date(ds+'T00:00:00Z').getUTCDay()+1)%7; }   // السبت=0
+function psWeekRange(){ const wd=psWeekdayOf(S.today); const start=addDaysStr(S.today,-wd); return { start, end:addDaysStr(start,6) }; }
+function psTo24(t,shift){
+  const m=String(t).match(/^(\d{1,2}):(\d{2})$/); if(!m) return t;
+  let h=parseInt(m[1],10); const mi=m[2];
+  if(shift==='morning'){ if(h<8) h+=12; }      // الصباحي: 8-11 صباحًا، 12 ظهرًا، 1-7 بعد الظهر
+  else { if(h<12) h+=12; }                      // المسائي: كله بعد الظهر
+  return String(h).padStart(2,'0')+':'+mi;
+}
+function psBuildSeedRows(){
+  const rows=[];
+  ['E1','E2'].forEach(ph=>['morning','evening'].forEach(sh=>{
+    PS_SEED[ph][sh].forEach((r,i)=>{
+      rows.push({ id:'ps_'+ph+'_'+r[0]+'_'+sh[0]+'_'+i, phase:ph, weekday:r[0], shift:sh, start_time:psTo24(r[1],sh), end_time:psTo24(r[2],sh), task:r[3], position:i });
+    });
+  }));
+  return rows;
+}
+async function loadPestSched(){
+  const {start,end}=psWeekRange();
+  const [r,d]=await Promise.all([
+    sb.from('pest_schedule_rows').select('*').order('position'),
+    sb.from('pest_schedule_done').select('*').gte('date',start).lte('date',end)
+  ]);
+  if(r.error){ console.warn('pest_schedule_rows',r.error.message); if(!psWarned){ psWarned=true; toast('جداول جدول الآفات ناقصة — شغّل update_v18.sql',false); } S.pestSched=[]; S.pestSchedDone=[]; S.pestSchedLoaded=true; return; }
+  S.pestSched=r.data||[]; S.pestSchedDone=d.data||[]; S.pestSchedLoaded=true;
+}
+function psRowsFor(phase,wd,shift){
+  return (S.pestSched||[]).filter(r=>r.phase===phase && r.weekday===wd && r.shift===shift)
+    .sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)) || (a.position||0)-(b.position||0));
+}
+function psIsDone(rowId,date){ return (S.pestSchedDone||[]).find(d=>d.row_id===rowId && d.date===date) || null; }
+function psNowMinutes(){ const p=new Intl.DateTimeFormat('en-GB',{ timeZone:'Africa/Cairo', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date()); const g=t=>parseInt(p.find(x=>x.type===t).value,10); return (g('hour')%24)*60+g('minute'); }
+function psMin(t){ const m=String(t).match(/^(\d{1,2}):(\d{2})/); return m? parseInt(m[1],10)*60+parseInt(m[2],10) : 0; }
+function renderPestSched(){
+  const role=S.profile.role; const isMgr=role==='admin'||role==='opm';
+  if(!(isMgr||role==='pest_sv')) return '';
+  const title='<div class="section-title"><h2>جدول مكافحة الحشرات اليومي</h2></div>';
+  if(!S.pestSchedLoaded){
+    if(!psLoading){ psLoading=true; loadPestSched().then(()=>{ psLoading=false; render(); }); }
+    return title+'<div class="card"><p style="color:var(--text-dim);">جارٍ التحميل...</p></div>';
+  }
+  if(!(S.pestSched||[]).length){
+    return title+`<div class="card"><p style="font-size:13px;color:var(--text-dim);line-height:1.8;margin:0 0 10px;">الجدول الأسبوعي للمرحلتين لسه ما اتحمّلش.</p>${isMgr?'<button class="primary-btn" id="ps-seed">📥 تحميل جدول المرحلتين (E1 + E2)</button>':''}</div>`;
+  }
+  const phase=S.pestSchedPhase; const date=S.pestSchedDate||S.today; const wd=psWeekdayOf(date);
+  const canTick=(date===S.today)||isMgr;
+  const {start}=psWeekRange();
+  const toolbar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      ${['E1','E2'].map(p=>`<button class="${phase===p?'primary-btn':'ghost-btn'}" data-ps-phase="${p}">${PS_PHASE_LABEL[p]}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="${S.pestSchedView==='day'?'primary-btn':'ghost-btn'}" data-ps-view="day">اليوم</button>
+      <button class="${S.pestSchedView==='week'?'primary-btn':'ghost-btn'}" data-ps-view="week">الجدول الأسبوعي</button>
+      ${isMgr?`<button class="${S.pestSchedEdit?'primary-btn':'ghost-btn'}" id="ps-edit-toggle">✏️ تعديل الجدول</button>`:''}
+    </div>`;
+  let body='';
+  if(S.pestSchedView==='week'){
+    body=renderPestWeekTable(phase,isMgr);
+  } else {
+    const chips=PS_DAYS.map((nm,i)=>{ const ds=addDaysStr(start,i); const sel=ds===date; const isToday=ds===S.today;
+      return `<button class="${sel?'primary-btn':'ghost-btn'}" style="padding:6px 10px;font-size:12px;${isToday&&!sel?'border-color:var(--mint);':''}" data-ps-date="${ds}">${nm}${isToday?' •':''}</button>`; }).join('');
+    const all=['morning','evening'].flatMap(sh=>psRowsFor(phase,wd,sh));
+    const doneN=all.filter(r=>psIsDone(r.id,date)).length;
+    const nowMin=psNowMinutes();
+    body=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${chips}</div>
+      <div class="stat-row"><div class="stat mint"><div class="num">${doneN}/${all.length}</div><div class="lbl">${PS_DAYS[wd]} ${esc(date)} — اتنفّذ</div></div></div>
+      ${['morning','evening'].map(sh=>{
+        const rows=psRowsFor(phase,wd,sh); const d=rows.filter(r=>psIsDone(r.id,date)).length;
+        return `<div class="card" style="margin-bottom:12px;border-right:5px solid ${PS_COLORS[wd]};">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><b>${PS_SHIFT_LABEL[sh]}</b><span style="font-size:12.5px;color:var(--text-dim);">${d}/${rows.length}</span></div>
+          ${rows.length? rows.map(r=>{ const dn=psIsDone(r.id,date); const live=(date===S.today && psMin(r.start_time)<=nowMin && nowMin<psMin(r.end_time) && !dn);
+            return `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line);${dn?'opacity:.85;':''}">
+              ${canTick?`<button class="ghost-btn" style="min-width:40px;padding:6px 0;" data-ps-tick="${r.id}">${dn?'✅':'⬜'}</button>`:`<span style="min-width:40px;text-align:center;">${dn?'✅':'⬜'}</span>`}
+              <div style="flex:1;"><div style="font-size:13.5px;font-weight:700;line-height:1.7;">${esc(r.task)}</div>
+                <div style="font-size:12px;color:var(--text-dim);">${esc(fmt12(r.start_time,'-'))} – ${esc(fmt12(r.end_time,'-'))}${live?' <b style="color:var(--mint);">· دلوقتي</b>':''}${dn?` · ✅ ${esc(dn.done_by_name||'')} ${esc(wasteTime(dn.done_at))}`:''}</div></div>
+              ${S.pestSchedEdit&&isMgr?`<div style="display:flex;gap:4px;"><button class="ghost-btn" data-ps-edit="${r.id}">✏️</button><button class="ghost-btn danger" data-ps-del="${r.id}">${ICON.trash(14)}</button></div>`:''}
+            </div>`; }).join('') : '<div style="font-size:12.5px;color:var(--text-dim);margin-top:8px;">مفيش بنود في الشيفت ده.</div>'}
+          ${S.pestSchedEdit&&isMgr?`<button class="ghost-btn" style="margin-top:8px;" data-ps-add="${sh}|${wd}">➕ إضافة بند</button>`:''}
+        </div>`; }).join('')}`;
+  }
+  return title+`<div class="card" style="margin-bottom:14px;"><p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.8;">جدول أسبوعي بيتكرر كل أسبوع، منفصل تمامًا عن المهام المجدولة.</p>${toolbar}${body}</div>`;
+}
+function renderPestWeekTable(phase,isMgr){
+  const th='border:1px solid #999;padding:5px 7px;background:#eef3ec;font-size:12px;';
+  const td='border:1px solid #999;padding:5px 7px;font-size:12px;vertical-align:top;';
+  let html=`<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;min-width:640px;direction:rtl;text-align:right;"><thead><tr>
+    <th style="${th}">اليوم</th><th style="${th}">الوقت</th><th style="${th}">${PS_SHIFT_LABEL.morning}</th><th style="${th}">الوقت</th><th style="${th}">${PS_SHIFT_LABEL.evening}</th></tr></thead><tbody>`;
+  PS_DAYS.forEach((nm,wd)=>{
+    const m=psRowsFor(phase,wd,'morning'), e=psRowsFor(phase,wd,'evening'); const n=Math.max(m.length,e.length,1);
+    for(let i=0;i<n;i++){
+      const bg=`background:${PS_COLORS[wd]};color:${[2,5].includes(wd)?'#000':(wd===3||wd===4||wd===6?'#fff':'#000')};`;
+      const mr=m[i], er=e[i];
+      html+='<tr>'+(i===0?`<td rowspan="${n}" style="${td}${bg}font-weight:800;text-align:center;">${nm}</td>`:'')
+        +`<td style="${td}${bg}">${mr?esc(fmt12(mr.start_time,'-'))+' – '+esc(fmt12(mr.end_time,'-')):''}</td><td style="${td}${bg}">${mr?esc(mr.task):''}</td>`
+        +`<td style="${td}${bg}">${er?esc(fmt12(er.start_time,'-'))+' – '+esc(fmt12(er.end_time,'-')):''}</td><td style="${td}${bg}">${er?esc(er.task):''}</td></tr>`;
+    }
+  });
+  return html+'</tbody></table></div>';
+}
+function renderPsRowModal(){
+  const d=S.psDraft; if(!d) return '';
+  return modalWrap(d.id?'تعديل بند':'إضافة بند', `
+    <div class="form-row"><label>المرحلة</label><select id="ps-phase">${['E1','E2'].map(p=>`<option value="${p}" ${d.phase===p?'selected':''}>${PS_PHASE_LABEL[p]}</option>`).join('')}</select></div>
+    <div class="form-row"><label>اليوم</label><select id="ps-wd">${PS_DAYS.map((n,i)=>`<option value="${i}" ${d.weekday===i?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-row"><label>الشيفت</label><select id="ps-shift">${['morning','evening'].map(s=>`<option value="${s}" ${d.shift===s?'selected':''}>${PS_SHIFT_LABEL[s]}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div class="form-row"><label>من</label><input type="time" id="ps-start" value="${esc(d.start_time||'')}"></div><div class="form-row"><label>إلى</label><input type="time" id="ps-end" value="${esc(d.end_time||'')}"></div></div>
+    <div class="form-row"><label>البرنامج</label><textarea id="ps-task">${esc(d.task||'')}</textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ</button>`);
+}
+async function savePsRow(){
+  const g=id=>document.getElementById(id).value;
+  const d=S.psDraft; const task=g('ps-task').trim(), st=g('ps-start'), en=g('ps-end');
+  if(!task||!st||!en){ toast('اكتب البرنامج والوقت',false); return; }
+  const rec={ phase:g('ps-phase'), weekday:parseInt(g('ps-wd'),10), shift:g('ps-shift'), start_time:st, end_time:en, task };
+  let error;
+  if(d.id){ ({error}=await sb.from('pest_schedule_rows').update(rec).eq('id',d.id)); }
+  else { const pos=(S.pestSched||[]).filter(r=>r.phase===rec.phase&&r.weekday===rec.weekday&&r.shift===rec.shift).length; ({error}=await sb.from('pest_schedule_rows').insert([Object.assign({ id:uid('ps'), position:pos }, rec)])); }
+  if(error){ toast('حصل خطأ: '+error.message,false); return; }
+  S.modal=null; S.psDraft=null; await loadPestSched(); render(); toast('تم الحفظ',true);
+}
+async function psToggle(rowId){
+  const date=S.pestSchedDate||S.today; const ex=psIsDone(rowId,date);
+  let error;
+  if(ex){ ({error}=await sb.from('pest_schedule_done').delete().eq('row_id',rowId).eq('date',date)); }
+  else { const nm=(shownName(S.session.user.id)||S.profile.full_name||''); ({error}=await sb.from('pest_schedule_done').insert([{ row_id:rowId, date, done_by:S.session.user.id, done_by_name:nm }])); }
+  if(error){ toast('حصل خطأ: '+error.message,false); return; }
+  await loadPestSched(); render();
+}
+function bindPestSched(){
+  const seed=document.getElementById('ps-seed');
+  if(seed) seed.onclick=async ()=>{
+    seed.disabled=true; toast('جارٍ تحميل الجدول...',true);
+    const rows=psBuildSeedRows();
+    for(let i=0;i<rows.length;i+=40){ const {error}=await sb.from('pest_schedule_rows').upsert(rows.slice(i,i+40),{ onConflict:'id', ignoreDuplicates:true }); if(error){ toast('حصل خطأ: '+error.message,false); seed.disabled=false; return; } }
+    await loadPestSched(); render(); toast('تم تحميل جدول المرحلتين',true);
+  };
+  document.querySelectorAll('[data-ps-phase]').forEach(b=>b.onclick=()=>{ S.pestSchedPhase=b.dataset.psPhase; render(); });
+  document.querySelectorAll('[data-ps-view]').forEach(b=>b.onclick=()=>{ S.pestSchedView=b.dataset.psView; render(); });
+  document.querySelectorAll('[data-ps-date]').forEach(b=>b.onclick=()=>{ S.pestSchedDate=b.dataset.psDate; render(); });
+  document.querySelectorAll('[data-ps-tick]').forEach(b=>b.onclick=()=>psToggle(b.dataset.psTick));
+  const et=document.getElementById('ps-edit-toggle'); if(et) et.onclick=()=>{ S.pestSchedEdit=!S.pestSchedEdit; if(S.pestSchedEdit) S.pestSchedView='day'; render(); };
+  document.querySelectorAll('[data-ps-edit]').forEach(b=>b.onclick=()=>{ const r=(S.pestSched||[]).find(x=>x.id===b.dataset.psEdit); if(!r) return; S.psDraft=Object.assign({},r); S.modal={type:'psRow'}; render(); });
+  document.querySelectorAll('[data-ps-add]').forEach(b=>b.onclick=()=>{ const [sh,wd]=b.dataset.psAdd.split('|'); S.psDraft={ id:null, phase:S.pestSchedPhase, weekday:parseInt(wd,10), shift:sh, start_time:'', end_time:'', task:'' }; S.modal={type:'psRow'}; render(); });
+  document.querySelectorAll('[data-ps-del]').forEach(b=>b.onclick=async ()=>{
+    if(!confirm('تحذف البند ده من الجدول؟')) return;
+    const {error}=await sb.from('pest_schedule_rows').delete().eq('id',b.dataset.psDel);
+    if(error){ toast('حصل خطأ: '+error.message,false); return; }
+    await loadPestSched(); render(); toast('تم الحذف',true);
+  });
+}
+
 function renderZones(){
   const zones=S.hkZones||[];
   if(!zones.length) return `<div class="card"><h3 style="margin-top:0;">الزونات</h3><p style="font-size:13px;color:var(--text-dim);">لسه مفيش زونات متعرّفة.</p><button class="primary-btn" id="zn-seed">إنشاء الزونات من 1 لـ 7</button></div>`;
@@ -3585,6 +3878,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='violForm') return renderViolForm();
+  if(m.type==='psRow') return renderPsRowModal();
   if(m.type==='wasteReport') return renderWasteReportModal();
   if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><button class="primary-btn" id="dr-modal-mail">📧 افتح الإيميل مع التقرير مرفق</button><button class="ghost-btn" id="dr-modal-print">🖨 طباعة / حفظ PDF</button></div><div style="overflow-x:auto;">${m.html}</div>`, 'full');
   if(m.type==='viewPhoto') return modalWrap(m.title||'الصورة', `<div style="text-align:center;">
@@ -4277,6 +4571,7 @@ async function handleModalSave(){
     if(await dbUpdate('suppliers', m.id, patch)){ await loadSuppliers(); pendingPhoto=null; S.modal={type:'supplierDetail', id:m.id}; render(); toast('تم حفظ تعديل المورد',true); }
   }
   else if(m.type==='violForm'){ await saveViolation(); }
+  else if(m.type==='psRow'){ await savePsRow(); }
   else if(m.type==='addSupplier'){
     const name=document.getElementById('m-sup-name').value.trim();
     if(!name){ toast('اكتب اسم المورد',false); return; }
