@@ -198,6 +198,10 @@ img,canvas,svg{max-width:100%;}
   .modal-body{padding:6px 16px calc(20px + env(safe-area-inset-bottom));}
 }
 
+/* form grids: fields must shrink inside their column (3-column rows were overflowing on phones) */
+.form-row{min-width:0;}
+.form-row input,.form-row select,.form-row textarea{width:100%;min-width:0;}
+
 /* ===== QR login ===== */
 .qr-or{display:flex;align-items:center;gap:10px;margin:14px 0 10px;color:var(--text-dim);font-size:12px;}
 .qr-or:before,.qr-or:after{content:'';flex:1;height:1px;background:var(--line);}
@@ -333,6 +337,137 @@ select.st-scheduled,select.st-pending{background:#FDF1D8 !important;color:#9A620
 select.st-in_progress{background:#E3EEFF !important;color:#1B55C4 !important;border-color:#3B7BE6 !important;}
 select.st-completed,select.st-done{background:#E1F5E6 !important;color:#17803A !important;border-color:#3FAE5E !important;}
 select.st-postponed{background:#FDE6E3 !important;color:#C2352A !important;border-color:#E2574B !important;}
+
+/* ===================================================================
+   GLASS THEME (visionOS style) — active when <body class="glass">
+   Toggle: ✨ button in the top bar (saved in localStorage "zw_glass")
+   =================================================================== */
+body.glass{
+  --glass-bg:rgba(255,255,255,.46);
+  --glass-bg-strong:rgba(255,255,255,.68);
+  --glass-border:rgba(255,255,255,.66);
+  --glass-shadow:0 14px 36px rgba(72,46,22,.14), inset 0 1px 0 rgba(255,255,255,.75);
+  --glass-blur:blur(22px) saturate(1.5);
+  --accent:#E8603C; --accent-2:#FF9A6C;
+  --charcoal:#27231F;
+}
+/* ambient background: the project photo, heavily blurred + warm light */
+body.glass:not(.on-login)::before{opacity:1 !important;filter:blur(34px) saturate(1.2);transform:scale(1.2);}
+body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 50% at 12% 8%,rgba(255,176,120,.42),transparent 62%),
+             radial-gradient(55% 45% at 92% 88%,rgba(255,118,86,.26),transparent 62%),
+             linear-gradient(180deg,rgba(248,238,228,.62),rgba(233,214,196,.62));}
+
+/* top bar = floating pill */
+body.glass .topbar{margin:12px 14px 0;top:10px;border-radius:999px;padding:9px 18px;border:1px solid rgba(255,255,255,.3);
+  background:rgba(36,30,26,.5);-webkit-backdrop-filter:blur(26px) saturate(1.6);backdrop-filter:blur(26px) saturate(1.6);
+  box-shadow:0 14px 34px rgba(40,24,10,.28), inset 0 1px 0 rgba(255,255,255,.32);}
+body.glass .tb-menu{border-radius:50%;background:rgba(255,255,255,.22);}
+body.glass .topbar #refresh-btn,body.glass .topbar #bell-btn,body.glass .topbar #glass-btn{border-radius:50% !important;background:rgba(255,255,255,.2) !important;color:#fff !important;width:34px !important;height:34px !important;}
+body.glass .role-badge{background:rgba(255,255,255,.22);}
+
+/* glass surfaces */
+body.glass .card,body.glass .stat,body.glass .tbl-wrap,body.glass .toolbar,body.glass .sidebar{
+  background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);border-radius:26px;}
+body.glass .card .card,body.glass .card .stat,body.glass .card .toolbar,body.glass .tbl-wrap .card,body.glass details.card .card{
+  -webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.36);box-shadow:none;border-radius:18px;}
+body.glass .stat:before{display:none;}
+body.glass .service-card:hover{border-color:#fff;box-shadow:0 18px 40px rgba(72,46,22,.2), inset 0 1px 0 #fff;}
+body.glass .section-title h2,body.glass .modal-head h3,body.glass .gate-card h2{color:var(--charcoal);}
+
+/* sidebar (desktop) */
+body.glass .sidebar{top:92px;}
+body.glass .sidebar button{border-radius:16px;}
+body.glass .sidebar button.active{background:rgba(39,35,31,.9);box-shadow:0 6px 16px rgba(39,35,31,.28);color:#fff;}
+body.glass .sidebar button:not(.active):hover{background:rgba(255,255,255,.55);color:var(--charcoal);}
+
+/* buttons = pills */
+body.glass .primary-btn{border-radius:999px;background:rgba(39,35,31,.92);box-shadow:0 8px 20px rgba(39,35,31,.28), inset 0 1px 0 rgba(255,255,255,.18);}
+body.glass .primary-btn:hover{background:#000;}
+body.glass .primary-btn:disabled{background:rgba(120,110,100,.45);}
+body.glass .ghost-btn{border-radius:999px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.75);color:var(--charcoal);}
+body.glass .ghost-btn:hover{background:rgba(255,255,255,.8);border-color:#fff;color:var(--charcoal);}
+body.glass .ghost-btn.danger:hover{color:var(--coral);}
+body.glass .pill,body.glass .tabs button,body.glass .mobile-tabs button{border-radius:999px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.75);}
+body.glass .pill.active,body.glass .tabs button.active,body.glass .mobile-tabs button.active{background:rgba(39,35,31,.9);border-color:transparent;color:#fff;}
+body.glass .mobile-tabs{background:transparent;border-bottom:none;}
+body.glass .mobile-tab-select{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:18px;}
+
+/* inputs */
+body.glass .form-row input,body.glass .form-row select,body.glass .form-row textarea,body.glass .fgroup input,body.glass .fgroup select,
+body.glass td select:not(.st-sel),body.glass .tbl-wrap select:not(.st-sel),body.glass .toolbar input,body.glass .toolbar select{
+  background:rgba(255,255,255,.58);border:1px solid rgba(255,255,255,.8);border-radius:14px;}
+body.glass input:focus,body.glass select:focus,body.glass textarea:focus{border-color:var(--accent) !important;box-shadow:0 0 0 3px rgba(232,96,60,.2);}
+
+/* tables */
+body.glass th{background:rgba(255,255,255,.4);color:var(--charcoal);border-bottom:1px solid rgba(255,255,255,.7);}
+body.glass td{border-bottom:1px solid rgba(39,35,31,.07);}
+body.glass tbody tr:hover td{background:rgba(255,255,255,.4);}
+body.glass td:first-child{background:rgba(255,255,255,.82);}
+
+/* progress = coral like the video */
+body.glass .svc-bar{background:rgba(255,255,255,.55);}
+body.glass .svc-bar>div{background:linear-gradient(90deg,var(--accent-2),var(--accent));}
+body.glass .svc-chip{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);border-radius:16px;}
+body.glass .svc-chip.done{background:rgba(255,255,255,.85);border-color:var(--accent);}
+
+/* modals & drawer */
+body.glass .modal-bg{background:rgba(48,32,20,.3);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
+body.glass .modal{background:var(--glass-bg-strong);-webkit-backdrop-filter:blur(34px) saturate(1.5);backdrop-filter:blur(34px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.75);border-radius:30px;box-shadow:0 30px 80px rgba(40,24,10,.32), inset 0 1px 0 #fff;}
+body.glass .modal-head{background:transparent;}
+body.glass .modal-head .close{border-radius:50%;background:rgba(255,255,255,.7);}
+body.glass .drawer-bg{background:rgba(48,32,20,.3);}
+body.glass .drawer{background:var(--glass-bg-strong);-webkit-backdrop-filter:blur(34px) saturate(1.5);backdrop-filter:blur(34px) saturate(1.5);border-left:1px solid rgba(255,255,255,.7);}
+body.glass .drawer-head{background:rgba(36,30,26,.72);}
+body.glass .drawer-list button.active{background:rgba(39,35,31,.9);color:#fff;}
+body.glass .toast{background:rgba(36,30,26,.82);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-radius:999px;}
+body.glass .toast.ok{background:rgba(24,120,70,.85);}
+
+/* mobile: floating bottom bar like the video */
+@media(max-width:820px){
+  body.glass .topbar{margin:calc(8px + env(safe-area-inset-top)) 10px 0;top:calc(6px + env(safe-area-inset-top));padding:7px 12px;}
+  body.glass .bottom-nav{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));padding:6px;border-radius:32px;
+    background:var(--glass-bg-strong);-webkit-backdrop-filter:blur(28px) saturate(1.6);backdrop-filter:blur(28px) saturate(1.6);
+    border:1px solid rgba(255,255,255,.8);box-shadow:0 16px 40px rgba(72,46,22,.22), inset 0 1px 0 #fff;}
+  body.glass .bottom-nav button{border-radius:24px;}
+  body.glass .bottom-nav button.active{background:rgba(255,255,255,.95);color:var(--charcoal);box-shadow:0 6px 16px rgba(72,46,22,.2);}
+  body.glass .shell{padding-bottom:calc(112px + env(safe-area-inset-bottom)) !important;}
+  body.glass .card,body.glass .stat{border-radius:24px;}
+}
+@media(max-width:640px){
+  body.glass .modal,body.glass .modal.wide,body.glass .modal.full{border-radius:30px 30px 0 0;}
+  body.glass .modal-head{background:rgba(255,255,255,.35);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);}
+  body.glass table.rtable tr{background:var(--glass-bg);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--glass-border);border-radius:22px;box-shadow:var(--glass-shadow);}
+  body.glass table.rtable td:first-child{background:rgba(255,255,255,.55) !important;border-radius:20px 20px 0 0;}
+}
+
+/* login card */
+body.glass.on-login #app > div > div[style*="max-width:390px"]{background:rgba(255,255,255,.5) !important;border:1px solid rgba(255,255,255,.75) !important;
+  -webkit-backdrop-filter:blur(30px) saturate(1.5);backdrop-filter:blur(30px) saturate(1.5);border-radius:30px !important;box-shadow:0 30px 80px rgba(0,0,0,.35), inset 0 1px 0 #fff !important;}
+
+/* inline-gradient cards (home search) = dark glass so their white text stays readable */
+body.glass .card[style*="linear-gradient"]{background:rgba(36,30,26,.55) !important;border-color:rgba(255,255,255,.3) !important;}
+body.glass .card[style*="linear-gradient"] input{background:rgba(255,255,255,.92);}
+@media(max-width:820px){ body.glass .topbar #glass-btn{display:none !important;} body.glass .tb-date{display:none;}
+  body.glass .topbar{gap:6px;margin-left:8px;margin-right:8px;padding:7px 10px;}
+  body.glass .topbar .brand{min-width:0;overflow:hidden;gap:6px;}
+  body.glass .brand-text .t1{font-size:12px;letter-spacing:0;}
+  @media(max-width:430px){ body.glass .brand-text{display:none;} }
+  body.glass .role-badge{max-width:78px;font-size:10.5px;padding:4px 8px;}
+  body.glass .tb-right{gap:5px !important;}
+  body.glass .topbar #refresh-btn,body.glass .topbar #bell-btn{width:30px !important;height:30px !important;}
+}
+
+/* graceful fallback */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  body.glass .card,body.glass .stat,body.glass .tbl-wrap,body.glass .toolbar,body.glass .sidebar,body.glass .modal,body.glass .drawer,body.glass .bottom-nav{background:rgba(255,255,255,.92);}
+  body.glass .topbar{background:rgba(36,30,26,.94);}
+}
+@media(prefers-reduced-transparency:reduce){
+  body.glass .card,body.glass .stat,body.glass .tbl-wrap,body.glass .toolbar,body.glass .sidebar,body.glass .modal,body.glass .drawer,body.glass .bottom-nav{background:rgba(255,255,255,.94);-webkit-backdrop-filter:none;backdrop-filter:none;}
+}
 </style>
 </head>
 <body>
@@ -755,6 +890,7 @@ function tabsForRole(role){
 function render(){
   const app=document.getElementById('app');
   document.body.classList.toggle('on-login', !S.session);
+  document.body.classList.toggle('glass', glassOn);
   if(configMissing()){
     app.innerHTML = `<div class="card" style="max-width:480px;margin:60px auto;text-align:center;">
       <h2>التطبيق يحتاج إعداد</h2><p>ضع مفاتيح Supabase في أعلى الكود.</p></div>`;
@@ -818,6 +954,7 @@ function bindAuthEvents(){
   if(S.authScan && document.getElementById('auth-scan-stage')) startAuthScanner();
 }
 
+let glassOn = (()=>{ try{ return localStorage.getItem('zw_glass')!=='0'; }catch(e){ return true; } })();
 function renderTopbar(){
   const unread = S.notifications.filter(n=>!n.read).length;
   return `<div class="topbar" style="position:relative;">
@@ -828,6 +965,7 @@ function renderTopbar(){
     </div>
     <div class="tb-date" style="font-size:12px;color:#BCD6F4;">${ICON.clock(13)} ${fmtDate(S.today)}</div>
     <div class="tb-right" style="display:flex;align-items:center;gap:10px;position:relative;">
+      <button id="glass-btn" title="المظهر الزجاجي" style="border:none;background:rgba(255,255,255,.08);color:#C6D9F0;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;">✨</button>
       <button id="refresh-btn" title="تحديث البيانات" style="border:none;background:rgba(255,255,255,.08);color:#C6D9F0;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
       </button>
@@ -875,6 +1013,9 @@ function bindGlobalEvents(){
     S.modal={ type:'viewPhoto', src, title: k==='inv'?'صورة الفاتورة':'إثبات الدفع', back:(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null };
     render();
   });
+  const toggleGlass=()=>{ glassOn=!glassOn; try{ localStorage.setItem('zw_glass',glassOn?'1':'0'); }catch(e){} document.body.classList.toggle('glass',glassOn); const dg=document.getElementById('drawer-glass'); if(dg) dg.textContent='✨ المظهر الزجاجي: '+(glassOn?'شغّال':'مقفول'); };
+  const gb=document.getElementById('glass-btn'); if(gb) gb.onclick=toggleGlass;
+  const dgb=document.getElementById('drawer-glass'); if(dgb) dgb.onclick=toggleGlass;
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
   const bb=document.getElementById('bell-btn'); if(bb) bb.onclick=(e)=>{
     e.stopPropagation();
@@ -5014,7 +5155,7 @@ function renderDrawer(tabs){
   <aside class="drawer" id="drawer">
     <div class="drawer-head"><div><div style="font-weight:900;font-size:15px;">${esc(S.profile.full_name||'')}</div><div style="font-size:12px;opacity:.85;margin-top:2px;">${esc(ROLE_LABEL[S.profile.role]||'')}</div></div><button id="drawer-close" class="tb-menu" style="display:inline-flex;">✕</button></div>
     <div class="drawer-list">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(label)}</span></button>`).join('')}</div>
-    <div class="drawer-foot"><button class="ghost-btn danger" id="drawer-logout" style="width:100%;justify-content:center;">تسجيل الخروج</button></div>
+    <div class="drawer-foot"><button class="ghost-btn" id="drawer-glass" style="width:100%;justify-content:center;margin-bottom:8px;">✨ المظهر الزجاجي: ${glassOn?'شغّال':'مقفول'}</button><button class="ghost-btn danger" id="drawer-logout" style="width:100%;justify-content:center;">تسجيل الخروج</button></div>
   </aside>`;
 }
 function bindMobileNav(){
