@@ -1078,7 +1078,7 @@ function bindTabEvents(){
     case 'urgent': bindUrgent(); break;
     case 'emergency': bindEmergency(); break;
     case 'qrsheet': bindQrSheet(); break;
-    case 'attendance': bindAttendance(); break;
+    case 'attendance': bindAttendance(); bindMpSection(); break;
     case 'distribution': bindDistribution(); break;
     case 'complaints': bindComplaints(); break;
     case 'suppliers': bindSuppliers(); break;
@@ -2059,6 +2059,7 @@ function renderAttendance(){
   </div>` : '';
   return `
   ${pendingHtml}
+  ${isApprover?renderMpSection():''}
   ${canRecord?`  <div class="card" style="margin-bottom:18px;">
     <h3 style="margin-top:0;font-size:14px;">تسجيل حضور جديد</h3>
     <p style="font-size:12px;color:var(--text-dim);margin:-4px 0 10px;line-height:1.7;">الحضور بيتسجّل مرة واحدة بس لكل وردية في اليوم. أي تعديل بعد كده بيتطلب موافقة الإدارة أو OPM.</p>
@@ -3302,6 +3303,113 @@ function bindPestSched(){
   });
 }
 
+
+/* ============================= MANPOWER SHORTAGE (عجز العمالة) ============================= */
+Object.assign(S,{ mpSettings:{}, mpLoaded:false, mpMonth:null, mpReturn:null });
+let mpLoading=false, mpWarned=false;
+const MP_ROLES=[['manager','مدير موقع','site_manager_count'],['senior','مشرف أول','senior_supervisor_count'],['supervisor','مشرف','supervisor_count'],['worker','عامل','worker_count']];
+const MP_PHASES=[['P1','المرحلة الأولى'],['P2','المرحلة الثانية']];
+const MP_SHIFTS=[['morning','الصباحية'],['evening','المسائية']];
+const MP_DEF_RATES={ manager:1012, senior:730, supervisor:644, worker:541 };
+const MP_DEF_REQ={ morning:{ manager:0, senior:1, supervisor:9, worker:40 }, evening:{ manager:0, senior:1, supervisor:2, worker:15 } };
+const mpEgp=n=>Number(Math.round(n||0)).toLocaleString('en-US')+' ج.م';
+function mpVal(key,def){ const v=(S.mpSettings||{})[key]; return (v===undefined||v===null||v==='')? def : Number(v); }
+function mpRate(r){ return mpVal('rate_'+r, MP_DEF_RATES[r]); }
+function mpReq(ph,sh,r){ return mpVal('req_'+ph+'_'+sh+'_'+r, MP_DEF_REQ[sh][r]); }
+async function loadMpSettings(){
+  const {data,error}=await sb.from('manpower_settings').select('*');
+  if(error){ console.warn('manpower_settings',error.message); if(!mpWarned){ mpWarned=true; toast('جدول إعدادات العقد ناقص — شغّل update_v19.sql (الحساب شغّال بالأرقام الافتراضية)',false); } S.mpSettings={}; S.mpLoaded=true; return; }
+  const m={}; (data||[]).forEach(r=>{ m[r.key]=r.value; }); S.mpSettings=m; S.mpLoaded=true;
+}
+function mpCompute(month){
+  const [y,mo]=month.split('-').map(Number); const dim=new Date(Date.UTC(y,mo,0)).getUTCDate();
+  const recs=S.attendance||[]; const res={};
+  const findRec=(date,label,sh)=>{ const c=recs.filter(a=>a.date===date && a.phase===label && a.shift===sh); return c.length? c[c.length-1] : null; };
+  MP_PHASES.forEach(([ph,label])=>{
+    const P={ ph, label, rows:{}, days:[], reqVal:0, shortVal:0, shortHeads:0, daysCounted:0, missingShifts:0 };
+    MP_SHIFTS.forEach(([sh])=>MP_ROLES.forEach(([r])=>{ P.rows[sh+'_'+r]={ sh, r, days:0, req:0, act:0, short:0, rate:mpRate(r), amount:0 }; }));
+    for(let d=1; d<=dim; d++){
+      const date=month+'-'+String(d).padStart(2,'0'); if(date>S.today) break;
+      MP_SHIFTS.forEach(([sh])=>{
+        const rec=findRec(date,label,sh); if(date===S.today && !rec) return;
+        P.daysCounted++; if(!rec) P.missingShifts++;
+        const roles=[]; let dayAmt=0, dayShort=0;
+        MP_ROLES.forEach(([r,,col])=>{
+          const req=mpReq(ph,sh,r); const act=rec? (+rec[col]||0) : 0; const short=Math.max(0,req-act); const rate=mpRate(r);
+          const row=P.rows[sh+'_'+r]; row.days++; row.req+=req; row.act+=act; row.short+=short; row.amount+=short*rate;
+          roles.push({ r, req, act, short, amount:short*rate }); dayAmt+=short*rate; dayShort+=short; P.reqVal+=req*rate;
+        });
+        P.shortVal+=dayAmt; P.shortHeads+=dayShort;
+        if(dayShort>0) P.days.push({ date, sh, missing:!rec, roles, amount:dayAmt });
+      });
+    }
+    res[ph]=P;
+  });
+  return res;
+}
+function renderMpSection(){
+  if(!S.mpLoaded){
+    if(!mpLoading){ mpLoading=true; Promise.all([loadMpSettings(), loadAttendance()]).then(()=>{ mpLoading=false; render(); }); }
+    return '<div class="card" style="margin-bottom:14px;"><p style="color:var(--text-dim);margin:0;">جارٍ تحميل عجز العمالة...</p></div>';
+  }
+  const month=S.mpMonth||S.today.slice(0,7); const data=mpCompute(month);
+  const roleLbl=Object.fromEntries(MP_ROLES.map(x=>[x[0],x[1]])); const shLbl=Object.fromEntries(MP_SHIFTS);
+  const totalReq=MP_PHASES.reduce((n,[ph])=>n+data[ph].reqVal,0), totalShort=MP_PHASES.reduce((n,[ph])=>n+data[ph].shortVal,0);
+  const th='padding:5px 6px;font-size:11.5px;text-align:right;white-space:nowrap;'; const td='padding:5px 6px;font-size:12px;text-align:right;white-space:nowrap;';
+  const phaseBox=P=>{
+    const rows=Object.values(P.rows).filter(r=>r.req>0 || r.act>0);
+    const tot=rows.reduce((a,r)=>({ req:a.req+r.req*r.rate, short:a.short+r.short*r.rate, shortH:a.shortH+r.short }),{ req:0, short:0, shortH:0 });
+    const pct=tot.req? Math.round(tot.short*1000/tot.req)/10 : 0;
+    return `<div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><h3 style="margin:0;font-size:15px;">${P.label}</h3><span style="font-size:12px;color:var(--text-dim);">${P.daysCounted} وردية محسوبة${P.missingShifts?` · <b style="color:var(--coral);">${P.missingShifts} وردية من غير تسجيل حضور</b>`:''}</span></div>
+      <div class="stat-row" style="margin-top:10px;"><div class="stat mint"><div class="num" style="font-size:17px;">${mpEgp(tot.req-tot.short)}</div><div class="lbl">اليوميات المنفّذة</div></div>
+        <div class="stat coral"><div class="num" style="font-size:17px;">${mpEgp(tot.short)}</div><div class="lbl">الخصم (${pct}% من المطلوب ${mpEgp(tot.req)})</div></div></div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:var(--sand);">
+        <th style="${th}">الوردية</th><th style="${th}">الفئة</th><th style="${th}">المطلوب/يوم</th><th style="${th}">أيام</th><th style="${th}">المطلوب (يوم عمل)</th><th style="${th}">الحاضر</th><th style="${th}">العجز</th><th style="${th}">اليومية</th><th style="${th}">الخصم</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr style="border-top:1px solid var(--line);"><td style="${td}">${shLbl[r.sh]}</td><td style="${td}"><b>${roleLbl[r.r]}</b></td><td style="${td}">${r.days?r.req/r.days:mpReq(P.ph,r.sh,r.r)}</td><td style="${td}">${r.days}</td><td style="${td}">${r.req}</td><td style="${td}">${r.act}</td><td style="${td}color:${r.short?'var(--coral)':'inherit'};font-weight:${r.short?800:400};">${r.short}</td><td style="${td}">${Number(r.rate).toLocaleString('en-US')}</td><td style="${td}font-weight:800;color:${r.amount?'var(--coral)':'inherit'};">${mpEgp(r.amount)}</td></tr>`).join('')}
+        <tr style="border-top:2px solid var(--line);background:var(--sand);"><td style="${td}" colspan="6"><b>الإجمالي</b></td><td style="${td}"><b>${tot.shortH}</b></td><td style="${td}"></td><td style="${td}font-weight:800;color:var(--coral);">${mpEgp(tot.short)}</td></tr>
+      </tbody></table></div>
+      <details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">تفاصيل الغياب يوم بيوم (${P.days.length} وردية فيها عجز)</summary>
+        ${P.days.length? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead><tr style="background:var(--sand);"><th style="${th}">التاريخ</th><th style="${th}">الوردية</th><th style="${th}">التفاصيل (حاضر / مطلوب)</th><th style="${th}">الخصم</th></tr></thead><tbody>
+          ${P.days.map(d=>`<tr style="border-top:1px solid var(--line);"><td style="${td}">${esc(d.date)}</td><td style="${td}">${shLbl[d.sh]}</td><td style="${td}white-space:normal;line-height:1.7;">${d.missing?'<b style="color:var(--coral);">لم يُسجَّل حضور — محسوب كله غياب</b><br>':''}${d.roles.filter(x=>x.req>0).map(x=>`${roleLbl[x.r]}: ${x.act}/${x.req}${x.short?` <b style="color:var(--coral);">(-${x.short})</b>`:''}`).join(' · ')}</td><td style="${td}font-weight:800;color:var(--coral);">${mpEgp(d.amount)}</td></tr>`).join('')}
+        </tbody></table></div>` : '<p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">مفيش عجز في الشهر ده.</p>'}
+      </details>
+    </div>`;
+  };
+  return `<div style="margin-bottom:18px;">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;font-size:15px;">عجز العمالة (Manpower)</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="month" id="mp-month" value="${esc(month)}" style="max-width:160px;"><button class="ghost-btn" data-mp-settings="1">⚙️ تعديل أعداد العقد والأسعار</button></div>
+    </div>
+    <div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div><div style="font-size:12px;color:var(--text-dim);">إجمالي الخصم (المرحلتين)</div><div style="font-size:22px;font-weight:800;color:var(--coral);">${mpEgp(totalShort)}</div></div>
+      <div><div style="font-size:12px;color:var(--text-dim);">إجمالي اليوميات المطلوبة</div><div style="font-size:22px;font-weight:800;">${mpEgp(totalReq)}</div></div></div>
+      <p style="font-size:11.5px;color:var(--text-dim);margin:8px 0 0;line-height:1.8;">الحساب على أعداد العقد والأسعار الحالية، وأي تغيير فيهم بيتطبّق على الشهر كله. اليوم اللي مفيهوش تسجيل حضور بيتحسب كله غياب (إلا النهارده لحد ما يتسجّل). العدد الزايد عن المطلوب مبيتخصمش من العجز.</p></div>
+    ${MP_PHASES.map(([ph])=>phaseBox(data[ph])).join('')}
+  </div>`;
+}
+function renderMpSettingsModal(){
+  const inp=(key,val)=>`<input type="number" min="0" step="any" data-mp-key="${key}" value="${val}" style="width:100%;">`;
+  return modalWrap('أعداد العقد والأسعار', `
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;line-height:1.8;">الأعداد المطلوبة يوميًا لكل مرحلة ووردية، واليومية لكل فئة. أي تعديل بيتطبّق على حسابات الشهر كله.</p>
+    <h4 style="margin:10px 0 6px;font-size:13.5px;">اليومية (ج.م)</h4>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">${MP_ROLES.map(([r,l])=>`<div class="form-row"><label>${l}</label>${inp('rate_'+r,mpRate(r))}</div>`).join('')}</div>
+    ${MP_PHASES.map(([ph,label])=>MP_SHIFTS.map(([sh,shl])=>`
+      <h4 style="margin:14px 0 6px;font-size:13.5px;">${label} — الوردية ${shl} (المطلوب يوميًا)</h4>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">${MP_ROLES.map(([r,l])=>`<div class="form-row"><label>${l}</label>${inp('req_'+ph+'_'+sh+'_'+r,mpReq(ph,sh,r))}</div>`).join('')}</div>`).join('')).join('')}
+    <button class="primary-btn" style="width:100%;justify-content:center;margin-top:12px;" id="m-save">${ICON.check(14)} حفظ</button>`, 'wide');
+}
+async function saveMpSettings(){
+  const rows=[]; document.querySelectorAll('[data-mp-key]').forEach(i=>{ const v=parseFloat(i.value); rows.push({ key:i.dataset.mpKey, value:isNaN(v)||v<0?0:v, updated_by:S.session.user.id, updated_at:new Date().toISOString() }); });
+  const {error}=await sb.from('manpower_settings').upsert(rows,{ onConflict:'key' });
+  if(error){ toast('حصل خطأ: '+error.message,false); return; }
+  await loadMpSettings(); S.modal=S.mpReturn||null; S.mpReturn=null; render(); toast('تم حفظ أعداد العقد والأسعار',true);
+}
+function bindMpSection(){
+  const mm=document.getElementById('mp-month'); if(mm) mm.onchange=()=>{ if(mm.value){ S.mpMonth=mm.value; render(); } };
+  document.querySelectorAll('[data-mp-settings]').forEach(b=>b.onclick=()=>{ S.mpReturn=(S.modal&&S.modal.type==='supplierDetail')? S.modal : null; S.modal={ type:'mpSettings' }; render(); });
+}
+
 function renderZones(){
   const zones=S.hkZones||[];
   if(!zones.length) return `<div class="card"><h3 style="margin-top:0;">الزونات</h3><p style="font-size:13px;color:var(--text-dim);">لسه مفيش زونات متعرّفة.</p><button class="primary-btn" id="zn-seed">إنشاء الزونات من 1 لـ 7</button></div>`;
@@ -4019,6 +4127,7 @@ function renderModal(){
     <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">${ICON.trash(14)} حذف نهائيًا</button>`);
   }
   if(m.type==='violForm') return renderViolForm();
+  if(m.type==='mpSettings') return renderMpSettingsModal();
   if(m.type==='psRow') return renderPsRowModal();
   if(m.type==='wasteReport') return renderWasteReportModal();
   if(m.type==='dailyReportView') return modalWrap(m.title||'التقرير', `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><button class="primary-btn" id="dr-modal-mail">📧 افتح الإيميل مع التقرير مرفق</button><button class="ghost-btn" id="dr-modal-print">🖨 طباعة / حفظ PDF</button></div><div style="overflow-x:auto;">${m.html}</div>`, 'full');
@@ -4281,10 +4390,12 @@ function renderModal(){
         ${tabBtn('overview','نظرة عامة')}
         ${tabBtn('kpi','تقييم الأداء (KPI)')}
         ${tabBtn('invoices','الفواتير')}
+        ${s.category==='housekeeping'?tabBtn('manpower','عجز العمالة'):''}
       </div>
       ${activeTab==='overview'? overviewHtml : ''}
       ${activeTab==='kpi'? kpiFormHtml + kpiListHtml : ''}
       ${activeTab==='invoices'? invFormHtml + invListHtml : ''}
+      ${(activeTab==='manpower' && s.category==='housekeeping')? renderMpSection() : ''}
     `, 'full');
   }
   if(m.type==='editKpi'){
@@ -4356,6 +4467,7 @@ function bindModalEvents(){
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
+  if(S.modal && S.modal.type==='supplierDetail') bindMpSection();
   if(S.modal && S.modal.type==='wasteReport') bindWasteReport();
   if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
   const saveBtn=document.getElementById('m-save');
@@ -4712,6 +4824,7 @@ async function handleModalSave(){
     if(await dbUpdate('suppliers', m.id, patch)){ await loadSuppliers(); pendingPhoto=null; S.modal={type:'supplierDetail', id:m.id}; render(); toast('تم حفظ تعديل المورد',true); }
   }
   else if(m.type==='violForm'){ await saveViolation(); }
+  else if(m.type==='mpSettings'){ await saveMpSettings(); }
   else if(m.type==='psRow'){ await savePsRow(); }
   else if(m.type==='addSupplier'){
     const name=document.getElementById('m-sup-name').value.trim();
