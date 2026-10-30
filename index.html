@@ -1348,8 +1348,21 @@ function renderOrders(){
       <div style="display:flex;gap:6px;"><button class="primary-btn" data-ord-approve="${o.id}">${ICON.check(13)} موافقة</button><button class="ghost-btn danger" data-ord-reject="${o.id}">رفض</button></div>
     </div>`).join('')}
   </div>` : '';
+  let sumCardsHtml='';
+  if(isApprover){
+    const real=list.filter(o=>orderApproved(o));
+    const amt=o=>+o.price||0; const sum=a=>a.reduce((t,o)=>t+amt(o),0); const fmtM=n=>n.toLocaleString('en-US')+' ج.م';
+    const paidL=real.filter(o=>o.payment_status==='paid'), unpaidL=real.filter(o=>o.payment_status!=='paid');
+    sumCardsHtml=`<div class="stat-row" style="margin-bottom:14px;">
+      <div class="stat ink"><div class="num">${real.length}</div><div class="lbl">إجمالي الأوردرات</div></div>
+      <div class="stat blue"><div class="num" style="font-size:19px;">${fmtM(sum(real))}</div><div class="lbl">إجمالي المبالغ</div></div>
+      <div class="stat mint"><div class="num" style="font-size:19px;">${fmtM(sum(paidL))}</div><div class="lbl">المدفوع (${paidL.length} أوردر)</div></div>
+      <div class="stat coral"><div class="num" style="font-size:19px;">${fmtM(sum(unpaidL))}</div><div class="lbl">غير المدفوع (${unpaidL.length} أوردر)</div></div>
+    </div>`;
+  }
   return `
   ${pendingHtml}
+  ${sumCardsHtml}
   <div class="toolbar">
     ${todayOnly? '<span style="font-size:13px;font-weight:800;">أوردرات اليوم فقط</span>' : `<div class="fgroup"><label>فلتر بالتاريخ</label><input type="date" id="ord-date" value="${S.ordersDate}"></div>
     <button class="ghost-btn" id="ord-clear">مسح الفلتر</button>`}
@@ -1864,6 +1877,7 @@ function taskMissed(l,run){
   if(run.date && run.date<S.today) return true;
   return !!l.close_time && taskWindowState(l).state==='closed';
 }
+function canOverrideClosed(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='opm'; }
 const MISSED_BADGE='<span class="badge postponed"><span class="dot"></span>⛔ أُغلقت قبل الإنجاز</span>';
 function taskRunBadge(run){
   if(!run) return '<span class="badge pending"><span class="dot"></span>قيد التجهيز</span>';
@@ -1997,7 +2011,7 @@ function renderSupTaskLists(shift){
     const w=taskWindowState(l); const winOpen = w.state==='open';
     const z=zoneOfList(l.id);
     const rejected = run.review_status==='rejected' && !run.supervisor_marked_done && !locked;
-    const frozen = locked || !winOpen;
+    const frozen = locked || (!winOpen && !canOverrideClosed());
     return `<details class="card" data-tsup-open="${l.id}" ${S.openTaskSup.has(l.id)?'open':''} style="margin-bottom:10px;${rejected?'border-color:var(--coral);':''}">
       <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span><b>${esc(l.name)}</b>${z?` <span class="tag-shift both">${esc(z.name)}</span>`:''}</span><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${taskTimerHtml(l)}<span style="font-size:12px;color:var(--text-dim);">${done}/${total}</span>${taskRunBadge(run)}</span></summary>
       <div style="margin-top:10px;">
@@ -2006,7 +2020,7 @@ function renderSupTaskLists(shift){
         ${items.length? items.map(it=>{ const ok=taskItemDone(run,it.id); return `<label style="display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px dashed var(--line);${ok?'background:var(--mint-light);':''}"><input type="checkbox" data-ti-check="${run.id}|${it.id}" ${ok?'checked':''} ${frozen?'disabled':''} style="width:20px;height:20px;flex-shrink:0;"><span style="flex:1;font-size:13.5px;${ok?'color:var(--text-dim);text-decoration:line-through;':''}">${esc(it.name)}</span></label>`; }).join('') : '<p style="color:var(--text-dim);font-size:13px;">القائمة لسه فاضية.</p>'}
         ${taskWhoHtml(run)}
         ${locked? `<div style="font-size:12px;color:var(--mint);text-align:center;padding:10px 0 0;">${ICON.check(13)} تم اعتمادها من المشرف الأول</div>`
-          : `<button class="${run.supervisor_marked_done?'ghost-btn':'primary-btn'}" style="width:100%;justify-content:center;margin-top:10px;" data-tl-mark="${run.id}" data-marked="${run.supervisor_marked_done?'1':'0'}" ${!winOpen?'disabled':''}>${run.supervisor_marked_done? ICON.check(13)+' تم الانتهاء ✓ (بانتظار اعتماد المشرف الأول) — دوس للتراجع' : 'تم الانتهاء من القائمة'}</button>`}
+          : `<button class="${run.supervisor_marked_done?'ghost-btn':'primary-btn'}" style="width:100%;justify-content:center;margin-top:10px;" data-tl-mark="${run.id}" data-marked="${run.supervisor_marked_done?'1':'0'}" ${(!winOpen && !canOverrideClosed())?'disabled':''}>${run.supervisor_marked_done? ICON.check(13)+' تم الانتهاء ✓ (بانتظار اعتماد المشرف الأول) — دوس للتراجع' : 'تم الانتهاء من القائمة'}</button>`}
       </div>
     </details>`;
   }).join('');
@@ -2369,7 +2383,7 @@ function bindDistribution(){
     if(del.error){ console.error(del.error); toast('حصل خطأ: '+del.error.message,false); btn.disabled=false; return; }
     if(await dbInsert('daily_presence', rows)){ await loadDistData(); render(); toast('تم حفظ حضور الوردية '+PRES_WINDOWS[sh].name,true); } else btn.disabled=false;
   });
-  document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
+  document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ if(!taskRunUnlockedForMe(b.dataset.scanTask)) return; S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
 }
 
 function cairoMinutes(){
@@ -2507,13 +2521,14 @@ function renderApprovalCard(l){
     ${taskWhoHtml(run)}
     <details data-trev-open="${l.id}" ${S.openTaskRev.has(l.id)?'open':''} style="margin:8px 0;"><summary style="cursor:pointer;font-size:12.5px;color:var(--mint);font-weight:700;">مراجعة البنود اللي اتنفذت (${p.done}/${p.total})</summary><div style="margin-top:6px;">${itemsHtml||'<span style="font-size:12px;color:var(--text-dim);">لا توجد بنود</span>'}</div></details>
     ${isDone? `<button class="primary-btn" style="width:100%;justify-content:center;" disabled>${ICON.check(14)} معتمدة</button>`
-      : marked? `<button class="primary-btn" style="width:100%;justify-content:center;" data-scan-task="${run.id}">${ICON.qr(14)} امسح كود القائمة للاعتماد</button>`
+      : (taskMissed(l,run) && !canOverrideClosed())? `<button class="ghost-btn" style="width:100%;justify-content:center;" disabled>⛔ القائمة اتقفلت بعد الوقت — الاعتماد للأدمن / OPM بس</button>`
+      : (marked || (taskMissed(l,run) && canOverrideClosed()))? `<button class="primary-btn" style="width:100%;justify-content:center;" data-scan-task="${run.id}">${ICON.qr(14)} ${marked?'امسح كود القائمة للاعتماد':'اعتماد يدوي بعد القفل (مسح الكود)'}</button>`
       : `<button class="ghost-btn" style="width:100%;justify-content:center;" disabled>بانتظار المشرف يأكد الانتهاء</button>`}
   </div>`;
 }
 function bindTaskReviewControls(){
   document.querySelectorAll('details[data-trev-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskRev.add(d.dataset.trevOpen); else S.openTaskRev.delete(d.dataset.trevOpen); }));
-  document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
+  document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ if(!taskRunUnlockedForMe(b.dataset.scanTask)) return; S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
 }
 function renderSeniorSection(){
   const role=S.profile.role; const me=S.session.user.id;
@@ -2805,6 +2820,12 @@ function syncViolDraft(){
   if(g('v-phase')!==null) d.phase=g('v-phase'); if(g('v-building')!==null) d.building=g('v-building').trim(); if(g('v-floor')!==null) d.floor_no=g('v-floor').trim();
   if(g('v-apt')!==null) d.apartment=g('v-apt').trim(); if(g('v-note')!==null) d.note=g('v-note').trim();
   document.querySelectorAll('[data-vcap]').forEach(inp=>{ const p=d.photos[+inp.dataset.vcap]; if(p) p.caption=inp.value.trim(); });
+}
+function syncNoteDraft(){ const d=S.noteDraft; if(!d) return; document.querySelectorAll('[data-ncap]').forEach(t=>{ const it=d.items[+t.dataset.ncap]; if(it) it.note=t.value; }); }
+function bindNoteModal(){
+  const add=document.getElementById('n-add'); if(add) add.onclick=()=>{ syncNoteDraft(); S.noteDraft.items.push({note:'',photo:null}); render(); };
+  document.querySelectorAll('[data-nrm]').forEach(b=>b.onclick=()=>{ syncNoteDraft(); S.noteDraft.items.splice(+b.dataset.nrm,1); render(); });
+  document.querySelectorAll('[data-nphoto]').forEach(inp=>inp.onchange=async()=>{ const f=inp.files&&inp.files[0]; if(!f) return; syncNoteDraft(); const data=await compressImage(f,900,0.55); if(data){ S.noteDraft.items[+inp.dataset.nphoto].photo=data; render(); } });
 }
 function bindViolModal(){
   const f=document.getElementById('viol-files');
@@ -3972,7 +3993,7 @@ function bindSupervisorToday(){
   const gu=document.querySelector('[data-goto-urgent]'); if(gu) gu.onclick=()=>{ S.tab='urgent'; render(); };
   document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.myDv, sel.value, loadDeliveries));
   document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.myOrd, sel.value, loadOrders));
-  document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
+  document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.noteDraft={unitId:b.dataset.addNote, items:[{note:'',photo:null}]}; S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
   document.querySelectorAll('details[data-tsup-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskSup.add(d.dataset.tsupOpen); else S.openTaskSup.delete(d.dataset.tsupOpen); }));
   document.querySelectorAll('[data-ti-check]').forEach(cb=>cb.onchange=async ()=>{
     const [runId,itemId]=cb.dataset.tiCheck.split('|'); const checked=cb.checked; cb.disabled=true;
@@ -3984,6 +4005,7 @@ function bindSupervisorToday(){
     render(); window.scrollTo(0,y);
   });
   document.querySelectorAll('[data-tl-mark]').forEach(b=>b.onclick=async ()=>{
+    if(!taskRunUnlockedForMe(b.dataset.tlMark)) return;
     const nowMarked=b.dataset.marked==='1'; b.disabled=true;
     const patch={ supervisor_marked_done: !nowMarked, supervisor_marked_done_at: !nowMarked? new Date().toISOString() : null, marked_by: !nowMarked? S.session.user.id : null };
     if(!nowMarked) patch.review_status=null;
@@ -4329,8 +4351,8 @@ function renderModal(){
         <button class="ghost-btn" id="edit-supplier-btn" style="width:100%;margin-top:10px;">✏️ تعديل بيانات المورد (الاسم / القطاع / البدجت)</button>
         <button class="ghost-btn danger" id="del-supplier-btn" style="width:100%;margin-top:8px;">${ICON.trash(12)} حذف المورد نهائيًا</button>
       </div>
-      <h4 style="font-size:14px;margin:16px 0 8px;">الحساب المجمّع شهريًا (كل الفيزات مع بعض)</h4>
-      ${monthly.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>الشهر</th><th>إجمالي الفواتير</th><th>المدفوع فعليًا</th><th>الخصومات</th><th>الفيزات</th></tr></thead><tbody>
+      <h4 style="font-size:14px;margin:16px 0 8px;">الحساب المجمّع شهريًا (كل المراحل مع بعض)</h4>
+      ${monthly.length? `<div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>الشهر</th><th>إجمالي الفواتير</th><th>المدفوع فعليًا</th><th>الخصومات</th><th>المراحل</th></tr></thead><tbody>
         ${monthly.map(mo=>`<tr><td>${mo.month}</td><td>${mo.invoiced.toLocaleString()}</td><td>${mo.paid.toLocaleString()}</td><td>${mo.discount.toLocaleString()}</td><td style="font-size:11.5px;color:var(--text-dim);">${mo.phases.join(' / ')}</td></tr>`).join('')}
       </tbody></table></div>` : `<p style="font-size:12px;color:var(--text-dim);">لا توجد فواتير بعد</p>`}
     `;
@@ -4338,7 +4360,7 @@ function renderModal(){
     const kpiFormHtml = `
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <div class="form-row" style="flex:1;min-width:140px;"><label>الشهر</label><input type="month" id="m-kpi-month"></div>
-        <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
+        <div class="form-row" style="flex:1;min-width:140px;"><label>المرحلة</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
       </div>
       <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
         ${kpiTemplateFor(s.category).map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
@@ -4406,7 +4428,7 @@ function renderModal(){
     return modalWrap('تعديل تقييم '+esc(k.month), `
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <div class="form-row" style="flex:1;min-width:140px;"><label>الشهر</label><input type="month" id="m-kpi-month" value="${k.month||''}"></div>
-      <div class="form-row" style="flex:1;min-width:140px;"><label>الفيز</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((k.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
+      <div class="form-row" style="flex:1;min-width:140px;"><label>المرحلة</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((k.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
     </div>
     <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
       ${tpl.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
@@ -4419,17 +4441,23 @@ function renderModal(){
     <div class="form-row"><label>المبلغ</label><input type="number" id="m-inv-amount" value="${i.amount||0}"></div>
     <div class="form-row"><label>الخصم (اختياري)</label><input type="number" id="m-inv-discount" value="${i.discount||0}"></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-inv-date" value="${i.invoice_date||''}"></div>
-    <div class="form-row"><label>الفيز</label><select id="m-inv-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((i.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div class="form-row"><label>المرحلة</label><select id="m-inv-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((i.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="form-row"><label>الحالة</label><select id="m-inv-status">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
   }
-  if(m.type==='addUnitNote') return modalWrap('إضافة ملاحظة عن الوحدة', `
-    <div class="form-row"><label>وصف العطل أو التلفية</label><textarea id="m-note-text" placeholder="مثال: الباب الزجاجي مكسور"></textarea></div>
-    <div class="form-row"><label>صورة (اختياري لكن يُفضّل)</label>
-      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
-      <img id="cf-photo-preview" class="photo-preview" style="display:none;">
-    </div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ الملاحظة</button>`);
+  if(m.type==='addUnitNote'){
+    if(!S.noteDraft||S.noteDraft.unitId!==m.id) S.noteDraft={unitId:m.id, items:[{note:'',photo:null}]};
+    const its=S.noteDraft.items;
+    return modalWrap('إضافة ملاحظات عن الوحدة', `
+      ${its.map((it,i)=>`<div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b style="font-size:13px;">ملاحظة ${i+1}</b>${its.length>1?`<button type="button" class="ghost-btn" data-nrm="${i}" style="padding:2px 10px;">حذف</button>`:''}</div>
+        <textarea data-ncap="${i}" placeholder="شرح الملاحظة / العطل (مثال: الباب الزجاجي مكسور)">${esc(it.note||'')}</textarea>
+        ${it.photo?`<img src="${it.photo}" class="photo-preview" style="max-height:150px;display:block;margin-top:6px;">`:''}
+        <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-top:6px;">${ICON.camera()} ${it.photo?'تغيير الصورة':'إضافة صورة'}<input type="file" accept="image/*" data-nphoto="${i}"></label>
+      </div>`).join('')}
+      <button type="button" class="ghost-btn" id="n-add" style="width:100%;justify-content:center;margin-bottom:10px;">＋ إضافة ملاحظة / صورة أخرى</button>
+      <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ الملاحظات</button>`);
+  }
   if(m.type==='viewUnitNotes'){
     const notes=(S.unitNotes||[]).filter(n=>n.delivery_unit_id===m.id);
     return modalWrap('ملاحظات الوحدة', notes.length? notes.map(n=>`
@@ -4467,6 +4495,7 @@ function bindModalEvents(){
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
+  if(S.modal && S.modal.type==='addUnitNote') bindNoteModal();
   if(S.modal && S.modal.type==='supplierDetail') bindMpSection();
   if(S.modal && S.modal.type==='wasteReport') bindWasteReport();
   if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
@@ -4833,10 +4862,11 @@ async function handleModalSave(){
     if(await dbInsert('suppliers',[row])){ await loadSuppliers(); pendingPhoto=null; S.modal=null; render(); toast('تمت إضافة المورد',true); }
   }
   else if(m.type==='addUnitNote'){
-    const note=document.getElementById('m-note-text').value.trim();
-    if(!note){ toast('اكتب وصف الملاحظة',false); return; }
-    const row={ id:uid('un'), delivery_unit_id:m.id, note, photo:pendingPhoto, created_by:S.session.user.id };
-    if(await dbInsert('unit_notes',[row])){ await loadUnitNotes(); pendingPhoto=null; S.modal=null; render(); toast('تم حفظ الملاحظة',true); }
+    syncNoteDraft(); const items=(S.noteDraft&&S.noteDraft.items||[]).filter(it=>(it.note||'').trim()||it.photo);
+    if(!items.length){ toast('اكتب ملاحظة واحدة على الأقل',false); return; }
+    if(items.some(it=>!(it.note||'').trim())){ toast('اكتب شرح لكل صورة',false); return; }
+    const rows=items.map(it=>({ id:uid('un'), delivery_unit_id:m.id, note:it.note.trim(), photo:it.photo||null, created_by:S.session.user.id }));
+    if(await dbInsert('unit_notes',rows)){ await loadUnitNotes(); S.noteDraft=null; pendingPhoto=null; S.modal=null; render(); toast('تم حفظ '+rows.length+' ملاحظة',true); }
   }
 }
 
@@ -4874,12 +4904,19 @@ async function decodeFromFile(file){
   const data = await decodeQrFromFile(file);
   if(data) handleScannedCode(data); else toast('لم يتم التعرف على الرمز',false);
 }
+function taskRunUnlockedForMe(runId){
+  const run=(S.taskRuns||[]).find(r=>r.id===runId); if(!run) return true;
+  const l=(S.taskLists||[]).find(x=>x.id===run.list_id);
+  if(l && taskMissed(l,run) && !canOverrideClosed()){ toast('⛔ المهمة اتقفلت بعد الوقت — الأدمن / OPM بس اللي يقدر يعتمدها',false); return false; }
+  return true;
+}
 function handleScannedCode(code){
   const clean=(code||'').trim();
   const listId = clean.startsWith('ZEDWEST|TL|') ? clean.split('|')[2] : clean;
   const run = (S.taskRuns||[]).find(r=>r.id===(S.scanCtx&&S.scanCtx.runId));
   if(!run){ toast('تعذر إيجاد المهمة',false); return; }
   if(run.list_id !== listId){ toast('هذا الرمز يخص قائمة مختلفة',false); return; }
+  if(!taskRunUnlockedForMe(run.id)) return;
   stopScanner();
   S.modal={type:'confirmChecklist'};
   render();
@@ -4917,6 +4954,7 @@ async function rejectTaskRun(){
   const notes=(document.getElementById('cf-notes')||{value:''}).value.trim();
   if(!notes){ toast('اكتب سبب عدم المطابقة',false); return; }
   const runId=S.scanCtx&&S.scanCtx.runId; const run=(S.taskRuns||[]).find(x=>x.id===runId); if(!run) return;
+  if(!taskRunUnlockedForMe(runId)) return;
   const btn=document.getElementById('m-reject'); if(btn) btn.disabled=true;
   const patch={ status:'incomplete', supervisor_marked_done:false, supervisor_marked_done_at:null, review_status:'rejected', review_note:notes, reviewed_by:S.session.user.id, rework_count:(run.rework_count||0)+1 };
   const del=await sb.from('task_run_items').delete().eq('run_id',runId);
@@ -4927,6 +4965,7 @@ async function rejectTaskRun(){
   } else if(btn) btn.disabled=false;
 }
 async function submitTaskConfirm(){
+  if(!taskRunUnlockedForMe(S.scanCtx&&S.scanCtx.runId)) return;
   const notes=(document.getElementById('cf-notes')||{value:''}).value.trim();
   const patch={ status:'completed', verified_by:S.session.user.id, completed_at:new Date().toISOString(), notes, photo:pendingPhoto, review_status:'approved', reviewed_by:S.session.user.id };
   if(await dbUpdate('task_runs', S.scanCtx.runId, patch)){
