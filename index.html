@@ -109,6 +109,7 @@ tr:last-child td{border-bottom:none;}
 .modal.full{max-width:1180px;max-height:96vh;}
 .modal-head{padding:18px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;}
 .modal-head h3{margin:0;font-size:16px;}
+.modal-head .close svg{pointer-events:none;}
 .modal-head .close{border:none;background:var(--sand);width:30px;height:30px;border-radius:50%;color:var(--text-dim);flex-shrink:0;font-size:14px;}
 .modal-body{padding:6px 20px 20px;}
 .tag-shift{font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:800;}
@@ -752,6 +753,7 @@ const ICON = {
   camera:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   printer:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
   trash:(s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  deskwork:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="2"/><path d="M5.5 7.6V14M5.5 10l4 2.4M3 15h4.5M5.5 15v6"/><path d="M8 14.5h14M9.5 14.5V21M20.5 14.5V21"/><rect x="13" y="12" width="8" height="2.5" rx=".5"/><rect x="13.7" y="9.6" width="6.8" height="2.4" rx=".5"/><rect x="13" y="7.2" width="8" height="2.4" rx=".5"/><rect x="13.7" y="4.8" width="6.8" height="2.4" rx=".5"/></svg>`,
   wrench:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
   home:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -877,11 +879,11 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'wrench', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
@@ -1576,7 +1578,7 @@ function bindSideServices(){
 }
 function renderSsForm(){
   const m=S.modal; const ex=m.id? (S.sideSvc||[]).find(x=>x.id===m.id):null;
-  return modalWrap(ex?'تعديل':'إضافة وحدات / أوردرات (خدمات)', `
+  return modalWrap(ex?'تعديل':'إضافة وحدات / أوردرات (خدمات جانبية)', `
     <div class="form-row"><label>النوع</label><select id="ss-f-type"><option value="integrated" ${ex&&ex.service_type==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${ex&&ex.service_type==='modifications'?'selected':''}>Modifications</option></select></div>
     <div class="form-row"><label>التاريخ</label><input type="date" id="ss-f-date" value="${ex?ex.date:S.ssDate}"></div>
     ${ex? `<div class="form-row"><label>كود الوحدة</label><input id="ss-f-code" value="${esc(ex.unit_code)}"></div>`
@@ -1610,7 +1612,7 @@ function bindSsForm(){
 function renderSideSvcForSupervisor(){
   const last=addDaysStr(S.today,2);
   const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
-  return `<div class="section-title"><h2>خدمات — Integrated / Modifications (اليوم + يومين)</h2></div>
+  return `<div class="section-title"><h2>خدمات جانبية — Integrated / Modifications (اليوم + يومين)</h2></div>
   ${arr.length? arr.map(x=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div><b>${esc(x.unit_code)}</b> ${ssTypeTag(x.service_type)}${x.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${x.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(x.date)}</span>`:''}${x.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(x.notes)}</div>`:''}</div>
     ${ssStatusSelect('data-my-ss',x)}</div>`).join('') : '<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات خدمات النهاردة ولا في اليومين الجايين</p>'}`;
@@ -4847,7 +4849,7 @@ function supervisorOptions(){
 
 function bindModalEvents(){
   bindTime12();
-  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
+  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b && !b.classList.contains('close')) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
   if(S.modal && S.modal.type==='addUnitNote') bindNoteModal();
   if(S.modal && S.modal.type==='monthlyFinance') bindMonthlyFinance();
