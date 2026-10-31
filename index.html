@@ -352,18 +352,18 @@ select.st-postponed{background:#FDE6E3 !important;color:#C2352A !important;borde
    Toggle: ✨ button in the top bar (saved in localStorage "zw_glass")
    =================================================================== */
 body.glass{
-  --glass-bg:rgba(255,255,255,.46);
-  --glass-bg-strong:rgba(255,255,255,.68);
+  --glass-bg:rgba(255,255,255,.74);
+  --glass-bg-strong:rgba(255,255,255,.88);
   --glass-border:rgba(255,255,255,.66);
   --glass-shadow:0 14px 36px rgba(72,46,22,.14), inset 0 1px 0 rgba(255,255,255,.75);
-  --glass-blur:blur(22px) saturate(1.5);
+  --glass-blur:blur(26px) saturate(1.3);
   --accent:#E8603C; --accent-2:#FF9A6C;
   --charcoal:#27231F;
 }
 /* ambient background: same project photo as the login screen (towers + clouds), kept sharp, with a light veil for readability */
-body.glass:not(.on-login)::before{opacity:1 !important;filter:saturate(1.08);transform:none;}
+body.glass:not(.on-login)::before{opacity:1 !important;filter:blur(22px) saturate(1.05);transform:scale(1.12);}
 body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:linear-gradient(180deg,rgba(14,40,80,.18),rgba(14,40,80,.04) 38%,rgba(240,246,255,.30) 100%);}
+  background:linear-gradient(180deg,rgba(232,240,252,.50),rgba(238,244,254,.58) 45%,rgba(240,246,255,.66) 100%);}
 
 
 /* ===== glass theme motion ===== */
