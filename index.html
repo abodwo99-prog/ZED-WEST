@@ -360,12 +360,34 @@ body.glass{
   --accent:#E8603C; --accent-2:#FF9A6C;
   --charcoal:#27231F;
 }
-/* ambient background: the project photo, heavily blurred + warm light */
-body.glass:not(.on-login)::before{opacity:1 !important;filter:blur(34px) saturate(1.2);transform:scale(1.2);}
+/* ambient background: same project photo as the login screen (towers + clouds), kept sharp, with a light veil for readability */
+body.glass:not(.on-login)::before{opacity:1 !important;filter:saturate(1.08);transform:none;}
 body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:radial-gradient(60% 50% at 12% 8%,rgba(255,176,120,.42),transparent 62%),
-             radial-gradient(55% 45% at 92% 88%,rgba(255,118,86,.26),transparent 62%),
-             linear-gradient(180deg,rgba(248,238,228,.62),rgba(233,214,196,.62));}
+  background:linear-gradient(180deg,rgba(14,40,80,.18),rgba(14,40,80,.04) 38%,rgba(240,246,255,.30) 100%);}
+
+
+/* ===== glass theme motion ===== */
+@keyframes gSideIn{from{opacity:0;transform:translateX(46px);}to{opacity:1;transform:none;}}
+@keyframes gRise{from{opacity:0;transform:translateY(20px) scale(.97);}to{opacity:1;transform:none;}}
+@keyframes gPop{from{opacity:0;transform:translateY(16px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes gFade{from{opacity:0;}to{opacity:1;}}
+@keyframes gSlideL{from{transform:translateX(-100%);}to{transform:none;}}
+@keyframes gPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55);}100%{box-shadow:0 0 0 14px rgba(255,255,255,0);}}
+body.glass .g-side{animation:gSideIn .55s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0)*45ms);}
+body.glass .g-rise{animation:gRise .6s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0)*70ms);}
+body.glass .modal{animation:gPop .32s cubic-bezier(.2,.9,.3,1.1);}
+body.glass .modal-bg{animation:gFade .22s ease;}
+body.glass .sp{animation:gSlideL .34s cubic-bezier(.2,.8,.2,1);}
+body.glass .sp-bg{animation:gFade .25s ease;}
+body.glass .toast{animation:gRise .35s cubic-bezier(.2,.8,.2,1);}
+body.glass .card,body.glass .stat,body.glass .tbl-wrap{transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s ease;}
+body.glass .stat:hover,body.glass .card:hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(14,40,80,.22), inset 0 1px 0 rgba(255,255,255,.8);}
+body.glass .primary-btn,body.glass .ghost-btn,body.glass .sidebar button,body.glass .bottom-nav button{transition:transform .18s ease,background .2s ease,box-shadow .2s ease;}
+body.glass .primary-btn:hover,body.glass .ghost-btn:hover{transform:translateY(-2px);}
+body.glass .primary-btn:active,body.glass .ghost-btn:active,body.glass .bottom-nav button:active{transform:scale(.95);}
+body.glass .sidebar button:hover{transform:translateX(-5px);}
+body.glass .tbl-wrap tbody tr{transition:background .2s ease;}
+@media (prefers-reduced-motion:reduce){ body.glass .g-side,body.glass .g-rise,body.glass .modal,body.glass .modal-bg,body.glass .sp,body.glass .sp-bg,body.glass .toast{animation:none !important;} }
 
 /* top bar = floating pill */
 body.glass .topbar{margin:12px 14px 0;top:10px;border-radius:999px;padding:9px 18px;border:1px solid rgba(255,255,255,.3);
@@ -898,6 +920,40 @@ function tabsForRole(role){
 }
 
 /* ============================= RENDER ROOT ============================= */
+
+/* ============================= GLASS MOTION: staggered entrance + number count-up ============================= */
+S._numPrev={}; S._gIntro=false;
+function glassCount(el, fromTxt){
+  if(el.children.length) return;
+  const final=el.textContent; const re=/\d[\d,]*(?:\.\d+)?/g; const toks=final.match(re); if(!toks) return;
+  const ft=fromTxt?(fromTxt.match(re)||[]):[];
+  const num=t=>parseFloat(String(t).replace(/,/g,''));
+  const to=toks.map(num), from=to.map((n,i)=>ft[i]!==undefined?num(ft[i]):0);
+  if(to.every((n,i)=>n===from[i])) return;
+  const dec=toks.map(t=>(t.split('.')[1]||'').length), comma=toks.map(t=>t.includes(','));
+  const fmt=(v,i)=>{ let x=v.toFixed(dec[i]); if(comma[i]){ const [a,b]=x.split('.'); x=a.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(b?'.'+b:''); } return x; };
+  const t0=performance.now(), D=950;
+  const step=now=>{
+    if(!el.isConnected) return;
+    const k=Math.min(1,(now-t0)/D), e=1-Math.pow(1-k,3); let i=0;
+    el.textContent=final.replace(re,()=>{ const j=i++; return fmt(from[j]+(to[j]-from[j])*e,j); });
+    if(k<1) requestAnimationFrame(step); else el.textContent=final;
+  };
+  requestAnimationFrame(step);
+}
+function glassFx(tabChanged){
+  if(!glassOn || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const intro = tabChanged || !S._gIntro; S._gIntro=true;
+  if(intro){
+    document.querySelectorAll('.sidebar button, .bottom-nav button').forEach((b,i)=>{ b.style.setProperty('--i',Math.min(i,16)); b.classList.add('g-side'); });
+    document.querySelectorAll('#tab-body .stat, #tab-body .card, #tab-body .tbl-wrap, #tab-body .toolbar, #tab-body .section-title').forEach((el,i)=>{ if(i>40) return; el.style.setProperty('--i',Math.min(i,12)); el.classList.add('g-rise'); });
+  }
+  document.querySelectorAll('#tab-body .stat .num').forEach((el,i)=>{
+    const key=S.tab+'#'+i, txt=el.textContent, prev=S._numPrev[key]; S._numPrev[key]=txt;
+    if(intro) glassCount(el,null); else if(prev!==undefined && prev!==txt) glassCount(el,prev);
+  });
+}
+
 function render(){
   const app=document.getElementById('app');
   document.body.classList.toggle('on-login', !S.session);
@@ -930,6 +986,7 @@ function render(){
   enhanceTables();
   document.body.style.overflow = notifGateNeeded() ? 'hidden' : '';
   if(S.tab==='home') drawHomeCharts();
+  glassFx(tabChanged);
 }
 
 function renderAuthScreen(){
@@ -1024,7 +1081,7 @@ function bindGlobalEvents(){
     S.modal={ type:'viewPhoto', src, title: k==='inv'?'صورة الفاتورة':'إثبات الدفع', back:(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null };
     render();
   });
-  const toggleGlass=()=>{ glassOn=!glassOn; try{ localStorage.setItem('zw_glass',glassOn?'1':'0'); }catch(e){} document.body.classList.toggle('glass',glassOn); const dg=document.getElementById('drawer-glass'); if(dg) dg.textContent='✨ المظهر الزجاجي: '+(glassOn?'شغّال':'مقفول'); };
+  const toggleGlass=()=>{ glassOn=!glassOn; try{ localStorage.setItem('zw_glass',glassOn?'1':'0'); }catch(e){} document.body.classList.toggle('glass',glassOn); const dg=document.getElementById('drawer-glass'); if(dg) dg.textContent='✨ المظهر الزجاجي: '+(glassOn?'شغّال':'مقفول'); if(glassOn){ S._gIntro=false; render(); } };
   const gb=document.getElementById('glass-btn'); if(gb) gb.onclick=toggleGlass;
   const dgb=document.getElementById('drawer-glass'); if(dgb) dgb.onclick=toggleGlass;
   const rb=document.getElementById('refresh-btn'); if(rb) rb.onclick=manualRefresh;
