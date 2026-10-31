@@ -3055,14 +3055,15 @@ function violFiltered(){
   return (S.violations||[]).filter(v=>{
     if(f.phase && (v.phase||'')!==f.phase) return false;
     if(f.by && v.created_by!==f.by) return false;
-    if(f.from && String(v.created_at||'').slice(0,10)<f.from) return false;
-    if(f.to && String(v.created_at||'').slice(0,10)>f.to) return false;
+    const day=v.created_at? new Date(v.created_at).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'}) : '';
+    if(f.from && day<f.from) return false;
+    if(f.to && day>f.to) return false;
     if(q && !(violLocation(v)+' '+(v.note||'')).toLowerCase().includes(q)) return false;
     return true;
   });
 }
 function renderViolations(){
-  const isAdmin=S.profile.role==='admin';
+  const isAdmin=S.profile.role==='admin'||S.profile.role==='opm';
   const f=S.violFilter||(S.violFilter={ q:'', phase:'', by:'', from:'', to:'' });
   const all=S.violations||[]; const list=violFiltered();
   const phases=[...new Set(all.map(v=>v.phase).filter(Boolean))];
@@ -3193,11 +3194,17 @@ async function saveViolation(){
   S.modal=null; S.violDraft=null; await loadViolations(); render(); toast('تم حفظ المخالفة',true);
 }
 async function violationReport(){
-  if(S.profile.role!=='admin') return;
+  if(S.profile.role!=='admin' && S.profile.role!=='opm') return;
   toast('جارٍ تجهيز التقرير...',true);
   await loadViolations();
-  const vs=(S.violations||[]).slice();
-  if(!vs.length){ toast('مفيش مخالفات للتقرير',false); return; }
+  const vs=violFiltered().slice();
+  if(!vs.length){ toast('مفيش مخالفات مطابقة للفلتر الحالي',false); return; }
+  const fl=S.violFilter||{}; const flParts=[];
+  if(fl.from||fl.to) flParts.push('التاريخ: '+(fl.from||'...')+' → '+(fl.to||'...'));
+  if(fl.phase) flParts.push('المرحلة: '+fl.phase);
+  if(fl.by) flParts.push('سجّلها: '+(shownName(fl.by)||'-'));
+  if(fl.q&&fl.q.trim()) flParts.push('بحث: '+fl.q.trim());
+  const flText=flParts.length? flParts.join(' · ') : 'بدون فلتر (كل المخالفات)';
   const photos={};
   for(let i=0;i<vs.length;i+=8){
     const ids=vs.slice(i,i+8).map(v=>v.id);
@@ -3226,6 +3233,7 @@ async function violationReport(){
   holder.innerHTML=`<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;color:#111;padding:14px;">
     <h1 style="margin:0 0 4px;font-size:22px;">تقرير مخالفات العملاء — Zed West</h1>
     <div style="font-size:12px;color:#555;margin-bottom:10px;">تاريخ السحب: ${esc(fmtCairo(new Date().toISOString()))} · عدد المخالفات: ${vs.length} · عدد الصور: ${totalPhotos}</div>
+    <div style="font-size:12px;color:#555;margin-bottom:10px;">الفلتر المطبّق: ${esc(flText)}</div>
     ${body}</div>`;
   setTimeout(()=>window.print(),300);
 }
