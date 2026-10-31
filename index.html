@@ -3784,6 +3784,8 @@ let mpLoading=false, mpWarned=false;
 const MP_ROLES=[['manager','مدير موقع','site_manager_count'],['senior','مشرف أول','senior_supervisor_count'],['supervisor','مشرف','supervisor_count'],['worker','عامل','worker_count']];
 const MP_PHASES=[['P1','المرحلة الأولى'],['P2','المرحلة الثانية']];
 const MP_SHIFTS=[['morning','الصباحية'],['evening','المسائية']];
+// مدير الموقع / المشرف الأول / المشرف: محسوبين على 26 يوم في الشهر (يوم راحة أسبوعي لكل واحد) — العمال على كل أيام الشهر
+const MP_REST_DAYS=4; const MP_REST_ROLES=['manager','senior','supervisor'];
 const MP_DEF_RATES={ manager:1012, senior:730, supervisor:644, worker:541 };
 const MP_DEF_REQ={ morning:{ manager:0, senior:1, supervisor:9, worker:40 }, evening:{ manager:0, senior:1, supervisor:2, worker:15 } };
 const mpEgp=n=>Number(Math.round(n||0)).toLocaleString('en-US')+' ج.م';
@@ -3817,6 +3819,13 @@ function mpCompute(month){
         if(dayShort>0) P.days.push({ date, sh, missing:!rec, roles, amount:dayAmt });
       });
     }
+    // بعد ما الأيام اتعدّت: الراحة الأسبوعية مسموحة لمدير الموقع والمشرفين، والعجز يتحسب بعدها
+    P.reqVal=0; P.shortVal=0; P.shortHeads=0;
+    Object.values(P.rows).forEach(row=>{
+      const offR = MP_REST_ROLES.includes(row.r) ? MP_REST_DAYS/dim : 0;
+      row.allow = row.req*offR; row.net = Math.max(0,row.short-row.allow); row.reqEff = row.req-row.allow; row.amount = row.net*row.rate;
+      P.reqVal+=row.reqEff*row.rate; P.shortVal+=row.amount; P.shortHeads+=row.net;
+    });
     res[ph]=P;
   });
   return res;
@@ -3832,18 +3841,19 @@ function renderMpSection(){
   const th='padding:5px 6px;font-size:11.5px;text-align:right;white-space:nowrap;'; const td='padding:5px 6px;font-size:12px;text-align:right;white-space:nowrap;';
   const phaseBox=P=>{
     const rows=Object.values(P.rows).filter(r=>r.req>0 || r.act>0);
-    const tot=rows.reduce((a,r)=>({ req:a.req+r.req*r.rate, short:a.short+r.short*r.rate, shortH:a.shortH+r.short }),{ req:0, short:0, shortH:0 });
+    const tot=rows.reduce((a,r)=>({ req:a.req+r.reqEff*r.rate, short:a.short+r.net*r.rate, shortH:a.shortH+r.net }),{ req:0, short:0, shortH:0 });
+    const n1=x=>String(Math.round((x||0)*10)/10);
     const pct=tot.req? Math.round(tot.short*1000/tot.req)/10 : 0;
     return `<div class="card" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><h3 style="margin:0;font-size:15px;">${P.label}</h3><span style="font-size:12px;color:var(--text-dim);">${P.daysCounted} وردية محسوبة${P.missingShifts?` · <b style="color:var(--coral);">${P.missingShifts} وردية من غير تسجيل حضور</b>`:''}</span></div>
       <div class="stat-row" style="margin-top:10px;"><div class="stat mint"><div class="num" style="font-size:17px;">${mpEgp(tot.req-tot.short)}</div><div class="lbl">اليوميات المنفّذة</div></div>
         <div class="stat coral"><div class="num" style="font-size:17px;">${mpEgp(tot.short)}</div><div class="lbl">الخصم (${pct}% من المطلوب ${mpEgp(tot.req)})</div></div></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:var(--sand);">
-        <th style="${th}">الوردية</th><th style="${th}">الفئة</th><th style="${th}">المطلوب/يوم</th><th style="${th}">أيام</th><th style="${th}">المطلوب (يوم عمل)</th><th style="${th}">الحاضر</th><th style="${th}">العجز</th><th style="${th}">اليومية</th><th style="${th}">الخصم</th></tr></thead><tbody>
-        ${rows.map(r=>`<tr style="border-top:1px solid var(--line);"><td style="${td}">${shLbl[r.sh]}</td><td style="${td}"><b>${roleLbl[r.r]}</b></td><td style="${td}">${r.days?r.req/r.days:mpReq(P.ph,r.sh,r.r)}</td><td style="${td}">${r.days}</td><td style="${td}">${r.req}</td><td style="${td}">${r.act}</td><td style="${td}color:${r.short?'var(--coral)':'inherit'};font-weight:${r.short?800:400};">${r.short}</td><td style="${td}">${Number(r.rate).toLocaleString('en-US')}</td><td style="${td}font-weight:800;color:${r.amount?'var(--coral)':'inherit'};">${mpEgp(r.amount)}</td></tr>`).join('')}
-        <tr style="border-top:2px solid var(--line);background:var(--sand);"><td style="${td}" colspan="6"><b>الإجمالي</b></td><td style="${td}"><b>${tot.shortH}</b></td><td style="${td}"></td><td style="${td}font-weight:800;color:var(--coral);">${mpEgp(tot.short)}</td></tr>
+        <th style="${th}">الوردية</th><th style="${th}">الفئة</th><th style="${th}">المطلوب/يوم</th><th style="${th}">أيام</th><th style="${th}">المطلوب (يوم عمل)</th><th style="${th}">الحاضر</th><th style="${th}">العجز</th><th style="${th}">راحات مسموحة</th><th style="${th}">العجز بعد الراحات</th><th style="${th}">اليومية</th><th style="${th}">الخصم</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr style="border-top:1px solid var(--line);"><td style="${td}">${shLbl[r.sh]}</td><td style="${td}"><b>${roleLbl[r.r]}</b></td><td style="${td}">${r.days?r.req/r.days:mpReq(P.ph,r.sh,r.r)}</td><td style="${td}">${r.days}</td><td style="${td}">${n1(r.reqEff)}</td><td style="${td}">${r.act}</td><td style="${td}">${r.short}</td><td style="${td}">${r.allow?n1(r.allow):'-'}</td><td style="${td}color:${r.net?'var(--coral)':'inherit'};font-weight:${r.net?800:400};">${n1(r.net)}</td><td style="${td}">${Number(r.rate).toLocaleString('en-US')}</td><td style="${td}font-weight:800;color:${r.amount?'var(--coral)':'inherit'};">${mpEgp(r.amount)}</td></tr>`).join('')}
+        <tr style="border-top:2px solid var(--line);background:var(--sand);"><td style="${td}" colspan="7"><b>الإجمالي</b></td><td style="${td}"><b>${n1(tot.shortH)}</b></td><td style="${td}"></td><td style="${td}font-weight:800;color:var(--coral);">${mpEgp(tot.short)}</td></tr>
       </tbody></table></div>
-      <details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">تفاصيل الغياب يوم بيوم (${P.days.length} وردية فيها عجز)</summary>
+      <details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">تفاصيل الغياب يوم بيوم — قبل احتساب الراحات (${P.days.length} وردية فيها عجز)</summary>
         ${P.days.length? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead><tr style="background:var(--sand);"><th style="${th}">التاريخ</th><th style="${th}">الوردية</th><th style="${th}">التفاصيل (حاضر / مطلوب)</th><th style="${th}">الخصم</th></tr></thead><tbody>
           ${P.days.map(d=>`<tr style="border-top:1px solid var(--line);"><td style="${td}">${esc(d.date)}</td><td style="${td}">${shLbl[d.sh]}</td><td style="${td}white-space:normal;line-height:1.7;">${d.missing?'<b style="color:var(--coral);">لم يُسجَّل حضور — محسوب كله غياب</b><br>':''}${d.roles.filter(x=>x.req>0).map(x=>`${roleLbl[x.r]}: ${x.act}/${x.req}${x.short?` <b style="color:var(--coral);">(-${x.short})</b>`:''}`).join(' · ')}</td><td style="${td}font-weight:800;color:var(--coral);">${mpEgp(d.amount)}</td></tr>`).join('')}
         </tbody></table></div>` : '<p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;">مفيش عجز في الشهر ده.</p>'}
@@ -3858,7 +3868,7 @@ function renderMpSection(){
     <div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <div><div style="font-size:12px;color:var(--text-dim);">إجمالي الخصم (المرحلتين)</div><div style="font-size:22px;font-weight:800;color:var(--coral);">${mpEgp(totalShort)}</div></div>
       <div><div style="font-size:12px;color:var(--text-dim);">إجمالي اليوميات المطلوبة</div><div style="font-size:22px;font-weight:800;">${mpEgp(totalReq)}</div></div></div>
-      <p style="font-size:11.5px;color:var(--text-dim);margin:8px 0 0;line-height:1.8;">الحساب على أعداد العقد والأسعار الحالية، وأي تغيير فيهم بيتطبّق على الشهر كله. اليوم اللي مفيهوش تسجيل حضور بيتحسب كله غياب (إلا النهارده لحد ما يتسجّل). العدد الزايد عن المطلوب مبيتخصمش من العجز.</p></div>
+      <p style="font-size:11.5px;color:var(--text-dim);margin:8px 0 0;line-height:1.8;">الحساب على أعداد العقد والأسعار الحالية، وأي تغيير فيهم بيتطبّق على الشهر كله. اليوم اللي مفيهوش تسجيل حضور بيتحسب كله غياب (إلا النهارده لحد ما يتسجّل). العدد الزايد عن المطلوب مبيتخصمش من العجز. مدير الموقع والمشرف الأول والمشرف بيتحسب لكل واحد فيهم ${MP_REST_DAYS} أيام راحة في الشهر (راحة أسبوعية) والعجز بيتحسب بعدها، أما العمال فعلى كل أيام الشهر بنفس أعدادهم.</p></div>
     ${MP_PHASES.map(([ph])=>phaseBox(data[ph])).join('')}
   </div>`;
 }
