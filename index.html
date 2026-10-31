@@ -2586,7 +2586,7 @@ function bindDistribution(){
     btn.disabled=true;
     const del=await sb.from('daily_presence').delete().eq('date',S.today).eq('shift',sh).in('user_id',ids);
     if(del.error){ console.error(del.error); toast('حصل خطأ: '+del.error.message,false); btn.disabled=false; return; }
-    if(await dbInsert('daily_presence', rows)){ await loadDistData(); render(); toast('تم حفظ حضور الوردية '+PRES_WINDOWS[sh].name,true); } else btn.disabled=false;
+    if(await dbInsert('daily_presence', rows)){ const dblN=(sh==='evening')? rows.filter(r=>r.present && (S.presence||[]).some(x=>x.user_id===r.user_id && (x.shift||'morning')==='morning' && x.present===true && !x.virtual)).length : 0; await loadDistData(); render(); toast('تم حفظ حضور الوردية '+PRES_WINDOWS[sh].name+(dblN?' — '+dblN+' دوبل شيفت (اتبعت إشعار للإدارة)':''),true); } else btn.disabled=false;
   });
   document.querySelectorAll('[data-scan-task]').forEach(b=>b.onclick=()=>{ if(!taskRunUnlockedForMe(b.dataset.scanTask)) return; S.scanCtx={runId:b.dataset.scanTask}; S.modal={type:'scan'}; render(); });
 }
@@ -2684,13 +2684,14 @@ function renderPresencePart(sh){
     const scope = (mine && mine.scope) || (inOther && inOther.scope) || 'general_areas';
     const holder = cardHolderOf(u.id);
     const actualName = (mine && mine.actual_name) || holder || '';
-    const lock = !!inOther;
+    const lock = !!inOther && sh==='morning';
+    const dbl = !!inOther && sh==='evening';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;${lock?'opacity:.55;':''}">
-      <span style="font-size:13px;">${esc(u.full_name)}${holder?` <span style="font-size:11px;color:var(--mint);font-weight:700;">🪪 ${esc(holder)}</span>`:''}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}</span>
+      <span style="font-size:13px;">${esc(u.full_name)}${holder?` <span style="font-size:11px;color:var(--mint);font-weight:700;">🪪 ${esc(holder)}</span>`:''}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}${dbl?` <span style="font-size:11px;color:var(--amber);font-weight:700;">(حضر الصباحية — لو سجّلته حاضر هيتحسب دوبل شيفت ويتبعت إشعار للإدارة)</span>`:''}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" ${lock?'disabled':dis} style="${selStyle}width:130px;">
         <select data-presence-select="${u.id}" ${lock?'disabled':dis} style="border:1px solid ${selCol};color:${selCol};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
-          <option value="1" ${val==='1'?'selected':''}>حاضر</option>
+          <option value="1" ${val==='1'?'selected':''}>${dbl?'حاضر (دوبل شيفت)':'حاضر'}</option>
           <option value="0" ${val==='0'?'selected':''}>غائب</option>
           ${sh==='morning'?`<option value="2" ${val==='2'?'selected':''}>مرحّل للمسائية</option>`:''}
         </select>
