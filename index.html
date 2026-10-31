@@ -644,6 +644,13 @@ async function fetchProfile(userId){
   if(error){ console.error(error); return null; }
   return data;
 }
+async function fnAuthToken(force){
+  try{
+    if(force){ const {data,error}=await sb.auth.refreshSession(); if(!error && data && data.session){ S.session=data.session; return data.session.access_token; } }
+    const {data}=await sb.auth.getSession(); if(data && data.session){ S.session=data.session; return data.session.access_token; }
+  }catch(e){}
+  return S.session && S.session.access_token;
+}
 async function refreshSession(){
   const {data} = await sb.auth.getSession();
   S.session = data.session || null;
@@ -4031,19 +4038,26 @@ async function loadUsers(){ S.users = (await dbSelect('profiles')) ?? S.users; }
 async function callAdminUsersFn(body){
   const res = await fetch(SUPABASE_URL + '/functions/v1/admin-users', {
     method:'POST',
-    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+S.session.access_token },
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+(await fnAuthToken()) },
     body: JSON.stringify(body)
   });
   return res.json();
 }
 
 async function callQrFn(body){
-  const res = await fetch(SUPABASE_URL + '/functions/v1/qr-auth', {
+  const doFetch=async force=>fetch(SUPABASE_URL + '/functions/v1/qr-auth', {
     method:'POST',
-    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+S.session.access_token },
+    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+(await fnAuthToken(force)) },
     body: JSON.stringify(body)
   });
-  return res.json();
+  let res=await doFetch(false);
+  if(res.status===401) res=await doFetch(true);
+  let j=null; try{ j=await res.json(); }catch(e){}
+  if(!res.ok || !j){
+    const why = res.status===404 ? 'الدالة qr-auth مش منشورة (404)' : res.status===401||res.status===403 ? 'مفيش صلاحية ('+res.status+') — راجع JWT verification وإنك داخل أدمن/OPM' : 'خطأ '+res.status+(j&&j.error?(' — '+j.error):'');
+    throw new Error(why);
+  }
+  return j;
 }
 async function loadQrTokens(){
   try{
@@ -4052,7 +4066,7 @@ async function loadQrTokens(){
     S.qrTokens = r.tokens || [];
   }catch(e){
     console.error('qr list', e);
-    toast('تعذّر تحميل أكواد QR — اتأكد إن دالة qr-auth اتنشرت', false);
+    toast('تعذّر تحميل أكواد QR — '+(e.message||'اتأكد إن دالة qr-auth اتنشرت'), false);
   }
   S.qrLoaded = true;
 }
@@ -4121,7 +4135,7 @@ function composeEmergencyMessage(type, location, details){
 async function callEmergencyFn(body){
   const res = await fetch(SUPABASE_URL + '/functions/v1/emergency-notify', {
     method:'POST',
-    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+S.session.access_token },
+    headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+(await fnAuthToken()) },
     body: JSON.stringify(body)
   });
   return res.json();
