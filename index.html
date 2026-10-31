@@ -1709,10 +1709,18 @@ function renderOrders(){
   if(isApprover){
     const real=list.filter(o=>orderApproved(o));
     const amt=o=>+o.price||0; const sum=a=>a.reduce((t,o)=>t+amt(o),0); const fmtM=n=>n.toLocaleString('en-US')+' ج.م';
-    const paidL=real.filter(o=>o.payment_status==='paid'), unpaidL=real.filter(o=>o.payment_status!=='paid');
+    const done=real.filter(o=>o.status==='completed');
+    const paidL=done.filter(o=>o.payment_status==='paid'), unpaidL=done.filter(o=>o.payment_status!=='paid');
+    const cnt=s=>real.filter(o=>o.status===s).length;
     sumCardsHtml=`<div class="stat-row" style="margin-bottom:14px;">
       <div class="stat ink"><div class="num">${real.length}</div><div class="lbl">إجمالي الأوردرات</div></div>
-      <div class="stat blue"><div class="num" style="font-size:19px;">${fmtM(sum(real))}</div><div class="lbl">إجمالي المبالغ</div></div>
+      <div class="stat mint"><div class="num">${cnt('completed')}</div><div class="lbl">تم الانتهاء</div></div>
+      <div class="stat blue"><div class="num">${cnt('in_progress')}</div><div class="lbl">جاري العمل</div></div>
+      <div class="stat amber"><div class="num">${cnt('scheduled')}</div><div class="lbl">مجدولة</div></div>
+      <div class="stat coral"><div class="num">${cnt('postponed')}</div><div class="lbl">تم التأجيل</div></div>
+    </div>
+    <div class="stat-row" style="margin-bottom:14px;">
+      <div class="stat blue"><div class="num" style="font-size:19px;">${fmtM(sum(done))}</div><div class="lbl">إجمالي المبالغ (المنتهي فقط)</div></div>
       <div class="stat mint"><div class="num" style="font-size:19px;">${fmtM(sum(paidL))}</div><div class="lbl">المدفوع (${paidL.length} أوردر)</div></div>
       <div class="stat coral"><div class="num" style="font-size:19px;">${fmtM(sum(unpaidL))}</div><div class="lbl">غير المدفوع (${unpaidL.length} أوردر)</div></div>
     </div>`;
