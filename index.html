@@ -3402,13 +3402,17 @@ async function loadWasteReport(date,service){
     if(rw.error||dn.error){ toast('تعذّر تحميل تقرير الحشرات — '+((rw.error||dn.error).message),false); }
     S.wasteRep={ date, service:sv, loading:false, rows:[], pres:pr.data||[], sched:rw.data||[], schedDone:dn.data||[] }; render(); return;
   }
-  const [lg,pr]=await Promise.all([
-    sb.from('svc_item_log').select('*').eq('service',sv).eq('log_date',date).order('done_at'),
-    sb.from('svc_presence').select('*').eq('service',sv).eq('date',date).order('created_at')
-  ]);
+  const addDays=(d,n)=>{ const x=new Date(d+'T12:00:00Z'); x.setUTCDate(x.getUTCDate()+n); return x.toISOString().slice(0,10); };
+  const logQ = sv==='facade'
+    ? sb.from('svc_item_log').select('*').eq('service',sv).lte('log_date',addDays(date,1)).order('done_at').range(0,4999)
+    : sb.from('svc_item_log').select('*').eq('service',sv).gte('log_date',addDays(date,-1)).lte('log_date',addDays(date,1)).order('done_at');
+  const [lg,pr]=await Promise.all([ logQ, sb.from('svc_presence').select('*').eq('service',sv).eq('date',date).order('created_at') ]);
   if(lg.error){ toast('تعذّر تحميل التقرير — شغّل update_v16.sql ('+lg.error.message+')',false); S.wasteRep={ date, service:sv, loading:false, rows:[], pres:[] }; render(); return; }
-  S.wasteRep={ date, service:sv, loading:false, rows:lg.data||[], pres:pr.data||[] }; render();
+  const allRows=lg.data||[];
+  S.wasteRep={ date, service:sv, loading:false, rows:allRows.filter(x=>svcLogDay(x)===date), cum: sv==='facade'? allRows.filter(x=>svcLogDay(x)<=date) : null, pres:pr.data||[] }; render();
 }
+function violCairoDay(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleDateString('en-CA',{ timeZone:'Africa/Cairo' }); }catch(e){ return String(iso).slice(0,10); } }
+function svcLogDay(x){ return x.done_at ? violCairoDay(x.done_at) : String(x.log_date||'').slice(0,10); }
 function wasteTime(iso){ return iso? new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit', hour12:true }) : ''; }
 function pestReportModel(){
   const r=S.wasteRep||{}; const sched=r.sched||[]; const dn=r.schedDone||[]; const wd=psWeekdayOf(r.date||S.today);
@@ -3427,6 +3431,16 @@ function wasteReportModel(){
     const items=svcItemsOf(l.id);
     const done=rows.filter(x=>x.list_id===l.id);
     const doneIds=new Set(done.map(x=>x.item_id));
+    if(wasteSv()==='facade' && r.cum){
+      // الواجهات شغل تراكمي على دورة: المتبقي = اللي لسه ما اتعملش في الدورة، مش اللي ما اتعملش النهارده بس
+      const resetDay=l.last_reset_at? violCairoDay(l.last_reset_at):'';
+      const known=!resetDay || (r.date>=resetDay);
+      const cumIds=new Set(r.cum.filter(x=>x.list_id===l.id && (!resetDay || svcLogDay(x)>=resetDay)).map(x=>x.item_id));
+      const isToday=r.date>=S.today;
+      const cumDone = isToday ? items.filter(i=>i.done).length : (known ? items.filter(i=>cumIds.has(i.id)).length : null);
+      const notDone = cumDone===null ? [] : (isToday ? items.filter(i=>!i.done) : items.filter(i=>!cumIds.has(i.id))).map(i=>i.label);
+      return { name:l.name, total:items.length, done, notDone, cumDone };
+    }
     return { name:l.name, total:items.length, done, notDone:items.filter(i=>!doneIds.has(i.id)).map(i=>i.label) };
   });
   const known=new Set(svcListsOf(wasteSv()).map(l=>l.id));
@@ -3437,11 +3451,13 @@ function wasteReportModel(){
 function renderWasteReportModal(){
   const r=S.wasteRep||{ date:S.today }; const groups=wasteReportModel();
   const totalAll=groups.reduce((n,g)=>n+g.total,0), doneAll=groups.reduce((n,g)=>n+g.done.length,0);
+  const cumMode=groups.some(g=>g.cumDone!==undefined);
+  const remainAll=cumMode? groups.reduce((n,g)=>n+(g.cumDone==null?0:g.total-g.cumDone),0) : Math.max(0,totalAll-doneAll);
   const shiftLbl=v=>v==='evening'?'مسائي':(v==='morning'?'صباحي':'-');
   const body = r.loading ? '<p style="color:var(--text-dim);">جارٍ التحميل...</p>' : `
-    <div class="stat-row"><div class="stat mint"><div class="num">${doneAll}</div><div class="lbl">اتنفّذ</div></div><div class="stat amber"><div class="num">${Math.max(0,totalAll-doneAll)}</div><div class="lbl">ما اتنفّذش</div></div></div>
+    <div class="stat-row"><div class="stat mint"><div class="num">${doneAll}</div><div class="lbl">${cumMode?'اتنفّذ في اليوم ده':'اتنفّذ'}</div></div><div class="stat amber"><div class="num">${remainAll}</div><div class="lbl">${cumMode?'متبقي في الدورة (لسه ما اتنفّذش)':'ما اتنفّذش'}</div></div></div>
     ${groups.map(g=>`<div class="card" style="margin-bottom:12px;">
-      <div style="display:flex;justify-content:space-between;gap:8px;"><b>${esc(g.name)}</b><span style="font-size:12.5px;"><b style="color:var(--mint);">${g.total?Math.round(g.done.length*100/g.total):0}%</b> · ${g.done.length}/${g.total}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;"><b>${esc(g.name)}</b><span style="font-size:12.5px;">${g.cumDone!==undefined ? (g.cumDone==null? `<b>${g.done.length}</b> النهارده` : `<b style="color:var(--mint);">${g.total?Math.round(g.cumDone*100/g.total):0}%</b> · ${g.cumDone}/${g.total} في الدورة · <b>${g.done.length}</b> النهارده`) : `<b style="color:var(--mint);">${g.total?Math.round(g.done.length*100/g.total):0}%</b> · ${g.done.length}/${g.total}`}</span></div>
       ${g.done.length? `<div style="margin-top:8px;">${g.done.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);"><span><b>${esc(x.label)}</b></span><span style="color:var(--text-dim);">${esc(wasteTime(x.done_at))} · ${esc(x.done_by_name||'-')} · ${shiftLbl(x.done_shift)}</span></div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">ما اتنفّذش حاجة في اليوم ده.</div>'}
       ${g.notDone.length? `<div style="font-size:12px;margin-top:8px;line-height:1.8;"><b style="color:var(--amber);">ما اتنفّذش:</b> ${g.notDone.map(esc).join('، ')}</div>`:''}
     </div>`).join('')}
