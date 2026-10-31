@@ -73,12 +73,14 @@ input,textarea,select{font-family:inherit;}
 .stat .num{font-family:'Cairo';font-weight:900;font-size:24px;line-height:1;}
 .stat .lbl{font-size:11.5px;color:var(--text-dim);margin-top:6px;font-weight:700;}
 .stat.mint .num{color:var(--mint);} .stat.amber .num{color:var(--amber);} .stat.coral .num{color:var(--coral);} .stat.ink .num{color:var(--ink);} .stat.blue .num{color:var(--blue);}
-.drawer-bg{position:fixed;inset:0;background:rgba(14,58,110,.35);z-index:150;}
-.drawer{position:fixed;top:0;bottom:0;left:0;width:min(460px,100%);background:var(--paper);z-index:160;box-shadow:8px 0 40px rgba(0,0,0,.22);display:flex;flex-direction:column;}
-.drawer-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);}
-.drawer-body{padding:14px 16px;overflow-y:auto;flex:1;}
-.drawer-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;}
-.drawer-kv span:first-child{color:var(--text-dim);}
+.sp-bg{position:fixed;inset:0;background:rgba(14,58,110,.35);z-index:150;}
+.sp{position:fixed;top:0;bottom:0;left:0;width:min(460px,100%);background:var(--paper);z-index:160;box-shadow:8px 0 40px rgba(0,0,0,.22);display:flex;flex-direction:column;}
+body.glass .sp{background:rgba(255,255,255,.97);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);}
+.sp-bg{backdrop-filter:blur(2px);}
+.sp-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);}
+.sp-body{padding:14px 16px;overflow-y:auto;flex:1;}
+.sp-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+.sp-kv span:first-child{color:var(--text-dim);}
 .tbl-wrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;box-shadow:var(--shadow);margin-bottom:18px;}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
 th{background:var(--ink);color:#fff;text-align:right;padding:10px 12px;font-weight:700;font-size:11.5px;white-space:nowrap;}
@@ -750,6 +752,7 @@ const ICON = {
   camera:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   printer:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
   trash:(s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  wrench:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
   home:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
   truck:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
@@ -874,7 +877,7 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'wrench', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
@@ -1539,7 +1542,7 @@ function dxPrintQuote(qty, o, month){
 }
 
 
-function drawerHtml(title, body){ return `<div class="drawer-bg" data-drawer-close></div><aside class="drawer"><div class="drawer-head"><b style="font-size:14.5px;">${title}</b><button class="ghost-btn" data-drawer-close>✕ إغلاق</button></div><div class="drawer-body">${body}</div></aside>`; }
+function drawerHtml(title, body){ return `<div class="sp-bg" data-drawer-close></div><aside class="sp"><div class="sp-head"><b style="font-size:14.5px;">${title}</b><button class="ghost-btn" data-drawer-close>✕ إغلاق</button></div><div class="sp-body">${body}</div></aside>`; }
 function bindDrawer(){ document.querySelectorAll('[data-drawer-close]').forEach(e=>e.onclick=()=>{ S.drawer=null; render(); }); }
 /* ============================= خدمات (Integrated / Modifications) — بدون أسعار ============================= */
 const SS_TYPES={ integrated:'Integrated', modifications:'Modifications' };
@@ -1685,7 +1688,7 @@ function renderOrders(){
   </tbody></table></div>
   ${list.length>(S.ordLimit||30)?`<div style="text-align:center;margin-bottom:16px;"><button class="ghost-btn" id="ord-more">عرض المزيد (${list.length-(S.ordLimit||30)} متبقي)</button></div>`:''}
   ${(()=>{ const d=S.drawer; if(!d||d.kind!=='order') return ''; const o=S.orders.find(x=>x.id===d.id); if(!o) return '';
-    const kv=(k,v)=>`<div class="drawer-kv"><span>${k}</span><span style="text-align:left;">${v}</span></div>`;
+    const kv=(k,v)=>`<div class="sp-kv"><span>${k}</span><span style="text-align:left;">${v}</span></div>`;
     return drawerHtml('أوردر '+esc(o.unit_code||''),
       kv('رقم الوحدة',esc(o.unit_code||'-'))+kv('النوع',ORDER_TYPE_LABEL[o.order_type]||o.order_type)+kv('رقم Sales Force',esc(o.client_info||'-'))
       +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.payment_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
@@ -3308,6 +3311,15 @@ function wasteSv(){ return (S.wasteRep&&S.wasteRep.service)||'waste'; }
 async function loadWasteReport(date,service){
   const sv=service||wasteSv();
   S.wasteRep={ date, service:sv, loading:true, rows:[], pres:[] }; render();
+  if(sv==='pest'){
+    const [rw,dn,pr]=await Promise.all([
+      sb.from('pest_schedule_rows').select('*').order('position'),
+      sb.from('pest_schedule_done').select('*').eq('date',date),
+      sb.from('svc_presence').select('*').eq('service','pest').eq('date',date).order('created_at')
+    ]);
+    if(rw.error||dn.error){ toast('تعذّر تحميل تقرير الحشرات — '+((rw.error||dn.error).message),false); }
+    S.wasteRep={ date, service:sv, loading:false, rows:[], pres:pr.data||[], sched:rw.data||[], schedDone:dn.data||[] }; render(); return;
+  }
   const [lg,pr]=await Promise.all([
     sb.from('svc_item_log').select('*').eq('service',sv).eq('log_date',date).order('done_at'),
     sb.from('svc_presence').select('*').eq('service',sv).eq('date',date).order('created_at')
@@ -3316,7 +3328,18 @@ async function loadWasteReport(date,service){
   S.wasteRep={ date, service:sv, loading:false, rows:lg.data||[], pres:pr.data||[] }; render();
 }
 function wasteTime(iso){ return iso? new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit', hour12:true }) : ''; }
+function pestReportModel(){
+  const r=S.wasteRep||{}; const sched=r.sched||[]; const dn=r.schedDone||[]; const wd=psWeekdayOf(r.date||S.today);
+  const doneMap=new Map(dn.map(x=>[x.row_id,x]));
+  const lbl=x=>x.task+' ('+fmt12(x.start_time,'-')+' – '+fmt12(x.end_time,'-')+')';
+  return ['E1','E2'].map(ph=>{
+    const rows=sched.filter(x=>x.phase===ph && x.weekday===wd).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
+    const done=rows.filter(x=>doneMap.has(x.id)).map(x=>{ const d=doneMap.get(x.id); return { label:lbl(x), done_at:d.done_at, done_by_name:d.done_by_name, done_shift:x.shift }; });
+    return { name:PS_PHASE_LABEL[ph]+' — '+PS_DAYS[wd], total:rows.length, done, notDone:rows.filter(x=>!doneMap.has(x.id)).map(lbl) };
+  });
+}
 function wasteReportModel(){
+  if(wasteSv()==='pest') return pestReportModel();
   const r=S.wasteRep||{}; const rows=r.rows||[];
   const groups=svcListsOf(wasteSv()).map(l=>{
     const items=svcItemsOf(l.id);
@@ -3352,7 +3375,7 @@ function bindWasteReport(){
     if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل',false); return; }
     const r=S.wasteRep||{}; const groups=wasteReportModel(); const wb=XLSX.utils.book_new();
     const doneRows=[]; const notRows=[];
-    groups.forEach(g=>{ g.done.forEach(x=>doneRows.push({ 'القائمة':g.name, 'الغرفة':x.label, 'الوقت':wasteTime(x.done_at), 'المنفذ':x.done_by_name||'', 'الشفت':x.done_shift==='evening'?'مسائي':(x.done_shift==='morning'?'صباحي':'') })); g.notDone.forEach(l=>notRows.push({ 'القائمة':g.name, 'الغرفة':l })); });
+    groups.forEach(g=>{ g.done.forEach(x=>doneRows.push({ 'القائمة':g.name, [wasteSv()==='waste'?'الغرفة':'البند']:x.label, 'الوقت':wasteTime(x.done_at), 'المنفذ':x.done_by_name||'', 'الشفت':x.done_shift==='evening'?'مسائي':(x.done_shift==='morning'?'صباحي':'') })); g.notDone.forEach(l=>notRows.push({ 'القائمة':g.name, [wasteSv()==='waste'?'الغرفة':'البند']:l })); });
     if(doneRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doneRows), 'اتنفّذ');
     if(notRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notRows), 'ما اتنفّذش');
     if((r.pres||[]).length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((r.pres||[]).map(p=>({ 'الاسم':p.person_name||'', 'الشفت':p.shift==='evening'?'مسائي':'صباحي', 'الوقت':wasteTime(p.created_at) }))), 'الحضور');
