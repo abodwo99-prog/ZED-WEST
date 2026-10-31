@@ -73,6 +73,12 @@ input,textarea,select{font-family:inherit;}
 .stat .num{font-family:'Cairo';font-weight:900;font-size:24px;line-height:1;}
 .stat .lbl{font-size:11.5px;color:var(--text-dim);margin-top:6px;font-weight:700;}
 .stat.mint .num{color:var(--mint);} .stat.amber .num{color:var(--amber);} .stat.coral .num{color:var(--coral);} .stat.ink .num{color:var(--ink);} .stat.blue .num{color:var(--blue);}
+.drawer-bg{position:fixed;inset:0;background:rgba(14,58,110,.35);z-index:150;}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(460px,100%);background:var(--paper);z-index:160;box-shadow:8px 0 40px rgba(0,0,0,.22);display:flex;flex-direction:column;}
+.drawer-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);}
+.drawer-body{padding:14px 16px;overflow-y:auto;flex:1;}
+.drawer-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+.drawer-kv span:first-child{color:var(--text-dim);}
 .tbl-wrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;box-shadow:var(--shadow);margin-bottom:18px;}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
 th{background:var(--ink);color:#fff;text-align:right;padding:10px 12px;font-weight:700;font-size:11.5px;white-space:nowrap;}
@@ -872,7 +878,7 @@ const TAB_ICON = { home:'home', deliveries:'keyhand', orders:'dollar', pest:'bug
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
@@ -993,7 +999,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; S.tab=b.dataset.tab; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
@@ -1041,6 +1047,7 @@ function renderTabBody(){
   switch(S.tab){
     case 'home': return renderHome();
     case 'deliveries': return renderDeliveries();
+    case 'sideservices': return renderSideServices();
     case 'orders': return renderOrders();
     case 'pest': return renderPest();
     case 'facade': return renderFacade();
@@ -1067,6 +1074,7 @@ function bindTabEvents(){
   switch(S.tab){
     case 'home': bindHome(); break;
     case 'deliveries': bindDeliveries(); break;
+    case 'sideservices': bindSideServices(); break;
     case 'orders': bindOrders(); break;
     case 'pest': bindPest(); break;
     case 'facade': bindFacade(); break;
@@ -1530,6 +1538,81 @@ function dxPrintQuote(qty, o, month){
   toast('اختار "حفظ كـ PDF" من نافذة الطباعة',true);
 }
 
+
+function drawerHtml(title, body){ return `<div class="drawer-bg" data-drawer-close></div><aside class="drawer"><div class="drawer-head"><b style="font-size:14.5px;">${title}</b><button class="ghost-btn" data-drawer-close>✕ إغلاق</button></div><div class="drawer-body">${body}</div></aside>`; }
+function bindDrawer(){ document.querySelectorAll('[data-drawer-close]').forEach(e=>e.onclick=()=>{ S.drawer=null; render(); }); }
+/* ============================= خدمات (Integrated / Modifications) — بدون أسعار ============================= */
+const SS_TYPES={ integrated:'Integrated', modifications:'Modifications' };
+Object.assign(S,{ sideSvc:[], ssDate:todayStr(), ssType:'all' });
+async function sideSvcFetch(){ try{ const {data,error}=await sb.from('side_service_units').select('*'); if(error){ console.warn('side_service_units',error.message); return null; } return data||[]; }catch(e){ return null; } }
+async function loadSideSvc(){ const d=await sideSvcFetch(); if(d) S.sideSvc=d; }
+function ssTypeTag(t){ return `<span class="tag-shift ${t==='integrated'?'morning':'evening'}">${SS_TYPES[t]||esc(t)}</span>`; }
+function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option></select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
+function renderSideServices(){
+  const canWrite=S.profile.role==='admin'||S.profile.role==='opm';
+  const day=(S.sideSvc||[]).filter(x=>x.date===S.ssDate);
+  const list=day.filter(x=>S.ssType==='all'||x.service_type===S.ssType);
+  const cnt=t=>day.filter(x=>x.service_type===t).length;
+  return `<div class="toolbar">
+    <div class="fgroup"><label>التاريخ</label><input type="date" id="ss-date" value="${S.ssDate}"></div>
+    <div class="fgroup"><label>النوع</label><select id="ss-type"><option value="all" ${S.ssType==='all'?'selected':''}>الكل</option><option value="integrated" ${S.ssType==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${S.ssType==='modifications'?'selected':''}>Modifications</option></select></div>
+    ${canWrite?`<button class="primary-btn" id="ss-add">${ICON.plus()} إضافة وحدات / أوردرات</button>`:''}
+  </div>
+  <div class="stat-row" style="margin-bottom:14px;"><div class="stat mint"><div class="num">${cnt('integrated')}</div><div class="lbl">Integrated</div></div><div class="stat blue"><div class="num">${cnt('modifications')}</div><div class="lbl">Modifications</div></div><div class="stat ink"><div class="num">${day.filter(x=>x.status==='completed').length}/${day.length}</div><div class="lbl">منتهية</div></div></div>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>النوع</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(x=>`<tr><td>${esc(x.unit_code)}</td><td>${ssTypeTag(x.service_type)}</td><td>${(canWrite||S.profile.role==='supervisor')? ssStatusSelect('data-ss-status',x) : statusBadge(x.status)}</td><td style="white-space:normal;min-width:140px;">${esc(x.notes||'-')}</td><td>${canWrite?`<button class="ghost-btn" data-ss-edit="${x.id}">تعديل</button> <button class="ghost-btn danger" data-ss-del="${x.id}">${ICON.trash()}</button>`:''}</td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  </tbody></table></div>`;
+}
+function bindSideServices(){
+  const d=document.getElementById('ss-date'); if(d) d.onchange=()=>{ S.ssDate=d.value; render(); };
+  const t=document.getElementById('ss-type'); if(t) t.onchange=()=>{ S.ssType=t.value; render(); };
+  const a=document.getElementById('ss-add'); if(a) a.onclick=()=>{ S.modal={type:'ssForm'}; render(); };
+  document.querySelectorAll('[data-ss-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'ssForm', id:b.dataset.ssEdit}; render(); });
+  document.querySelectorAll('[data-ss-del]').forEach(b=>b.onclick=async ()=>{ if(!confirm('تحذف السطر ده؟')) return; if(await dbDelete('side_service_units', b.dataset.ssDel)){ await loadSideSvc(); render(); toast('تم الحذف',true); } });
+  document.querySelectorAll('[data-ss-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('side_service_units', sel.dataset.ssStatus, sel.value, loadSideSvc));
+}
+function renderSsForm(){
+  const m=S.modal; const ex=m.id? (S.sideSvc||[]).find(x=>x.id===m.id):null;
+  return modalWrap(ex?'تعديل':'إضافة وحدات / أوردرات (خدمات)', `
+    <div class="form-row"><label>النوع</label><select id="ss-f-type"><option value="integrated" ${ex&&ex.service_type==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${ex&&ex.service_type==='modifications'?'selected':''}>Modifications</option></select></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="ss-f-date" value="${ex?ex.date:S.ssDate}"></div>
+    ${ex? `<div class="form-row"><label>كود الوحدة</label><input id="ss-f-code" value="${esc(ex.unit_code)}"></div>`
+        : `<div class="form-row"><label>أكواد الوحدات (واحد في كل سطر أو بينهم فاصلة)</label><textarea id="ss-f-codes" rows="5" placeholder="E1-J1-3-2&#10;Y-A2-4-2"></textarea></div>`}
+    <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="ss-f-notes" rows="2">${esc(ex?ex.notes||'':'')}</textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="ss-f-save">${ICON.check(14)} حفظ</button>`);
+}
+function bindSsForm(){
+  const b=document.getElementById('ss-f-save'); if(!b) return;
+  b.onclick=async ()=>{
+    const m=S.modal; const g=id=>document.getElementById(id);
+    const type=g('ss-f-type').value, date=g('ss-f-date').value, notes=g('ss-f-notes').value.trim()||null;
+    if(!date){ toast('اختار التاريخ',false); return; }
+    b.disabled=true;
+    if(m.id){
+      const code=g('ss-f-code').value.trim(); if(!code){ toast('اكتب كود الوحدة',false); b.disabled=false; return; }
+      if(!(await dbUpdate('side_service_units', m.id, { service_type:type, date, unit_code:code, notes, updated_at:new Date().toISOString() }))){ b.disabled=false; return; }
+    } else {
+      const codes=[...new Set(g('ss-f-codes').value.split(/[\n,،;]+/).map(x=>x.trim()).filter(Boolean))];
+      if(!codes.length){ toast('اكتب كود وحدة واحد على الأقل',false); b.disabled=false; return; }
+      const have=new Set((S.sideSvc||[]).filter(x=>x.date===date&&x.service_type===type).map(x=>String(x.unit_code).trim().toUpperCase()));
+      const fresh=codes.filter(c=>!have.has(c.toUpperCase()));
+      if(!fresh.length){ toast('كل الأكواد دي متضافة قبل كده في نفس اليوم والنوع',false); b.disabled=false; return; }
+      const rows=fresh.map(c=>({ id:uid('ss'), service_type:type, unit_code:c, date, notes, status:'scheduled', created_by:S.session.user.id }));
+      if(!(await dbInsert('side_service_units', rows))){ b.disabled=false; return; }
+      if(fresh.length<codes.length) toast('اتضافت '+fresh.length+' وحدة (التكرار اتجاهل)',true);
+    }
+    await loadSideSvc(); S.ssDate=date; S.modal=null; render(); toast('تم الحفظ',true);
+  };
+}
+function renderSideSvcForSupervisor(){
+  const last=addDaysStr(S.today,2);
+  const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
+  return `<div class="section-title"><h2>خدمات — Integrated / Modifications (اليوم + يومين)</h2></div>
+  ${arr.length? arr.map(x=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div><b>${esc(x.unit_code)}</b> ${ssTypeTag(x.service_type)}${x.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${x.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(x.date)}</span>`:''}${x.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(x.notes)}</div>`:''}</div>
+    ${ssStatusSelect('data-my-ss',x)}</div>`).join('') : '<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات خدمات النهاردة ولا في اليومين الجايين</p>'}`;
+}
+
 async function loadDeliveries(){ S.deliveries = (await dbSelect('delivery_units')) ?? S.deliveries; }
 async function loadUnitNotes(){ S.unitNotes = (await dbSelect('unit_notes')) ?? S.unitNotes; }
 
@@ -1574,8 +1657,8 @@ function renderOrders(){
     ${canCreate?`<button class="primary-btn" id="ord-add">${ICON.plus()} أوردر جديد</button>`:''}
     ${canCreate?`<button class="ghost-btn" id="ord-extra">${ICON.plus(13)} طلب وحدة إضافية</button>`:''}
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th><th>رقم Sales Force</th>${hideMoney?'':'<th>السعر</th><th>الدفع</th>'}<th>التاريخ</th><th>الميعاد</th><th>ملاحظات</th><th>الحالة</th><th></th></tr></thead><tbody>
-  ${list.length? list.map(o=>{
+  <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th>${hideMoney?'':'<th>السعر</th><th>الدفع</th>'}<th>التاريخ والميعاد</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.length? list.slice(0,S.ordLimit||30).map(o=>{
     const canChangeStatus = (isApprover||role==='supervisor') && orderApproved(o);
     const extraTag = o.extra_reason ? ' <span class="tag-shift evening">إضافية</span>' : '';
     const statusCell = o.approval_status==='pending' ? '<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'
@@ -1589,29 +1672,39 @@ function renderOrders(){
     return `<tr style="${o.approval_status==='rejected'?'opacity:.6;':''}">
       <td>${esc(o.unit_code||'-')}${extraTag}</td>
       <td>${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</td>
-      <td>${esc(o.client_info||'-')}</td>
       ${hideMoney?'':`      <td>${o.price!=null? (+o.price).toLocaleString('en-US')+' ج.م' : '-'}</td>
       <td>${canManage? `<select data-ord-payment="${o.id}">
         <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
         <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
-      </select>${o.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>`}
-      <td>${o.scheduled_date}</td>
-      <td>${fmt12(o.scheduled_time,'-')}</td>
-      <td>${esc(o.opm_notes||'-')}</td>
+      </select>` : (PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')}</td>`}
+      <td>${o.scheduled_date}<div style="font-size:11px;color:var(--text-dim);">${fmt12(o.scheduled_time,'-')}</div></td>
       <td>${statusCell}</td>
-      <td>${(canManage||role==='fm_dispatcher')?`<button class="ghost-btn" data-ord-edit="${o.id}">تعديل</button>`:''}${canManage?` <button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)}</button>`:''}</td>
+      <td><button class="ghost-btn" data-ord-open="${o.id}">تفاصيل ›</button></td>
     </tr>`;
-  }).join(''): `<tr><td colspan="${hideMoney?8:10}" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
-  </tbody></table></div>`;
+  }).join(''): `<tr><td colspan="${hideMoney?5:7}" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أوردرات</td></tr>`}
+  </tbody></table></div>
+  ${list.length>(S.ordLimit||30)?`<div style="text-align:center;margin-bottom:16px;"><button class="ghost-btn" id="ord-more">عرض المزيد (${list.length-(S.ordLimit||30)} متبقي)</button></div>`:''}
+  ${(()=>{ const d=S.drawer; if(!d||d.kind!=='order') return ''; const o=S.orders.find(x=>x.id===d.id); if(!o) return '';
+    const kv=(k,v)=>`<div class="drawer-kv"><span>${k}</span><span style="text-align:left;">${v}</span></div>`;
+    return drawerHtml('أوردر '+esc(o.unit_code||''),
+      kv('رقم الوحدة',esc(o.unit_code||'-'))+kv('النوع',ORDER_TYPE_LABEL[o.order_type]||o.order_type)+kv('رقم Sales Force',esc(o.client_info||'-'))
+      +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.payment_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
+      +kv('التاريخ',o.scheduled_date)+kv('الميعاد',fmt12(o.scheduled_time,'-'))+kv('الحالة',statusBadge(o.status))
+      +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')
+      +kv('ملاحظات',esc(o.opm_notes||'-'))
+      +((canManage||role==='fm_dispatcher')?`<div style="display:flex;gap:8px;margin-top:14px;"><button class="primary-btn" data-ord-edit="${o.id}">تعديل</button>${canManage?`<button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)} حذف</button>`:''}</div>`:'')); })()}`;
 }
 function bindOrders(){
-  const _od=document.getElementById('ord-date'); if(_od) _od.onchange=e=>{ S.ordersDate=e.target.value; render(); };
-  const _oc=document.getElementById('ord-clear'); if(_oc) _oc.onclick=()=>{ S.ordersDate=''; render(); };
+  bindDrawer();
+  document.querySelectorAll('[data-ord-open]').forEach(b=>b.onclick=()=>{ S.drawer={kind:'order', id:b.dataset.ordOpen}; render(); });
+  const _om=document.getElementById('ord-more'); if(_om) _om.onclick=()=>{ S.ordLimit=(S.ordLimit||30)+30; render(); };
+  const _od=document.getElementById('ord-date'); if(_od) _od.onchange=e=>{ S.ordersDate=e.target.value; S.ordLimit=30; render(); };
+  const _oc=document.getElementById('ord-clear'); if(_oc) _oc.onclick=()=>{ S.ordersDate=''; S.ordLimit=30; render(); };
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
   const ex=document.getElementById('ord-extra'); if(ex) ex.onclick=()=>{ S.modal={type:'addOrder', extra:true}; render(); };
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
   document.querySelectorAll('[data-ord-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editOrder', id:b.dataset.ordEdit}; render(); });
-  document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
+  document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
   document.querySelectorAll('[data-ord-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordPayment, {payment_status:sel.value}); await loadOrders(); render(); toast('تم تحديث حالة الدفع',true); });
   document.querySelectorAll('[data-ord-approve]').forEach(b=>b.onclick=async ()=>{
     b.disabled=true;
@@ -1965,15 +2058,17 @@ function renderFacadeOrdersForSV(){
   </tbody></table></div>`;
 }
 /* ============================= FACADE CLEANING ============================= */
+function svcRepBtn(sv){ const r=S.profile.role; return (r==='admin'||r==='opm')?`<div class="toolbar" style="margin-bottom:10px;"><button class="primary-btn" id="${sv}-report">📊 تقارير ${SVC_REP_NAME[sv]} (يوم بيوم)</button></div>`:''; }
+function bindSvcRepBtn(sv){ const b=document.getElementById(sv+'-report'); if(b) b.onclick=()=>{ S.modal={type:'wasteReport'}; loadWasteReport(S.today,sv); }; }
 function renderFacade(){
   const role=S.profile.role;
-  return renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld());
+  return svcRepBtn('facade') + renderSvcSection('facade') + (role==='facade_sv' ? renderFacadeOrdersForSV() : '<div class="section-title"><h2>أعمال نظافة الواجهات</h2></div>' + renderFacadeOld());
 }
-function bindFacade(){ bindSvc('facade'); if(S.profile.role!=='facade_sv') bindFacadeOld(); }
-function renderPest(){ return renderPestSched() + renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
-function bindPest(){ bindPestSched(); bindSvc('pest'); bindPestOld(); }
+function bindFacade(){ bindSvcRepBtn('facade'); bindSvc('facade'); if(S.profile.role!=='facade_sv') bindFacadeOld(); }
+function renderPest(){ return svcRepBtn('pest') + renderPestSched() + renderSvcSection('pest') + '<div class="section-title"><h2>طلبات مكافحة الحشرات</h2></div>' + renderPestOld(); }
+function bindPest(){ bindSvcRepBtn('pest'); bindPestSched(); bindSvc('pest'); bindPestOld(); }
 function renderWaste(){ const isMgrW=(S.profile.role==='admin'||S.profile.role==='opm'); return (isMgrW?'<div class="toolbar" style="margin-bottom:10px;"><button class="primary-btn" id="waste-report">📊 تقارير رفع المخلفات (يوم بيوم)</button></div>':'') + renderSvcSection('waste') + '<div class="section-title"><h2>أعمال رفع المخلفات</h2></div>' + renderWasteOld(); }
-function bindWaste(){ bindSvc('waste'); bindWasteOld(); const wr=document.getElementById('waste-report'); if(wr) wr.onclick=()=>{ S.modal={type:'wasteReport'}; S.wasteRep={ date:S.today, loading:true, rows:[], pres:[] }; loadWasteReport(S.today); }; }
+function bindWaste(){ bindSvc('waste'); bindWasteOld(); const wr=document.getElementById('waste-report'); if(wr) wr.onclick=()=>{ S.modal={type:'wasteReport'}; loadWasteReport(S.today,'waste'); }; }
 function renderFacadeOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm';
@@ -2121,20 +2216,12 @@ async function ensureTodayTaskRuns(){
 }
 async function refreshTasks(){ await loadTaskData(); await ensureTodayTaskRuns(); render(); }
 
-function renderTasksAdmin(){
-  const lists=sortedTaskLists();
-  return `
-  <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button></div>
-  <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك حسب تكرارها (يومي / أسبوعي / شهري) للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
-  ${lists.length? lists.map(l=>{
+function taskAdminParts(l){
     const items=taskItemsOf(l.id); const {run,done,total}=taskProgress(l);
-    const open=S.openTaskAdmin.has(l.id);
-    return `<details class="card" data-tl-open="${l.id}" ${open?'open':''} style="margin-bottom:12px;${l.active===false?'opacity:.65;':''}">
-      <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    return { sum:`
         <span><b style="font-size:14.5px;">${esc(l.name)}</b> <span class="tag-shift ${l.shift||'both'}">${SHIFT_LABEL[l.shift||'both']}</span> <span class="tag-shift both">${esc(taskFreqText(l))}</span> ${taskWindowText(l)} ${(zoneOfList(l.id)?`<span class="tag-shift both">${esc(zoneOfList(l.id).name)}</span>`:'')}</span>
         <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text-dim);">${total} بند${taskDueToday(l)?' · اليوم '+done+'/'+total:''}</span>${l.active===false?'<span class="badge pending"><span class="dot"></span>موقوفة</span>':(taskDueToday(l)?taskRunBadge(run):'<span class="badge pending"><span class="dot"></span>مش مجدولة النهاردة</span>')}</span>
-      </summary>
-      <div style="margin-top:12px;">
+`, body:`
         ${taskWhoHtml(run)}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
           <button class="ghost-btn" data-tl-qr="${l.id}">${ICON.qr(13)} كود QR</button>
@@ -2158,9 +2245,15 @@ function renderTasksAdmin(){
           <textarea data-ti-bulk="${l.id}" rows="5" placeholder="اكتب كل بند في سطر (مثال: الدور 1، الدور 2، أبواب الشقق...)" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--sand);"></textarea>
           <button class="ghost-btn" data-ti-bulk-add="${l.id}" style="margin-top:6px;">إضافة البنود</button>
         </details>
-      </div>
-    </details>`;
-  }).join('') : `<div class="empty-state"><span class="em">📋</span>لسه مفيش قوائم مهام — دوس "قائمة مهام جديدة"</div>`}`;
+` };
+}
+function renderTasksAdmin(){
+  const lists=sortedTaskLists();
+  return `
+  <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button></div>
+  <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك حسب تكرارها (يومي / أسبوعي / شهري) للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
+  ${lists.length? lists.map(l=>`<div class="card" data-tl-drawer="${l.id}" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;${l.active===false?'opacity:.65;':''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">${taskAdminParts(l).sum}<span style="color:var(--mint);font-weight:800;">فتح ›</span></div></div>`).join('') : `<div class="empty-state"><span class="em">📋</span>لسه مفيش قوائم مهام — دوس "قائمة مهام جديدة"</div>`}
+  ${(()=>{ const d=S.drawer; if(!d||d.kind!=='tasklist') return ''; const l=lists.find(x=>x.id===d.id); if(!l) return ''; return drawerHtml(esc(l.name), `<div>${taskAdminParts(l).body}</div>`); })()}`;
 }
 async function addTaskItems(listId, names){
   const items=taskItemsOf(listId); let pos=items.reduce((m,i)=>Math.max(m,i.position||0),0);
@@ -2176,12 +2269,14 @@ async function moveTaskItem(id, dir){
   S.openTaskAdmin.add(it.list_id); await refreshTasks();
 }
 function bindTasksAdmin(){
+  bindDrawer();
+  document.querySelectorAll('[data-tl-drawer]').forEach(c=>c.onclick=()=>{ S.drawer={kind:'tasklist', id:c.dataset.tlDrawer}; render(); });
   const add=document.getElementById('tl-add'); if(add) add.onclick=()=>{ S.modal={type:'addTaskList'}; render(); };
   document.querySelectorAll('details[data-tl-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskAdmin.add(d.dataset.tlOpen); else S.openTaskAdmin.delete(d.dataset.tlOpen); }));
   document.querySelectorAll('[data-tl-qr]').forEach(b=>b.onclick=()=>{ const l=S.taskLists.find(x=>x.id===b.dataset.tlQr); S.qrTarget={code:'ZEDWEST|TL|'+l.id, label:l.name}; S.modal={type:'qr'}; render(); });
   document.querySelectorAll('[data-tl-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editTaskList', id:b.dataset.tlEdit}; render(); });
   document.querySelectorAll('[data-tl-toggle]').forEach(b=>b.onclick=async ()=>{ const l=S.taskLists.find(x=>x.id===b.dataset.tlToggle); await dbUpdate('task_lists', l.id, {active: l.active===false}); await refreshTasks(); });
-  document.querySelectorAll('[data-tl-del]').forEach(b=>b.onclick=()=>{ S.modal={type:'confirmDeleteTaskList', id:b.dataset.tlDel}; render(); });
+  document.querySelectorAll('[data-tl-del]').forEach(b=>b.onclick=()=>{ S.drawer=null; S.modal={type:'confirmDeleteTaskList', id:b.dataset.tlDel}; render(); });
   document.querySelectorAll('[data-ti-add]').forEach(b=>b.onclick=async ()=>{
     const lid=b.dataset.tiAdd; const inp=document.querySelector(`[data-ti-new="${lid}"]`); const name=(inp.value||'').trim();
     if(!name){ toast('اكتب اسم البند',false); return; }
@@ -2602,7 +2697,7 @@ const PRES_WINDOWS = {
   morning:{ from:480, to:600, name:'الصباحية', openTxt:'8:00 صباحًا', closeTxt:'10:00 صباحًا' },
   evening:{ from:900, to:1020, name:'المسائية', openTxt:'3:00 عصرًا', closeTxt:'5:00 عصرًا' },
 };
-const ST_SELECTORS='select[data-dv-status],select[data-ord-status],select[data-my-dv],select[data-my-ord],select[data-fsv-ord],select[data-pest-status],select[data-my-pest],select[data-urg-status]';
+const ST_SELECTORS='select[data-dv-status],select[data-ss-status],select[data-my-ss],select[data-ord-status],select[data-my-dv],select[data-my-ord],select[data-fsv-ord],select[data-pest-status],select[data-my-pest],select[data-urg-status]';
 function paintStatusSelects(){
   document.querySelectorAll(ST_SELECTORS).forEach(sel=>{
     const paint=()=>{ sel.classList.remove('st-scheduled','st-pending','st-in_progress','st-completed','st-done','st-postponed'); sel.classList.add('st-sel','st-'+sel.value); };
@@ -2949,9 +3044,32 @@ function compressImage(file, maxW, q){
     reader.onerror=()=>resolve(null); reader.readAsDataURL(file);
   });
 }
+function violCanManage(v){ const r=S.profile.role; return v.created_by===S.session.user.id || r==='admin' || r==='opm'; }
+function violFiltered(){
+  const f=S.violFilter||{}; const q=(f.q||'').trim().toLowerCase();
+  return (S.violations||[]).filter(v=>{
+    if(f.phase && (v.phase||'')!==f.phase) return false;
+    if(f.by && v.created_by!==f.by) return false;
+    if(f.from && String(v.created_at||'').slice(0,10)<f.from) return false;
+    if(f.to && String(v.created_at||'').slice(0,10)>f.to) return false;
+    if(q && !(violLocation(v)+' '+(v.note||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
 function renderViolations(){
   const isAdmin=S.profile.role==='admin';
-  const list=S.violations||[];
+  const f=S.violFilter||(S.violFilter={ q:'', phase:'', by:'', from:'', to:'' });
+  const all=S.violations||[]; const list=violFiltered();
+  const phases=[...new Set(all.map(v=>v.phase).filter(Boolean))];
+  const bys=[...new Set(all.map(v=>v.created_by).filter(Boolean))];
+  const filterBar=`<div class="toolbar" style="margin-bottom:12px;">
+    <div class="fgroup"><label>بحث (مكان / ملاحظة)</label><input id="vf-q" value="${esc(f.q)}" placeholder="مبنى، دور، شقة..."></div>
+    <div class="fgroup"><label>المرحلة</label><select id="vf-phase"><option value="">الكل</option>${phases.map(x=>`<option value="${esc(x)}" ${f.phase===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+    <div class="fgroup"><label>سجّلها</label><select id="vf-by"><option value="">الكل</option>${bys.map(x=>`<option value="${x}" ${f.by===x?'selected':''}>${esc(shownName(x)||'-')}</option>`).join('')}</select></div>
+    <div class="fgroup"><label>من تاريخ</label><input type="date" id="vf-from" value="${f.from||''}"></div>
+    <div class="fgroup"><label>إلى تاريخ</label><input type="date" id="vf-to" value="${f.to||''}"></div>
+    <button class="ghost-btn" id="vf-clear">مسح الفلتر</button>
+  </div>`;
   const cards=list.map(v=>{
     const open=S.violOpen.has(v.id);
     const photos=S.violPhotos[v.id]||null;
@@ -2965,7 +3083,7 @@ function renderViolations(){
       ${open? (photos? (photos.length? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px;">${photos.map(p=>`<div><img src="${p.photo}" data-viol-view="${p.id}|${v.id}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer;">${p.caption?`<div style="font-size:11.5px;margin-top:3px;line-height:1.6;">${esc(p.caption)}</div>`:''}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">مفيش صور.</div>') : '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">جارٍ تحميل الصور...</div>') : ''}
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
         ${(v.photo_count||0)>0?`<button class="ghost-btn" data-viol-toggle="${v.id}">${open?'إخفاء الصور':'عرض الصور'}</button>`:''}
-        ${v.created_by===S.session.user.id? `<button class="ghost-btn" data-viol-edit="${v.id}">✏️ تعديل</button>
+        ${violCanManage(v)? `<button class="ghost-btn" data-viol-edit="${v.id}">✏️ تعديل</button>
         <button class="ghost-btn danger" data-viol-del="${v.id}">${ICON.trash(14)} حذف</button>` : ''}
       </div>
     </div>`; }).join('');
@@ -2973,12 +3091,17 @@ function renderViolations(){
       <button class="primary-btn" id="viol-add">${ICON.plus(14)} إضافة مخالفة</button>
       ${isAdmin?`<button class="ghost-btn" id="viol-report">${ICON.printer(14)} سحب تقرير</button>`:''}
     </div>
-    <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;line-height:1.8;">كل البيانات اختيارية. كل واحد بيعدّل ويحذف مخالفاته هو بس. المخالفات بتتمسح تلقائيًا بعد 7 أيام من تسجيلها.</p>
-    ${list.length? cards : '<div class="empty-state"><span class="em">📋</span>مفيش مخالفات مسجّلة</div>'}`;
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;line-height:1.8;">كل البيانات اختيارية. كل واحد بيعدّل ويحذف مخالفاته هو، والأدمن و OPM يقدروا يعدّلوا ويحذفوا أي مخالفة. المخالفات بتتمسح تلقائيًا بعد 7 أيام من تسجيلها.</p>
+    ${filterBar}
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">${list.length} من ${all.length} مخالفة</div>
+    ${list.length? cards : '<div class="empty-state"><span class="em">📋</span>مفيش مخالفات مطابقة</div>'}`;
 }
 function bindViolations(){
   const add=document.getElementById('viol-add'); if(add) add.onclick=()=>{ S.violDraft={ id:null, phase:'', building:'', floor_no:'', apartment:'', note:'', photos:[], removedIds:[] }; S.modal={type:'violForm'}; render(); };
   const rep=document.getElementById('viol-report'); if(rep) rep.onclick=violationReport;
+  { const F=()=>S.violFilter||(S.violFilter={ q:'', phase:'', by:'', from:'', to:'' });
+    [['vf-q','q'],['vf-phase','phase'],['vf-by','by'],['vf-from','from'],['vf-to','to']].forEach(([id,k])=>{ const el=document.getElementById(id); if(el) el.onchange=()=>{ F()[k]=el.value; render(); }; });
+    const c=document.getElementById('vf-clear'); if(c) c.onclick=()=>{ S.violFilter={ q:'', phase:'', by:'', from:'', to:'' }; render(); }; }
   document.querySelectorAll('[data-viol-toggle]').forEach(b=>b.onclick=async ()=>{
     const id=b.dataset.violToggle;
     if(S.violOpen.has(id)){ S.violOpen.delete(id); render(); return; }
@@ -2990,13 +3113,13 @@ function bindViolations(){
   });
   document.querySelectorAll('[data-viol-edit]').forEach(b=>b.onclick=async ()=>{
     const v=(S.violations||[]).find(x=>x.id===b.dataset.violEdit); if(!v) return;
-    if(v.created_by!==S.session.user.id){ toast('مينفعش تعدّل مخالفة حد تاني',false); return; }
+    if(!violCanManage(v)){ toast('مينفعش تعدّل مخالفة حد تاني',false); return; }
     const photos=(v.photo_count||0)>0 ? await loadViolPhotos(v.id) : [];
     S.violDraft={ id:v.id, phase:v.phase||'', building:v.building||'', floor_no:v.floor_no||'', apartment:v.apartment||'', note:v.note||'', photos:photos.map(p=>({id:p.id,photo:p.photo,caption:p.caption||''})), removedIds:[] };
     S.modal={type:'violForm'}; render();
   });
   document.querySelectorAll('[data-viol-del]').forEach(b=>b.onclick=async ()=>{
-    { const vv=(S.violations||[]).find(x=>x.id===b.dataset.violDel); if(!vv || vv.created_by!==S.session.user.id){ toast('مينفعش تحذف مخالفة حد تاني',false); return; } }
+    { const vv=(S.violations||[]).find(x=>x.id===b.dataset.violDel); if(!vv || !violCanManage(vv)){ toast('مينفعش تحذف مخالفة حد تاني',false); return; } }
     if(!confirm('تحذف المخالفة دي بصورها؟')) return;
     const {error}=await sb.from('client_violations').delete().eq('id',b.dataset.violDel);
     if(error){ toast('حصل خطأ: '+error.message,false); return; }
@@ -3180,25 +3303,28 @@ function bindReports(){
 
 /* ============================= WASTE DAILY REPORT ============================= */
 Object.assign(S,{ wasteRep:null });
-async function loadWasteReport(date){
-  S.wasteRep={ date, loading:true, rows:[], pres:[] }; render();
+const SVC_REP_NAME={ waste:'رفع المخلفات', facade:'نظافة الواجهات', pest:'مكافحة الحشرات' };
+function wasteSv(){ return (S.wasteRep&&S.wasteRep.service)||'waste'; }
+async function loadWasteReport(date,service){
+  const sv=service||wasteSv();
+  S.wasteRep={ date, service:sv, loading:true, rows:[], pres:[] }; render();
   const [lg,pr]=await Promise.all([
-    sb.from('svc_item_log').select('*').eq('service','waste').eq('log_date',date).order('done_at'),
-    sb.from('svc_presence').select('*').eq('service','waste').eq('date',date).order('created_at')
+    sb.from('svc_item_log').select('*').eq('service',sv).eq('log_date',date).order('done_at'),
+    sb.from('svc_presence').select('*').eq('service',sv).eq('date',date).order('created_at')
   ]);
-  if(lg.error){ toast('تعذّر تحميل التقرير — شغّل update_v16.sql ('+lg.error.message+')',false); S.wasteRep={ date, loading:false, rows:[], pres:[] }; render(); return; }
-  S.wasteRep={ date, loading:false, rows:lg.data||[], pres:pr.data||[] }; render();
+  if(lg.error){ toast('تعذّر تحميل التقرير — شغّل update_v16.sql ('+lg.error.message+')',false); S.wasteRep={ date, service:sv, loading:false, rows:[], pres:[] }; render(); return; }
+  S.wasteRep={ date, service:sv, loading:false, rows:lg.data||[], pres:pr.data||[] }; render();
 }
 function wasteTime(iso){ return iso? new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit', hour12:true }) : ''; }
 function wasteReportModel(){
   const r=S.wasteRep||{}; const rows=r.rows||[];
-  const groups=svcListsOf('waste').map(l=>{
+  const groups=svcListsOf(wasteSv()).map(l=>{
     const items=svcItemsOf(l.id);
     const done=rows.filter(x=>x.list_id===l.id);
     const doneIds=new Set(done.map(x=>x.item_id));
     return { name:l.name, total:items.length, done, notDone:items.filter(i=>!doneIds.has(i.id)).map(i=>i.label) };
   });
-  const known=new Set(svcListsOf('waste').map(l=>l.id));
+  const known=new Set(svcListsOf(wasteSv()).map(l=>l.id));
   const orphan=rows.filter(x=>!known.has(x.list_id));
   if(orphan.length) groups.push({ name:'قوائم محذوفة', total:orphan.length, done:orphan, notDone:[] });
   return groups;
@@ -3214,14 +3340,14 @@ function renderWasteReportModal(){
       ${g.done.length? `<div style="margin-top:8px;">${g.done.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);"><span><b>${esc(x.label)}</b></span><span style="color:var(--text-dim);">${esc(wasteTime(x.done_at))} · ${esc(x.done_by_name||'-')} · ${shiftLbl(x.done_shift)}</span></div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">ما اتنفّذش حاجة في اليوم ده.</div>'}
       ${g.notDone.length? `<div style="font-size:12px;margin-top:8px;line-height:1.8;"><b style="color:var(--amber);">ما اتنفّذش:</b> ${g.notDone.map(esc).join('، ')}</div>`:''}
     </div>`).join('')}
-    <div class="card"><b>حضور مشرفي رفع المخلفات</b>
+    <div class="card"><b>حضور مشرفي ${SVC_REP_NAME[wasteSv()]}</b>
       ${(r.pres||[]).length? (r.pres||[]).map(p=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);"><span>${esc(p.person_name||'-')}</span><span style="color:var(--text-dim);">${shiftLbl(p.shift)} · ${esc(wasteTime(p.created_at))}</span></div>`).join('') : '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">محدش سجّل حضور في اليوم ده.</div>'}
     </div>
     <button class="ghost-btn" id="wr-export" style="margin-top:10px;">📥 تصدير Excel لليوم ده</button>`;
-  return modalWrap('تقرير رفع المخلفات', `<div class="form-row"><label>اختار اليوم</label><input type="date" id="wr-date" value="${esc(r.date||S.today)}"></div>${body}`, 'wide');
+  return modalWrap('تقرير '+SVC_REP_NAME[wasteSv()], `<div class="form-row"><label>اختار اليوم</label><input type="date" id="wr-date" value="${esc(r.date||S.today)}"></div>${body}`, 'wide');
 }
 function bindWasteReport(){
-  const d=document.getElementById('wr-date'); if(d) d.onchange=()=>{ if(d.value) loadWasteReport(d.value); };
+  const d=document.getElementById('wr-date'); if(d) d.onchange=()=>{ if(d.value) loadWasteReport(d.value,wasteSv()); };
   const ex=document.getElementById('wr-export'); if(ex) ex.onclick=()=>{
     if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل',false); return; }
     const r=S.wasteRep||{}; const groups=wasteReportModel(); const wb=XLSX.utils.book_new();
@@ -3232,7 +3358,7 @@ function bindWasteReport(){
     if((r.pres||[]).length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((r.pres||[]).map(p=>({ 'الاسم':p.person_name||'', 'الشفت':p.shift==='evening'?'مسائي':'صباحي', 'الوقت':wasteTime(p.created_at) }))), 'الحضور');
     if(!wb.SheetNames.length){ toast('مفيش بيانات لليوم ده',false); return; }
     const blob=new Blob([XLSX.write(wb,{ bookType:'xlsx', type:'array' })],{ type:'application/octet-stream' });
-    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='رفع_المخلفات_'+(r.date||S.today)+'.xlsx'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),3000);
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=SVC_REP_NAME[wasteSv()].replace(/ /g,'_')+'_'+(r.date||S.today)+'.xlsx'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),3000);
     toast('تم تصدير الملف',true);
   };
 }
@@ -3982,8 +4108,6 @@ function renderReportsMain(){
       <option value="all" ${type==='all'?'selected':''}>كل الخدمات</option>
       <option value="deliveries" ${type==='deliveries'?'selected':''}>وحدات التسليم</option>
       <option value="orders" ${type==='orders'?'selected':''}>الخدمة المدفوعة</option>
-      <option value="pest" ${type==='pest'?'selected':''}>مكافحة الحشرات</option>
-      <option value="facade" ${type==='facade'?'selected':''}>نظافة الواجهات</option>
       <option value="waste" ${type==='waste'?'selected':''}>رفع المخلفات</option>
       <option value="checklist" ${type==='checklist'?'selected':''}>المهمات المجدولة</option>
       <option value="attendance" ${type==='attendance'?'selected':''}>الحضور</option>
@@ -3997,8 +4121,6 @@ function renderReportsMain(){
     return toolbar + `<div class="stat-row">
       <div class="stat mint"><div class="num">${deliv.filter(d=>d.status==='completed').length}/${deliv.length}</div><div class="lbl">وحدات تسليم منجزة</div></div>
       <div class="stat blue"><div class="num">${orders.filter(o=>o.status==='completed').length}/${orders.length}</div><div class="lbl">أوردرات خدمة مدفوعة منجزة</div></div>
-      <div class="stat coral"><div class="num">${pest.filter(p=>p.status==='completed').length}/${pest.length}</div><div class="lbl">مكافحة حشرات منجزة</div></div>
-      <div class="stat amber"><div class="num">${facade.filter(f=>f.status==='completed').length}/${facade.length}</div><div class="lbl">نظافة واجهات منجزة</div></div>
       <div class="stat ink"><div class="num">${waste.filter(w=>w.status==='completed').length}/${waste.length}</div><div class="lbl">رفع مخلفات منجزة</div></div>
       <div class="stat ink"><div class="num">${checklist.filter(c=>c.status==='completed').length}/${checklist.length}</div><div class="lbl">مهمات مجدولة منجزة</div></div>
       <div class="stat ink"><div class="num">${attendanceTotal}</div><div class="lbl">إجمالي أفراد الحضور</div></div>
@@ -4076,8 +4198,6 @@ function exportReportExcel(){
   const payFmt = v => PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
   if(want('deliveries')) addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['client_arrival_time','ميعاد وصول العميل',v=>fmt12(v,'')],['special_instructions','تعليمات خاصة'],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['notes','ملاحظات']]);
   if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
-  if(want('pest')) addSheet(data.pest, 'مكافحة الحشرات', [['unit_code','كود الوحدة'],['service_type','النوع',v=>PEST_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt]]);
-  if(want('facade')) addSheet(data.facade, 'نظافة الواجهات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt]]);
   if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',(v,r)=>v==='completed'?'تم اعتمادها':(r.supervisor_marked_done?'بانتظار اعتماد المشرف الأول':((r.date<S.today || taskMissed((S.taskLists||[]).find(l=>l.id===r.list_id),r))?'أُغلقت قبل الإنجاز':'قيد التنفيذ'))],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
   if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
@@ -4155,6 +4275,7 @@ function renderSupervisorToday(){
         </div>
       </div>`;
     }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة ولا في اليومين الجايين</p>`}`;
+    html += renderSideSvcForSupervisor();
     html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
     ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${fmt12(o.scheduled_time,'')}
@@ -4184,7 +4305,7 @@ function bindSupervisorToday(){
   const rb=document.getElementById('refresh-my-locs');
   if(rb) rb.onclick=async ()=>{
     rb.disabled=true;
-    await refreshAssignments(); await loadDeliveries(); await loadOrders(); await loadTaskData(); await ensureTodayTaskRuns();
+    await refreshAssignments(); await loadDeliveries(); await loadSideSvc(); await loadOrders(); await loadTaskData(); await ensureTodayTaskRuns();
     render(); toast('تم التحديث',true);
   };
   const wcs=document.getElementById('wc-save');
@@ -4199,6 +4320,7 @@ function bindSupervisorToday(){
   const gu=document.querySelector('[data-goto-urgent]'); if(gu) gu.onclick=()=>{ S.tab='urgent'; render(); };
   document.querySelectorAll('[data-my-dv]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.myDv, sel.value, loadDeliveries));
   document.querySelectorAll('[data-my-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.myOrd, sel.value, loadOrders));
+  document.querySelectorAll('[data-my-ss]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('side_service_units', sel.dataset.mySs, sel.value, loadSideSvc));
   document.querySelectorAll('[data-add-note]').forEach(b=>b.onclick=()=>{ S.noteDraft={unitId:b.dataset.addNote, items:[{note:'',photo:null}]}; S.modal={type:'addUnitNote', id:b.dataset.addNote}; render(); });
   document.querySelectorAll('details[data-tsup-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskSup.add(d.dataset.tsupOpen); else S.openTaskSup.delete(d.dataset.tsupOpen); }));
   document.querySelectorAll('[data-ti-check]').forEach(cb=>cb.onchange=async ()=>{
@@ -4243,6 +4365,7 @@ function bindMyName(){
 function renderModal(){
   if(!S.modal) return '';
   const m=S.modal;
+  if(m.type==='ssForm') return renderSsForm();
   if(m.type==='dvExport') return renderDvExport();
   if(m.type==='monthlyFinance') return modalWrap('Monthly Finance Breakdown', renderMonthlyFinance(), 'full');
   if(m.type==='addDelivery') return modalWrap('إضافة وحدة تسليم', `
@@ -4706,6 +4829,7 @@ function bindModalEvents(){
   if(S.modal && S.modal.type==='addUnitNote') bindNoteModal();
   if(S.modal && S.modal.type==='monthlyFinance') bindMonthlyFinance();
   if(S.modal && S.modal.type==='dvExport') bindDvExport();
+  if(S.modal && S.modal.type==='ssForm') bindSsForm();
   if(S.modal && S.modal.type==='supplierDetail') bindMpSection();
   if(S.modal && S.modal.type==='wasteReport') bindWasteReport();
   if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
@@ -4980,7 +5104,7 @@ async function handleModalSave(){
     const reason=document.getElementById('m-postpone-generic-reason').value.trim();
     if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
     await dbUpdate(m.table, m.id, {status:'postponed', postpone_reason:reason, updated_at:new Date().toISOString()});
-    const reloadMap = { delivery_units: loadDeliveries, paid_service_orders: loadOrders };
+    const reloadMap = { delivery_units: loadDeliveries, paid_service_orders: loadOrders, side_service_units: loadSideSvc };
     if(reloadMap[m.table]) await reloadMap[m.table]();
     S.modal=null; render(); toast('تم تسجيل التأجيل',true);
   }
@@ -5204,6 +5328,7 @@ async function loadRoleData(){
     jobs.units = dbSelect('units_master');
   }
   if(wantsOpsData){
+    jobs.sideSvc = sideSvcFetch();
     jobs.orders = dbSelect('paid_service_orders');
     jobs.pest = dbSelect('pest_control_requests');
     jobs.facade = dbSelect('facade_works');
@@ -5242,6 +5367,7 @@ async function loadRoleData(){
   if(data.facade) S.facade = data.facade;
   if(data.waste) S.waste = data.waste;
   if(data.deliveries) S.deliveries = data.deliveries;
+  if(data.sideSvc) S.sideSvc = data.sideSvc;
   if(data.unitNotes) S.unitNotes = data.unitNotes;
   if(data.complaints) S.complaints = data.complaints;
   if(data.suppliers) S.suppliers = data.suppliers;
