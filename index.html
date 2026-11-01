@@ -369,7 +369,9 @@ body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;po
 .fv-ov{position:fixed;inset:0;z-index:9000;background:#0b1220;color:#fff;display:flex;flex-direction:column;}
 .fv-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;}
 .fv-x{border:none;background:rgba(255,255,255,.18);color:inherit;width:34px;height:34px;border-radius:50%;font-size:16px;}
-.fv-vwrap{position:relative;flex:1;min-height:0;background:#000;}
+.fv-vwrap{position:relative;flex:1;min-height:0;background:#000;overflow:hidden;}
+.fv-frame{position:absolute;border:3px solid #fff;border-radius:18px;box-shadow:0 0 0 100vmax rgba(0,0,0,.58);pointer-events:none;transition:border-color .15s;}
+.fv-frame.ok{border-color:#3ddc84;}
 .fv-vwrap video{width:100%;height:100%;object-fit:cover;}
 .fv-badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.65);padding:6px 14px;border-radius:999px;font-weight:800;font-size:15px;}
 .fv-zone{padding:6px 14px;font-size:12.5px;text-align:center;font-weight:700;background:#444;}
@@ -959,6 +961,7 @@ async function loadVerify(){
   const q=async f=>{ try{ const r=await f(); return r.error?null:r.data; }catch(e){ return null; } };
   const [zone,session]=await Promise.all([ q(()=>sb.from('verify_settings').select('*').eq('id','zone').maybeSingle()), q(()=>sb.from('verify_sessions').select('*').eq('id',S.today).maybeSingle()) ]);
   const checks=await q(()=>sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_thumb,selfie_at,submitted_at,worker_count,result').eq('date',S.today));
+  if(fvStaff() && !(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(e){} }
   const faces=fvStaff()? (await q(()=>sb.from('verify_faces').select('id,kind,label_user_id,thumb,created_at').eq('date',S.today).order('created_at'))||[]) : [];
   const v=S.verify; v.zone=zone; v.session=session; v.checks=checks||[]; v.faces=faces; v.loaded=true;
   const sig=JSON.stringify([session&&[session.status,session.call_deadline,session.workers_count,session.supervisors_count],v.checks.map(c=>[c.id,c.status,c.worker_count]),faces.length,zone&&[zone.lat,zone.lng,zone.radius_m]]);
@@ -1025,14 +1028,24 @@ function fvOpenScanner(opt){
     const faces=[]; let stream=null, alive=true, pos=null, zoneOk=!opt.zoneCheck, watchId=null, fa=null, stable=0;
     const ov=document.createElement('div'); ov.id='fv-scan'; ov.className='fv-ov';
     ov.innerHTML=`<div class="fv-head"><b>${esc(opt.title)}</b><button class="fv-x" id="fv-cancel">✕</button></div>
-      <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-badge"><span id="fv-count">0</span> وش</div></div>
+      <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-frame" id="fv-frame"></div><div class="fv-badge"><span id="fv-count">0</span> وش</div></div>
       <div class="fv-zone" id="fv-zone" style="display:${opt.zoneCheck?'block':'none'}">جاري تحديد موقعك...</div>
       <div class="fv-msg" id="fv-msg">جاري تشغيل الكاميرا...</div>
       <div class="fv-strip" id="fv-strip"></div>
       <div class="fv-foot"><button class="primary-btn" id="fv-fin" style="width:100%;justify-content:center;" disabled>${esc(opt.finishLabel||'تم')}</button></div>`;
     document.body.appendChild(ov);
-    const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin');
-    const close=res=>{ alive=false; try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} if(watchId!=null) try{ navigator.geolocation.clearWatch(watchId); }catch(e){} ov.remove(); resolve(res); };
+    const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin'), wrap=$('.fv-vwrap'), frameEl=$('#fv-frame');
+    // الإطار: المربع اللي لازم الوش يبقى جواه — أي وش برّاه أو بعيد (صغير) بيتتجاهل
+    const frameRect=()=>{ const W=wrap.clientWidth, H=wrap.clientHeight, s=Math.min(W,H)*.72; return { x:(W-s)/2, y:(H-s)/2, s }; };
+    const placeFrame=()=>{ const f=frameRect(); frameEl.style.cssText='left:'+f.x+'px;top:'+f.y+'px;width:'+f.s+'px;height:'+f.s+'px;'; };
+    const inFrame=(b,minRatio)=>{
+      const W=wrap.clientWidth, H=wrap.clientHeight, vw=video.videoWidth, vh=video.videoHeight; if(!vw||!vh||!W||!H) return false;
+      const sc=Math.max(W/vw,H/vh), ox=(vw*sc-W)/2, oy=(vh*sc-H)/2;
+      const x=b.x*sc-ox, y=b.y*sc-oy, w=b.width*sc, h=b.height*sc, f=frameRect(), tol=f.s*.06;
+      return x>=f.x-tol && y>=f.y-tol && x+w<=f.x+f.s+tol && y+h<=f.y+f.s+tol && w>=f.s*minRatio;
+    };
+    placeFrame(); window.addEventListener('resize',placeFrame);
+    const close=res=>{ alive=false; window.removeEventListener('resize',placeFrame); try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} if(watchId!=null) try{ navigator.geolocation.clearWatch(watchId); }catch(e){} ov.remove(); resolve(res); };
     const refresh=()=>{
       $('#fv-count').textContent=faces.length;
       $('#fv-strip').innerHTML=faces.map((f,i)=>`<div class="th"><img src="${f.t}"><button data-i="${i}">✕</button></div>`).join('');
@@ -1055,7 +1068,7 @@ function fvOpenScanner(opt){
       catch(e){ msg.textContent='تعذّر تشغيل الكاميرا — صرّح للكاميرا من إعدادات المتصفح'; return; }
       msg.textContent='جاري تحميل نموذج التعرف على الوجوه (أول مرة بياخد وقت)...';
       try{ fa=await fvEngine(); }catch(e){ msg.textContent='فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
-      msg.textContent=opt.selfie?'قرّب وشك من الكاميرا':'وجّه الكاميرا على وجوه العمالة واحد واحد';
+      msg.textContent=opt.selfie?'حط وشك جوا الإطار':'حط وش كل عامل جوا الإطار واحد واحد';
       const loop=async()=>{
         if(!alive) return;
         try{
@@ -1063,20 +1076,23 @@ function fvOpenScanner(opt){
             const vw=video.videoWidth;
             const dets=await fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
             if(opt.selfie){
-              const good=dets.filter(d=>d.detection.score>=.7 && d.detection.box.width>=vw*.2);
+              const good=dets.filter(d=>d.detection.score>=.7 && inFrame(d.detection.box,.42));
+              frameEl.classList.toggle('ok',good.length===1||faces.length>0);
               if(faces.length) msg.textContent='✓ تم التقاط السيلفي — اضغط للإنهاء (أو احذفه وأعد)';
               else if(good.length===1){ if(++stable>=3){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); refresh(); } else msg.textContent='ثبّت وشك...'; }
-              else { stable=0; msg.textContent=good.length>1?'لازم وش واحد بس في الكادر':'قرّب وشك من الكاميرا وخليه واضح'; }
+              else { stable=0; msg.textContent=good.length>1?'لازم وش واحد بس جوا الإطار':'حط وشك جوا الإطار وقرّب شوية'; }
             } else {
               let added=0;
               for(const d of dets){
-                if(d.detection.score<.6 || d.detection.box.width<vw*.07) continue;
+                if(d.detection.score<.6 || !inFrame(d.detection.box,.30)) continue;
                 const e=Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000);
                 if(faces.some(f=>fvDist(f.e,e)<FV_DEDUP)) continue;
                 faces.push({ e, t:fvCrop(video,d.detection.box) }); added++;
               }
               if(added){ refresh(); fvBeep(); }
-              msg.textContent=dets.length? `بيتم رصد ${dets.length} وش في الكادر — اتسجّل ${faces.length}` : 'وجّه الكاميرا على وجوه العمالة واحد واحد';
+              const inside=dets.filter(d=>d.detection.score>=.6 && inFrame(d.detection.box,.30)).length;
+              frameEl.classList.toggle('ok',inside>0);
+              msg.textContent=inside? `وش جوا الإطار — اتسجّل ${faces.length}` : 'حط وش العامل جوا الإطار (واحد واحد) وقرّب شوية';
             }
           }
         }catch(e){ console.warn('fv loop',e); }
@@ -1256,14 +1272,14 @@ function renderVerify(){
     h+=`<div class="section-title"><h2>تحقق العمالة</h2></div><div class="card" style="margin-bottom:14px;">${fvThumbs(wF.map(f=>f.thumb),'#3b8be6')||'<div style="font-size:13px;color:var(--text-dim);">لم يتم مسح عمالة اليوم</div>'}
       <button class="primary-btn" id="fv-enrol-worker" ${locked?'disabled':''}>${ICON.faceScan(16)} ${wF.length?'إعادة مسح وجوه العمالة':'ابدأ مسح وجوه العمالة'}</button></div>
       <div class="section-title"><h2>تحقق المشرفين</h2></div><div class="card" style="margin-bottom:14px;">
-      ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
+      ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(cardHolderOf(u.id)||u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
       <button class="primary-btn" id="fv-enrol-sup" ${locked?'disabled':''}>${ICON.faceScan(16)} ${sF.length?'إعادة مسح وجوه المشرفين':'ابدأ مسح وجوه المشرفين'}</button></div>`;
   }
   if(ses&&['calling','closed'].includes(ses.status)){
     h+=`<div class="section-title"><h2>${ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء'}</h2></div>`;
     if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
       h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وشوش الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وشوش اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وش مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وش جديد</div></div></div>`; }
-    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(c.supervisor_name||'-')}</b><span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وش`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
+    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وش`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
     const mis=(v.checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
     if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
   }
@@ -1837,18 +1853,18 @@ function renderMonthlyFinance(){
   h+=box(0,6,0,0,'background:#2F3034;align-items:center;padding-left:'+(X[2]+8)+'px;',`<div style="color:#fff;line-height:1.15;"><div style="font-weight:700;font-size:34px;">Paid Service &amp;&nbsp; HO units&nbsp; ${mlabel} Breakdown</div><div style="font-size:18.7px;color:#D2D2D8;">CLEANING SERVICES SUMMARY</div></div>`);
   h+=box(7,10,0,0,'background:#EBECF0;align-items:center;padding-left:12px;font-size:16px;color:#2B2B33;',`<span>Facility Management Soft Services Department</span>`);
   // HO units
-  h+=sec(2,3,[[1,2,'No. of Janitors'],[4,4,'Unit Rate including VAT'],[6,6,'Total Dry Cost'],[8,8,'No. of request'],[10,10,'The invoice has been issued to ORA',true]],
+  h+=sec(2,3,[[1,2,'No. of Janitors'],[4,4,'Unit Rate excluding VAT'],[6,6,'Total Dry Cost'],[8,8,'No. of request'],[10,10,'The invoice has been issued to ORA',true]],
     [[0,2,MF_CFG.hoJanitors],[3,4,mfEgp(MF_CFG.hoUnitRate,2)],[5,6,mfEgp(r.hoCost,2)],[7,8,d.units],[9,10,mfEgp(r.hoInvoice,2)]]);
   // notes
   h+=box(0,10,5,9,'background:#F3F2FA;border:1px solid #D4D4E2;');
   h+=box(1,2,6,8,'align-items:center;justify-content:center;font-weight:700;font-size:26.7px;color:#1F1F24;padding-left:60px;','<span>Notes</span>');
   h+=box(3,3,6,8,'border-left:1px solid #D4D4E2;');
   h+=notesTxt(6,'Unit prices are as per the agreement between the <b>FM Department</b> and the <b>Technical Department.</b>');
-  h+=notesTxt(7,"The cost is based on the contractor's agreed rates, <b>inclusive of 14% VAT.</b>");
+  h+=notesTxt(7,"The cost is based on the contractor's agreed rates, <b>exclusive of 14% VAT.</b>");
   h+=notesTxt(8,'<b>No duplicate unit entries</b> have been included in this breakdown.');
   // paid service
   h+=box(0,10,11,11,'background:#2F3034;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:29px;','<span>Paid Service</span>');
-  h+=sec(12,13,[[1,2,'No of Janitors'],[4,4,'Hourly Rate (VAT Included)'],[6,6,'Cost of each request<br><span style="font-size:12px;">(Each request takes an average of 3 hours)</span>'],[8,8,'No of request'],[10,10,'Total dry cost',true]],
+  h+=sec(12,13,[[1,2,'No of Janitors'],[4,4,'Hourly Rate (VAT Excluded)'],[6,6,'Cost of each request<br><span style="font-size:12px;">(Each request takes an average of 3 hours)</span>'],[8,8,'No of request'],[10,10,'Total dry cost',true]],
     [[0,2,MF_CFG.psJanitors],[3,4,mfEgp(MF_CFG.psHourlyRate,2)],[5,6,mfEgp(r.psReq,2)],[7,8,d.orders],[9,10,mfEgp(r.psTotal,0)]]);
   // footer
   h+=box(0,5,15,15,'align-items:center;border-top:1px solid #D4D4E2;font-size:14.7px;color:#2B2B33;padding-left:12px;','<span>ORA PROPERTY MANAGEMENT</span>');
