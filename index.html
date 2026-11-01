@@ -933,15 +933,15 @@ const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', v
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','نداء التحقق'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
   if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ']];
   if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
   if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
-  if(role==='supervisor') return [['today','قائمة اليوم'],['verify','نداء التحقق'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['verify','نداء التحقق'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['verify','التحقق من الهوية'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['cards','استلام الكروت'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
@@ -953,6 +953,10 @@ function tabsForRole(role){
 const FV_TIMER_MIN=20, FV_DEDUP=0.5;
 const FV_CDNS=['https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7/','https://unpkg.com/@vladmandic/face-api@1.7/'];
 Object.assign(S,{ verify:{ zone:null, session:null, checks:[], faces:[], sig:'', loaded:false } });
+function fvAdm(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='opm'; }
+function fvCairoMin(){ const p=new Intl.DateTimeFormat('en-GB',{ timeZone:'Africa/Cairo', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date()); const g=k=>+(p.find(x=>x.type===k)||{}).value||0; return (g('hour')%24)*60+g('minute'); }
+const FV_ENROL_CUTOFF_MIN=9*60; // تسجيل الوجوه الصباحي بيقفل 9:00 ص بتوقيت القاهرة (الأدمن وOPM مستثنيين)
+function fvEnrolOpen(){ return fvAdm() || fvCairoMin()<FV_ENROL_CUTOFF_MIN; }
 function fvStaff(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='opm'||r==='hk_manager'; }
 function fvMyCheck(){ const v=S.verify; if(!S.session||!v.session) return null; return (v.checks||[]).find(c=>c.supervisor_id===S.session.user.id)||null; }
 function fvLeftMs(){ const d=S.verify.session&&S.verify.session.call_deadline; return d? new Date(d).getTime()-Date.now() : 0; }
@@ -1028,14 +1032,14 @@ function fvOpenScanner(opt){
     const faces=[]; let stream=null, alive=true, pos=null, zoneOk=!opt.zoneCheck, watchId=null, fa=null, stable=0;
     const ov=document.createElement('div'); ov.id='fv-scan'; ov.className='fv-ov';
     ov.innerHTML=`<div class="fv-head"><b>${esc(opt.title)}</b><button class="fv-x" id="fv-cancel">✕</button></div>
-      <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-frame" id="fv-frame"></div><div class="fv-badge"><span id="fv-count">0</span> وش</div></div>
+      <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-frame" id="fv-frame"></div><div class="fv-badge"><span id="fv-count">0</span> وجه</div></div>
       <div class="fv-zone" id="fv-zone" style="display:${opt.zoneCheck?'block':'none'}">جاري تحديد موقعك...</div>
       <div class="fv-msg" id="fv-msg">جاري تشغيل الكاميرا...</div>
       <div class="fv-strip" id="fv-strip"></div>
       <div class="fv-foot"><button class="primary-btn" id="fv-fin" style="width:100%;justify-content:center;" disabled>${esc(opt.finishLabel||'تم')}</button></div>`;
     document.body.appendChild(ov);
     const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin'), wrap=$('.fv-vwrap'), frameEl=$('#fv-frame');
-    // الإطار: المربع اللي لازم الوش يبقى جواه — أي وش برّاه أو بعيد (صغير) بيتتجاهل
+    // الإطار: المربع اللي لازم الوجه يبقى جواه — أي وجه برّاه أو بعيد (صغير) بيتتجاهل
     const frameRect=()=>{ const W=wrap.clientWidth, H=wrap.clientHeight, s=Math.min(W,H)*.72; return { x:(W-s)/2, y:(H-s)/2, s }; };
     const placeFrame=()=>{ const f=frameRect(); frameEl.style.cssText='left:'+f.x+'px;top:'+f.y+'px;width:'+f.s+'px;height:'+f.s+'px;'; };
     const inFrame=(b,minRatio)=>{
@@ -1052,7 +1056,7 @@ function fvOpenScanner(opt){
       $('#fv-strip').querySelectorAll('button').forEach(b=>b.onclick=()=>{ faces.splice(+b.dataset.i,1); stable=0; refresh(); });
       fin.disabled=!(zoneOk && (opt.selfie? faces.length===1 : faces.length>0));
     };
-    $('#fv-cancel').onclick=()=>{ if(!faces.length||confirm('تلغي المسح؟ الوشوش اللي اتصورت هتضيع')) close(null); };
+    $('#fv-cancel').onclick=()=>{ if(!faces.length||confirm('تلغي المسح؟ الوجوه اللي اتصورت هتضيع')) close(null); };
     fin.onclick=()=>close({ faces:faces.slice(), pos });
     if(opt.zoneCheck){
       const z=$('#fv-zone');
@@ -1068,7 +1072,7 @@ function fvOpenScanner(opt){
       catch(e){ msg.textContent='تعذّر تشغيل الكاميرا — صرّح للكاميرا من إعدادات المتصفح'; return; }
       msg.textContent='جاري تحميل نموذج التعرف على الوجوه (أول مرة بياخد وقت)...';
       try{ fa=await fvEngine(); }catch(e){ msg.textContent='فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
-      msg.textContent=opt.selfie?'حط وشك جوا الإطار':'حط وش كل عامل جوا الإطار واحد واحد';
+      msg.textContent=opt.selfie?'حط وجهك جوا الإطار':'حط وجه كل عامل جوا الإطار واحد واحد';
       const loop=async()=>{
         if(!alive) return;
         try{
@@ -1079,8 +1083,8 @@ function fvOpenScanner(opt){
               const good=dets.filter(d=>d.detection.score>=.7 && inFrame(d.detection.box,.42));
               frameEl.classList.toggle('ok',good.length===1||faces.length>0);
               if(faces.length) msg.textContent='✓ تم التقاط السيلفي — اضغط للإنهاء (أو احذفه وأعد)';
-              else if(good.length===1){ if(++stable>=3){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); refresh(); } else msg.textContent='ثبّت وشك...'; }
-              else { stable=0; msg.textContent=good.length>1?'لازم وش واحد بس جوا الإطار':'حط وشك جوا الإطار وقرّب شوية'; }
+              else if(good.length===1){ if(++stable>=3){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); refresh(); } else msg.textContent='ثبّت وجهك...'; }
+              else { stable=0; msg.textContent=good.length>1?'لازم وجه واحد بس جوا الإطار':'حط وجهك جوا الإطار وقرّب شوية'; }
             } else {
               let added=0;
               for(const d of dets){
@@ -1092,7 +1096,7 @@ function fvOpenScanner(opt){
               if(added){ refresh(); fvBeep(); }
               const inside=dets.filter(d=>d.detection.score>=.6 && inFrame(d.detection.box,.30)).length;
               frameEl.classList.toggle('ok',inside>0);
-              msg.textContent=inside? `وش جوا الإطار — اتسجّل ${faces.length}` : 'حط وش العامل جوا الإطار (واحد واحد) وقرّب شوية';
+              msg.textContent=inside? `وجه جوا الإطار — اتسجّل ${faces.length}` : 'حط وجه العامل جوا الإطار (واحد واحد) وقرّب شوية';
             }
           }
         }catch(e){ console.warn('fv loop',e); }
@@ -1153,40 +1157,50 @@ async function fvOpenZone(){
 /* ---- site manager: enrolment ---- */
 async function fvSaveEnrol(kind,faces){
   const v=S.verify, day=S.today;
-  if(v.session && ['calling','closed'].includes(v.session.status)){ toast('النداء بدأ بالفعل — مينفعش تعدّل الوشوش',false); return false; }
+  if(v.session && v.session.status==='calling'){ toast('فيه تحقق شغّال دلوقتي — مينفعش تعدّل الوجوه',false); return false; }
+  if(!fvEnrolOpen()){ toast('تسجيل الوجوه الصباحي اتقفل الساعة 9 ص',false); return false; }
+  const wasClosed=!!(v.session && v.session.status==='closed');
+  if(wasClosed){ const d0=await sb.from('verify_checks').delete().eq('session_id',day); if(d0.error){ toast('تعذّر تصفية الجولة السابقة: '+d0.error.message,false); return false; } }
   if(!v.session){ const r=await sb.from('verify_sessions').insert({ id:day, date:day, status:'enrolling' }); if(r.error){ toast('تعذّر إنشاء جلسة اليوم: '+r.error.message,false); return false; } }
   let r=await sb.from('verify_faces').delete().eq('date',day).eq('kind',kind);
-  if(r.error){ toast('تعذّر مسح الوشوش القديمة: '+r.error.message,false); return false; }
+  if(r.error){ toast('تعذّر مسح الوجوه القديمة: '+r.error.message,false); return false; }
   const rows=faces.map(f=>({ id:uid('vf'), session_id:day, date:day, kind, emb:f.e, thumb:f.t }));
-  for(let i=0;i<rows.length;i+=15){ r=await sb.from('verify_faces').insert(rows.slice(i,i+15)); if(r.error){ toast('تعذّر رفع الوشوش: '+r.error.message,false); return false; } }
+  for(let i=0;i<rows.length;i+=15){ r=await sb.from('verify_faces').insert(rows.slice(i,i+15)); if(r.error){ toast('تعذّر رفع الوجوه: '+r.error.message,false); return false; } }
   await loadVerify();
   const w=v.faces.filter(f=>f.kind==='worker').length, s=v.faces.filter(f=>f.kind==='supervisor').length;
   const patch={ workers_count:w, supervisors_count:s };
+  if(wasClosed){ Object.assign(patch,{ status:'enrolling', summary:null, closed_at:null, call_started_by:null, call_started_at:null, call_deadline:null }); }
   if(w>0&&s>0){ patch.status='enrolled'; patch.enrolled_by=S.session.user.id; patch.enrolled_at=new Date().toISOString(); }
   await sb.from('verify_sessions').update(patch).eq('id',day);
   await loadVerify(); return true;
 }
 async function fvEnrolScan(kind){
-  const v=S.verify; if(v.session&&['calling','closed'].includes(v.session.status)){ toast('النداء بدأ بالفعل',false); return; }
-  if(v.faces.some(f=>f.kind===kind) && !confirm('فيه وشوش متسجلة النهارده — المسح الجديد هيستبدلها. تكمل؟')) return;
+  const v=S.verify; if(v.session&&v.session.status==='calling'){ toast('فيه تحقق شغّال دلوقتي — استنى لحد ما يخلص',false); return; }
+  if(!fvEnrolOpen()){ toast('تسجيل الوجوه الصباحي اتقفل الساعة 9 ص',false); return; }
+  if(v.session&&v.session.status==='closed' && !confirm('جلسة التحقق السابقة اتقفلت — لو سجّلت وجوه جديدة تقريرها هيتمسح وتبدأ جولة جديدة. تكمل؟')) return;
+  if(v.faces.some(f=>f.kind===kind) && !confirm('فيه وجوه متسجلة النهارده — المسح الجديد هيستبدلها. تكمل؟')) return;
   const r=await fvOpenScanner({ title:kind==='worker'?'تحقق العمالة — مسح الوجوه':'تحقق المشرفين — مسح الوجوه', selfie:false, zoneCheck:false, finishLabel:'تم الانتهاء من مسح الوجوه الأولي — رفع للإدارة' });
   if(!r) return;
-  if(!r.faces.length){ toast('مفيش وشوش اتسجلت',false); return; }
-  if(await fvSaveEnrol(kind,r.faces)){ render(); toast('تم رفع '+r.faces.length+' وش للإدارة',true); }
+  if(!r.faces.length){ toast('مفيش وجوه اتسجلت',false); return; }
+  if(await fvSaveEnrol(kind,r.faces)){ render(); toast('تم رفع '+r.faces.length+' وجه للإدارة',true); }
 }
 
 /* ---- admin: start the call ---- */
 async function fvStartCall(){
   const v=S.verify, ses=v.session;
   if(!v.zone){ toast('حدّد الزون من الخريطة الأول',false); return; }
-  if(!ses||ses.status!=='enrolled'){ toast('لازم مدير الموقع يخلّص رفع وشوش العمالة والمشرفين الأول',false); return; }
+  if(!fvAdm()){ toast('البدء للأدمن وOPM بس',false); return; }
+  if(!ses||!['enrolled','closed'].includes(ses.status)){ toast('لازم يخلّص رفع وجوه العمالة والمشرفين الأول',false); return; }
+  const wasClosed=ses.status==='closed';
+  if(wasClosed && !((+ses.workers_count||0)>0 && (+ses.supervisors_count||0)>0)){ toast('مفيش وجوه مسجّلة — سجّل وجوه العمالة والمشرفين الأول',false); return; }
   let sups=(S.users||[]).filter(u=>u.role==='supervisor'&&u.active);
   const present=sups.filter(u=>{ const p=presenceOf(u.id); return p&&p.present===true; });
   if(present.length) sups=present;
   if(!sups.length){ toast('مفيش مشرفين',false); return; }
-  if(!confirm('هيتبعت النداء لـ '+sups.length+' مشرف ويبدأ تايمر '+FV_TIMER_MIN+' دقيقة. تكمل؟')) return;
+  if(!confirm((wasClosed?'هتبدأ جولة تحقق جديدة بنفس الوجوه المسجلة، وتقرير الجولة السابقة هيتمسح.\n':'')+'هيتبعت النداء لـ '+sups.length+' مشرف ويبدأ تايمر '+FV_TIMER_MIN+' دقيقة. تكمل؟')) return;
   const now=new Date(), dl=new Date(now.getTime()+FV_TIMER_MIN*60000);
-  let r=await sb.from('verify_sessions').update({ status:'calling', call_started_by:S.session.user.id, call_started_at:now.toISOString(), call_deadline:dl.toISOString() }).eq('id',S.today);
+  if(wasClosed){ const d0=await sb.from('verify_checks').delete().eq('session_id',S.today); if(d0.error){ toast('تعذّر تصفية الجولة السابقة: '+d0.error.message,false); return; } }
+  let r=await sb.from('verify_sessions').update({ status:'calling', summary:null, closed_at:null, call_started_by:S.session.user.id, call_started_at:now.toISOString(), call_deadline:dl.toISOString() }).eq('id',S.today);
   if(r.error){ toast('تعذّر بدء النداء: '+r.error.message,false); return; }
   r=await sb.from('verify_checks').insert(sups.map(u=>({ id:uid('vc'), session_id:S.today, date:S.today, supervisor_id:u.id, supervisor_name:u.full_name||'' })));
   if(r.error){ await sb.from('verify_sessions').update({ status:'enrolled', call_deadline:null, call_started_at:null }).eq('id',S.today); toast('تعذّر إرسال النداء: '+r.error.message,false); return; }
@@ -1226,21 +1240,21 @@ const FV_STATUS={ pending:'لم يفتح النداء', acknowledged:'فتح ا�
 function fvResultHtml(c){
   const r=c.result||{};
   if(c.status==='no_response') return `<div style="color:var(--coral);font-weight:800;">لم يتم التحقق في الوقت المحدد</div>`;
-  if(c.status==='matched') return `<div style="color:var(--mint);font-weight:800;font-size:15px;">✅ تمت المطابقة — كل عمالك كانوا موجودين الصبح (${r.matched||0} وش)</div>`;
+  if(c.status==='matched') return `<div style="color:var(--mint);font-weight:800;font-size:15px;">✅ تمت المطابقة — كل عمالك كانوا موجودين الصبح (${r.matched||0} وجه)</div>`;
   const why=[];
-  if(r.selfie_ok===false) why.push('السيلفي لم يطابق الوش المسجّل صباحًا');
+  if(r.selfie_ok===false) why.push('السيلفي لم يطابق الوجه المسجّل صباحًا');
   if(r.selfie_zone===false) why.push('كنت خارج حدود المشروع وقت السيلفي');
   if(r.scan_zone===false) why.push('كنت خارج حدود المشروع وقت مسح العمالة');
   return `<div style="color:var(--coral);font-weight:800;font-size:15px;margin-bottom:6px;">⚠️ تم وجود حالات غير مطابقة</div>
     ${why.map(w=>`<div style="font-size:13px;margin:3px 0;">• ${w}</div>`).join('')}
-    ${r.new_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.new_n}</b> وش جديد لم يدخل النظام الصبح:</div>${fvThumbs(r.new,'#d9534f')}`:''}
-    ${r.dups_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.dups_n}</b> وش ظهر عند مشرف آخر كمان:</div>${fvThumbs(r.dups,'#e0a800')}`:''}
+    ${r.new_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.new_n}</b> وجه جديد لم يدخل النظام الصبح:</div>${fvThumbs(r.new,'#d9534f')}`:''}
+    ${r.dups_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.dups_n}</b> وجه ظهر عند مشرف آخر كمان:</div>${fvThumbs(r.dups,'#e0a800')}`:''}
     ${r.missing_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.missing_n}</b> ظهروا الصبح ولم يظهروا في التحقق:</div>${fvThumbs((r.missing||[]).map(m=>m.t),'#6c757d')}`:''}`;
 }
 function renderVerify(){
   const role=S.profile.role, v=S.verify, ses=v.session, z=v.zone;
-  const stLabel={ enrolling:'جاري تسجيل الوشوش الصباحية', enrolled:'تم رفع الوشوش الصباحية — جاهز للنداء', calling:'النداء شغّال', closed:'تم إغلاق جلسة اليوم' };
-  const note='<div style="font-size:11.5px;color:var(--text-dim);margin-top:8px;">الوشوش بتتحذف أوتوماتيك كل يوم، وكل يوم له جلسة خاصة.</div>';
+  const stLabel={ enrolling:'جاري تسجيل الوجوه الصباحية', enrolled:'تم رفع الوجوه الصباحية — جاهز للنداء', calling:'النداء شغّال', closed:'تم إغلاق جلسة اليوم' };
+  const note='<div style="font-size:11.5px;color:var(--text-dim);margin-top:8px;">الوجوه بتتحذف أوتوماتيك كل يوم، وكل يوم له جلسة خاصة.</div>';
   if(role==='supervisor'){
     const c=fvMyCheck();
     if(!c||!ses||ses.status==='enrolled'||ses.status==='enrolling') return `<div class="card"><div class="empty-state"><span class="em">🧑‍🤝‍🧑</span>مفيش نداء تحقق دلوقتي — هيجيلك إشعار لما الإدارة تبدأ النداء</div></div>`;
@@ -1251,25 +1265,26 @@ function renderVerify(){
         <div style="font-size:13px;line-height:2;">${c.status==='selfie_ok'?'✅':'①'} سيلفي لنفسك (جوا حدود المشروع)<br>② مسح وجوه عمالتك (جوا حدود المشروع)<br>③ رفع الحالة للإدارة</div>
         <button class="primary-btn" id="fv-sup-start" style="width:100%;justify-content:center;margin-top:12px;">${ICON.faceScan(16)} ابدأ مسح وجوه العمالة</button>`;
     } else if(c.status==='submitted'){
-      body=`<div style="text-align:center;padding:10px 0;"><div style="font-size:40px;">⏳</div><b>معلّق لحين الانتهاء من المقارنة</b><div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">تم رفع ${c.worker_count} وش — المقارنة مع وشوش الصبح هتتم أوتوماتيك لما التايمر يخلص${fvLeftMs()>0?` (<span data-fvleft>${fvFmtLeft(fvLeftMs())}</span>)`:''}</div></div>`;
+      body=`<div style="text-align:center;padding:10px 0;"><div style="font-size:40px;">⏳</div><b>معلّق لحين الانتهاء من المقارنة</b><div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">تم رفع ${c.worker_count} وجه — المقارنة مع وجوه الصبح هتتم أوتوماتيك لما التايمر يخلص${fvLeftMs()>0?` (<span data-fvleft>${fvFmtLeft(fvLeftMs())}</span>)`:''}</div></div>`;
     } else if(['matched','mismatch','no_response'].includes(c.status)){ body=fvResultHtml(c); }
     else body=`<div style="text-align:center;color:var(--coral);font-weight:800;">انتهى وقت التحقق</div>`;
-    return `<div class="card"><div style="font-weight:900;font-size:16px;margin-bottom:10px;">🔔 نداء التحقق من هوية العمال</div>${body}${note}</div>`;
+    return `<div class="card"><div style="font-weight:900;font-size:16px;margin-bottom:10px;">🔔 التحقق من الهوية</div>${body}${note}</div>`;
   }
   // admin / opm / site manager
-  const mgr=(role==='hk_manager'||role==='admin');
+  const mgr=(role==='hk_manager'||role==='admin'||role==='opm');
+  const enrolOpen=fvEnrolOpen();
   const wF=v.faces.filter(f=>f.kind==='worker'), sF=v.faces.filter(f=>f.kind==='supervisor');
-  const locked=ses&&['calling','closed'].includes(ses.status);
+  const locked=!!(ses&&ses.status==='calling') || !enrolOpen;
   let h='';
   h+=`<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
     <div><div style="font-weight:900;">📍 زون المشروع</div><div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${z? `Lat ${(+z.lat).toFixed(5)} · Lng ${(+z.lng).toFixed(5)} · نصف القطر ${Math.round(z.radius_m)} م` : '<span style="color:var(--coral);font-weight:800;">لم يتم تحديد الزون بعد</span>'}</div></div>
     ${role==='admin'?`<button class="ghost-btn" id="fv-zone-btn">🗺️ تحديد الزون من الخريطة</button>`:''}</div></div>`;
-  h+=`<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><div style="font-weight:900;">نداء التحقق العشوائي — ${esc(S.today)}</div><div style="font-size:13px;margin-top:2px;">${ses? stLabel[ses.status] : 'لم يبدأ تسجيل الوشوش الصباحية'}${ses&&ses.status==='calling'?` · المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b>`:''}</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">${role==='admin'&&ses&&ses.status==='enrolled'?`<button class="primary-btn" id="fv-call">🔔 بدء النداء</button>`:''}${role==='admin'&&ses&&ses.status==='calling'&&fvLeftMs()<=0?`<button class="primary-btn" id="fv-run">تشغيل المطابقة الآن</button>`:''}</div></div>
-    <div class="stat-row" style="margin-top:12px;"><div class="stat blue"><div class="num">${wF.length}</div><div class="lbl">وشوش العمالة الصباحية</div></div><div class="stat mint"><div class="num">${sF.length}</div><div class="lbl">وشوش المشرفين</div></div></div>${note}</div>`;
+  h+=`<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><div style="font-weight:900;">التحقق من الهوية — ${esc(S.today)}</div><div style="font-size:13px;margin-top:2px;">${ses? stLabel[ses.status] : 'لم يبدأ تسجيل الوجوه الصباحية'}${ses&&ses.status==='calling'?` · المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b>`:''}</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">${fvAdm()&&ses&&['enrolled','closed'].includes(ses.status)?`<button class="primary-btn" id="fv-call">🔔 ${ses.status==='closed'?'بدء تحقق جديد':'بدء النداء'}</button>`:''}${fvAdm()&&ses&&ses.status==='calling'&&fvLeftMs()<=0?`<button class="primary-btn" id="fv-run">تشغيل المطابقة الآن</button>`:''}</div></div>
+    <div class="stat-row" style="margin-top:12px;"><div class="stat blue"><div class="num">${wF.length}</div><div class="lbl">وجوه العمالة الصباحية</div></div><div class="stat mint"><div class="num">${sF.length}</div><div class="lbl">وجوه المشرفين</div></div></div>${note}</div>`;
   if(mgr){
     const sups=(S.users||[]).filter(u=>u.role==='supervisor'&&u.active);
-    h+=`<div class="section-title"><h2>تحقق العمالة</h2></div><div class="card" style="margin-bottom:14px;">${fvThumbs(wF.map(f=>f.thumb),'#3b8be6')||'<div style="font-size:13px;color:var(--text-dim);">لم يتم مسح عمالة اليوم</div>'}
+    h+=`<div class="section-title"><h2>تحقق العمالة</h2></div>${enrolOpen?'':'<div class="card" style="margin-bottom:10px;border-color:var(--amber);"><b>تسجيل الوجوه الصباحي اتقفل (بعد الساعة 9 ص)</b></div>'}<div class="card" style="margin-bottom:14px;">${fvThumbs(wF.map(f=>f.thumb),'#3b8be6')||'<div style="font-size:13px;color:var(--text-dim);">لم يتم مسح عمالة اليوم</div>'}
       <button class="primary-btn" id="fv-enrol-worker" ${locked?'disabled':''}>${ICON.faceScan(16)} ${wF.length?'إعادة مسح وجوه العمالة':'ابدأ مسح وجوه العمالة'}</button></div>
       <div class="section-title"><h2>تحقق المشرفين</h2></div><div class="card" style="margin-bottom:14px;">
       ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(cardHolderOf(u.id)||u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
@@ -1278,8 +1293,8 @@ function renderVerify(){
   if(ses&&['calling','closed'].includes(ses.status)){
     h+=`<div class="section-title"><h2>${ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء'}</h2></div>`;
     if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
-      h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وشوش الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وشوش اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وش مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وش جديد</div></div></div>`; }
-    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وش`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
+      h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وجوه الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وجوه اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وجه مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وجه جديد</div></div></div>`; }
+    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وجه`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
     const mis=(v.checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
     if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
   }
