@@ -375,6 +375,7 @@ body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;po
 .fv-vwrap video{width:100%;height:100%;object-fit:cover;}
 .fv-badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.65);padding:6px 14px;border-radius:999px;font-weight:800;font-size:15px;}
 .fv-zone{padding:6px 14px;font-size:12.5px;text-align:center;font-weight:700;background:#444;}
+.fv-tips{padding:7px 14px;font-size:12px;line-height:1.7;text-align:center;background:#5a4a00;color:#ffe9a6;font-weight:700;}
 .fv-msg{padding:6px 14px;font-size:13px;text-align:center;color:#cfe3ff;}
 .fv-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 12px;background:#111a2e;min-height:72px;}
 .fv-strip .th{position:relative;flex:0 0 auto;}
@@ -953,6 +954,42 @@ function tabsForRole(role){
 const FV_TIMER_MIN=20, FV_DEDUP=0.5;
 const FV_CDNS=['https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7/','https://unpkg.com/@vladmandic/face-api@1.7/'];
 Object.assign(S,{ verify:{ zone:null, session:null, checks:[], faces:[], sig:'', loaded:false } });
+Object.assign(S.verify,{ rep:{ from:'', to:'', rows:[], detail:null, loaded:false, busy:false } });
+async function fvRepLoad(){
+  const r=S.verify.rep, from=r.from||S.today, to=r.to||from;
+  if(to<from){ toast('تاريخ النهاية قبل البداية',false); return; }
+  r.from=from; r.to=to; r.busy=true; r.detail=null;
+  const {data,error}=await sb.from('verify_sessions').select('id,date,status,workers_count,supervisors_count,summary,call_started_at').gte('date',from).lte('date',to).order('date',{ascending:false}).limit(120);
+  r.busy=false;
+  if(error){ toast('تعذّر تحميل التقرير: '+error.message,false); return; }
+  r.rows=data||[]; r.loaded=true; render();
+}
+async function fvRepDetail(date){
+  const r=S.verify.rep, ses=(r.rows||[]).find(x=>x.date===date); if(!ses) return;
+  const {data,error}=await sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_thumb,selfie_at,submitted_at,worker_count,result').eq('date',date);
+  if(error){ toast('تعذّر تحميل التفاصيل: '+error.message,false); return; }
+  if(!(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(e){} }
+  r.detail={ date, ses, checks:data||[] }; render();
+}
+function fvRepCardHtml(){
+  const r=S.verify.rep, from=r.from||S.today, to=r.to||from;
+  const th='padding:5px 6px;font-size:11.5px;text-align:right;white-space:nowrap;', td='padding:5px 6px;font-size:12px;text-align:right;';
+  const stL={ enrolling:'تسجيل وجوه', enrolled:'جاهز', calling:'شغّال', closed:'مقفول' };
+  let body='';
+  if(r.busy) body='<div style="font-size:13px;color:var(--text-dim);">جارٍ التحميل...</div>';
+  else if(r.loaded){
+    body= r.rows.length? `<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:var(--sand);"><th style="${th}">التاريخ</th><th style="${th}">الحالة</th><th style="${th}">وجوه الصبح</th><th style="${th}">اتصورت بعد النداء</th><th style="${th}">مطابق</th><th style="${th}">غير مطابق / لم يستجب</th><th style="${th}">وجه مفقود</th><th style="${th}">وجه جديد</th><th style="${th}"></th></tr></thead><tbody>
+      ${r.rows.map(x=>{ const s=x.summary||null; const c=v=>s&&s[v]!=null? s[v] : '-'; return `<tr style="border-top:1px solid var(--line);"><td style="${td}"><b>${esc(x.date)}</b></td><td style="${td}">${stL[x.status]||esc(x.status)}</td><td style="${td}">${s?c('workers_morning'):(x.workers_count||'-')}</td><td style="${td}">${c('scanned_total')}</td><td style="${td}">${c('ok')}</td><td style="${td}">${s? (+s.bad||0)+(+s.no_response||0) : '-'}</td><td style="${td}">${c('missing_n')}</td><td style="${td}">${c('new_n')}</td><td style="${td}"><button class="ghost-btn" data-fv-rep-d="${esc(x.date)}">تفاصيل</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div style="font-size:13px;color:var(--text-dim);margin-top:10px;">مفيش جلسات تحقق محفوظة في الفترة دي.</div>';
+  }
+  const det=r.detail? `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><b>تفاصيل ${esc(r.detail.date)}</b><button class="ghost-btn" id="fv-rep-x">إغلاق</button></div>${fvReportHtml(Object.assign({},r.detail.ses,{ status:r.detail.ses.status==='calling'?'calling':'closed' }),r.detail.checks,'تقرير '+esc(r.detail.date)) || '<div class="empty-state">لا توجد بيانات</div>'}</div>` : '';
+  return `<div class="section-title"><h2>تقرير بتاريخ</h2></div><div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+      <div class="form-row" style="margin:0;"><label>من</label><input type="date" id="fv-rf" value="${esc(from)}" max="${esc(S.today)}"></div>
+      <div class="form-row" style="margin:0;"><label>إلى</label><input type="date" id="fv-rt" value="${esc(to)}" max="${esc(S.today)}"></div>
+      <button class="primary-btn" id="fv-rep-go">عرض التقرير</button>
+    </div>${body}${det}</div>`;
+}
 function fvAdm(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='opm'; }
 function fvCairoMin(){ const p=new Intl.DateTimeFormat('en-GB',{ timeZone:'Africa/Cairo', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date()); const g=k=>+(p.find(x=>x.type===k)||{}).value||0; return (g('hour')%24)*60+g('minute'); }
 const FV_ENROL_CUTOFF_MIN=9*60; // تسجيل الوجوه الصباحي بيقفل 9:00 ص بتوقيت القاهرة (الأدمن وOPM مستثنيين)
@@ -1010,6 +1047,7 @@ async function fvAck(id){ await sb.from('verify_checks').update({ status:'acknow
 function fvDistM(a,b,c,d){ const R=6371000,rad=x=>x*Math.PI/180,dl=rad(c-a),dn=rad(d-b); const h=Math.sin(dl/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 function fvZoneState(p){ const z=S.verify.zone; if(!z) return { ok:true, unknown:true }; const d=fvDistM(p.coords.latitude,p.coords.longitude,z.lat,z.lng); return { ok:d<=z.radius_m, d }; }
 function fvDist(a,b){ let s=0; for(let i=0;i<a.length;i++){ const x=a[i]-b[i]; s+=x*x; } return Math.sqrt(s); }
+function fvLight(video){ try{ const c=document.createElement('canvas'); c.width=24; c.height=24; const x=c.getContext('2d'); x.drawImage(video,0,0,24,24); const d=x.getImageData(0,0,24,24).data; let s=0; for(let i=0;i<d.length;i+=4) s+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; return s/(d.length/4); }catch(e){ return 255; } }
 function fvCrop(video,b){ const m=.28,w=b.width*(1+2*m),h=b.height*(1+2*m),x=Math.max(0,b.x-b.width*m),y=Math.max(0,b.y-b.height*m); const c=document.createElement('canvas'); c.width=112; c.height=112; try{ c.getContext('2d').drawImage(video,x,y,Math.min(w,video.videoWidth-x),Math.min(h,video.videoHeight-y),0,0,112,112); }catch(e){} return c.toDataURL('image/jpeg',.6); }
 function fvLoadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
 let fvEngineP=null;
@@ -1033,6 +1071,7 @@ function fvOpenScanner(opt){
     const ov=document.createElement('div'); ov.id='fv-scan'; ov.className='fv-ov';
     ov.innerHTML=`<div class="fv-head"><b>${esc(opt.title)}</b><button class="fv-x" id="fv-cancel">✕</button></div>
       <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-frame" id="fv-frame"></div><div class="fv-badge"><span id="fv-count">0</span> وجه</div></div>
+      <div class="fv-tips">⚠️ التصوير بدون نظارات أو كاب أو كمامة أو خوذة · البنات بالحجاب فقط (من غير أي حاجة من المذكورات) · لازم إضاءة جيدة</div>
       <div class="fv-zone" id="fv-zone" style="display:${opt.zoneCheck?'block':'none'}">جاري تحديد موقعك...</div>
       <div class="fv-msg" id="fv-msg">جاري تشغيل الكاميرا...</div>
       <div class="fv-strip" id="fv-strip"></div>
@@ -1078,6 +1117,8 @@ function fvOpenScanner(opt){
         try{
           if(video.readyState>=2){
             const vw=video.videoWidth;
+            const lum=fvLight(video);
+            if(lum<50){ frameEl.classList.remove('ok'); msg.textContent='💡 الإضاءة ضعيفة جدًا — روح مكان أنور أو شغّل إضاءة قبل التصوير'; if(alive) setTimeout(loop,400); return; }
             const dets=await fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
             if(opt.selfie){
               const good=dets.filter(d=>d.detection.score>=.7 && inFrame(d.detection.box,.42));
@@ -1095,8 +1136,9 @@ function fvOpenScanner(opt){
               }
               if(added){ refresh(); fvBeep(); }
               const inside=dets.filter(d=>d.detection.score>=.6 && inFrame(d.detection.box,.30)).length;
+              if(lum<85 && !inside){ msg.textContent='💡 الإضاءة مش كفاية — زوّدها لتصوير أدق'; }
               frameEl.classList.toggle('ok',inside>0);
-              msg.textContent=inside? `وجه جوا الإطار — اتسجّل ${faces.length}` : 'حط وجه العامل جوا الإطار (واحد واحد) وقرّب شوية';
+              if(inside || lum>=85) msg.textContent=inside? `وجه جوا الإطار — اتسجّل ${faces.length}` : 'حط وجه العامل جوا الإطار (واحد واحد) وقرّب شوية';
             }
           }
         }catch(e){ console.warn('fv loop',e); }
@@ -1251,6 +1293,18 @@ function fvResultHtml(c){
     ${r.dups_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.dups_n}</b> وجه ظهر عند مشرف آخر كمان:</div>${fvThumbs(r.dups,'#e0a800')}`:''}
     ${r.missing_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.missing_n}</b> ظهروا الصبح ولم يظهروا في التحقق:</div>${fvThumbs((r.missing||[]).map(m=>m.t),'#6c757d')}`:''}`;
 }
+function fvReportHtml(ses,checks,title){
+  let h='';
+  if(ses&&['calling','closed'].includes(ses.status)){
+    h+=`<div class="section-title"><h2>${title||(ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء')}</h2></div>`;
+    if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
+      h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وجوه الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وجوه اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وجه مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وجه جديد</div></div></div>`; }
+    h+=(checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وجه`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
+    const mis=(checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
+    if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
+  }
+  return h;
+}
 function renderVerify(){
   const role=S.profile.role, v=S.verify, ses=v.session, z=v.zone;
   const stLabel={ enrolling:'جاري تسجيل الوجوه الصباحية', enrolled:'تم رفع الوجوه الصباحية — جاهز للنداء', calling:'النداء شغّال', closed:'تم إغلاق جلسة اليوم' };
@@ -1290,18 +1344,17 @@ function renderVerify(){
       ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(cardHolderOf(u.id)||u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
       <button class="primary-btn" id="fv-enrol-sup" ${locked?'disabled':''}>${ICON.faceScan(16)} ${sF.length?'إعادة مسح وجوه المشرفين':'ابدأ مسح وجوه المشرفين'}</button></div>`;
   }
-  if(ses&&['calling','closed'].includes(ses.status)){
-    h+=`<div class="section-title"><h2>${ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء'}</h2></div>`;
-    if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
-      h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وجوه الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وجوه اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وجه مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وجه جديد</div></div></div>`; }
-    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وجه`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
-    const mis=(v.checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
-    if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
-  }
+  h+=fvReportHtml(ses,v.checks||[]);
+  if(fvAdm()) h+=fvRepCardHtml();
   return h;
 }
 function bindVerify(){
   const b=id=>document.getElementById(id);
+  if(b('fv-rf')) b('fv-rf').onchange=()=>{ S.verify.rep.from=b('fv-rf').value; if(!S.verify.rep.to||S.verify.rep.to<S.verify.rep.from){ S.verify.rep.to=S.verify.rep.from; if(b('fv-rt')) b('fv-rt').value=S.verify.rep.to; } };
+  if(b('fv-rt')) b('fv-rt').onchange=()=>{ S.verify.rep.to=b('fv-rt').value; };
+  if(b('fv-rep-go')) b('fv-rep-go').onclick=fvRepLoad;
+  if(b('fv-rep-x')) b('fv-rep-x').onclick=()=>{ S.verify.rep.detail=null; render(); };
+  document.querySelectorAll('[data-fv-rep-d]').forEach(x=>x.onclick=()=>fvRepDetail(x.dataset.fvRepD));
   if(b('fv-zone-btn')) b('fv-zone-btn').onclick=fvOpenZone;
   if(b('fv-call')) b('fv-call').onclick=fvStartCall;
   if(b('fv-run')) b('fv-run').onclick=fvRunNow;
