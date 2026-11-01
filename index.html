@@ -366,6 +366,21 @@ body.glass:not(.on-login)::after{content:'';position:fixed;inset:0;z-index:-1;po
   background:linear-gradient(180deg,rgba(232,240,252,.50),rgba(238,244,254,.58) 45%,rgba(240,246,255,.66) 100%);}
 
 
+.fv-ov{position:fixed;inset:0;z-index:9000;background:#0b1220;color:#fff;display:flex;flex-direction:column;}
+.fv-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;}
+.fv-x{border:none;background:rgba(255,255,255,.18);color:inherit;width:34px;height:34px;border-radius:50%;font-size:16px;}
+.fv-vwrap{position:relative;flex:1;min-height:0;background:#000;}
+.fv-vwrap video{width:100%;height:100%;object-fit:cover;}
+.fv-badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.65);padding:6px 14px;border-radius:999px;font-weight:800;font-size:15px;}
+.fv-zone{padding:6px 14px;font-size:12.5px;text-align:center;font-weight:700;background:#444;}
+.fv-msg{padding:6px 14px;font-size:13px;text-align:center;color:#cfe3ff;}
+.fv-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 12px;background:#111a2e;min-height:72px;}
+.fv-strip .th{position:relative;flex:0 0 auto;}
+.fv-strip img{width:54px;height:54px;border-radius:10px;object-fit:cover;display:block;}
+.fv-strip button{position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;border:none;background:#d9534f;color:#fff;font-size:11px;}
+.fv-foot{padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#0b1220;}
+.fv-alarm{position:fixed;inset:0;z-index:100000;background:rgba(160,20,20,.96);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px;}
+@keyframes fvShake{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
 /* ===== glass theme motion ===== */
 @keyframes gSideIn{from{opacity:0;transform:translateX(46px);}to{opacity:1;transform:none;}}
 @keyframes gRise{from{opacity:0;transform:translateY(20px) scale(.97);}to{opacity:1;transform:none;}}
@@ -782,6 +797,7 @@ const ICON = {
   camera:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   printer:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
   trash:(s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  faceScan:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="10" r="3"/><path d="M6.8 17.5c.8-2.4 2.9-3.6 5.2-3.6s4.4 1.2 5.2 3.6"/></svg>`,
   deskwork:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="2"/><path d="M5.5 7.6V14M5.5 10l4 2.4M3 15h4.5M5.5 15v6"/><path d="M8 14.5h14M9.5 14.5V21M20.5 14.5V21"/><rect x="13" y="12" width="8" height="2.5" rx=".5"/><rect x="13.7" y="9.6" width="6.8" height="2.4" rx=".5"/><rect x="13" y="7.2" width="8" height="2.4" rx=".5"/><rect x="13.7" y="4.8" width="6.8" height="2.4" rx=".5"/></svg>`,
   wrench:(s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
   bracket:()=>`<span class="bk bk-tl"></span><span class="bk bk-tr"></span><span class="bk bk-bl"></span><span class="bk bk-br"></span>`,
@@ -908,25 +924,359 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','نداء التحقق'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
   if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ']];
   if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
   if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
-  if(role==='supervisor') return [['today','قائمة اليوم'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['verify','نداء التحقق'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['verify','نداء التحقق'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['cards','استلام الكروت'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
 }
 
 /* ============================= RENDER ROOT ============================= */
+
+/* ============================= نداء التحقق العشوائي من العمالة (Face verification call) ============================= */
+const FV_TIMER_MIN=20, FV_DEDUP=0.5;
+const FV_CDNS=['https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7/','https://unpkg.com/@vladmandic/face-api@1.7/'];
+Object.assign(S,{ verify:{ zone:null, session:null, checks:[], faces:[], sig:'', loaded:false } });
+function fvStaff(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='opm'||r==='hk_manager'; }
+function fvMyCheck(){ const v=S.verify; if(!S.session||!v.session) return null; return (v.checks||[]).find(c=>c.supervisor_id===S.session.user.id)||null; }
+function fvLeftMs(){ const d=S.verify.session&&S.verify.session.call_deadline; return d? new Date(d).getTime()-Date.now() : 0; }
+function fvFmtLeft(ms){ ms=Math.max(0,ms); return String(Math.floor(ms/60000)).padStart(2,'0')+':'+String(Math.floor(ms%60000/1000)).padStart(2,'0'); }
+async function loadVerify(){
+  const q=async f=>{ try{ const r=await f(); return r.error?null:r.data; }catch(e){ return null; } };
+  const [zone,session]=await Promise.all([ q(()=>sb.from('verify_settings').select('*').eq('id','zone').maybeSingle()), q(()=>sb.from('verify_sessions').select('*').eq('id',S.today).maybeSingle()) ]);
+  const checks=await q(()=>sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_thumb,selfie_at,submitted_at,worker_count,result').eq('date',S.today));
+  const faces=fvStaff()? (await q(()=>sb.from('verify_faces').select('id,kind,label_user_id,thumb,created_at').eq('date',S.today).order('created_at'))||[]) : [];
+  const v=S.verify; v.zone=zone; v.session=session; v.checks=checks||[]; v.faces=faces; v.loaded=true;
+  const sig=JSON.stringify([session&&[session.status,session.call_deadline,session.workers_count,session.supervisors_count],v.checks.map(c=>[c.id,c.status,c.worker_count]),faces.length,zone&&[zone.lat,zone.lng,zone.radius_m]]);
+  const changed=sig!==v.sig; v.sig=sig; return changed;
+}
+let fvTickBusy=false, fvSecs=0;
+async function verifyTick(force){
+  if(fvTickBusy||!S.session||!S.profile||document.visibilityState!=='visible') return;
+  if(!['admin','opm','hk_manager','supervisor'].includes(S.profile.role)) return;
+  fvTickBusy=true;
+  try{ const ch=await loadVerify(); fvAlarmCheck(); if((ch||force) && (S.tab==='verify'||S.tab==='today') && !document.getElementById('fv-scan') && !document.getElementById('fv-zone-ov') && !S.modal) render(); }
+  finally{ fvTickBusy=false; }
+}
+function fvSecondTick(){
+  document.querySelectorAll('[data-fvleft]').forEach(el=>{ el.textContent=fvFmtLeft(fvLeftMs()); });
+  const ses=S.verify.session; fvSecs++;
+  if(ses&&ses.status==='calling'&&fvLeftMs()<=0&&fvSecs%5===0) verifyTick(true);
+}
+setInterval(()=>verifyTick(),12000); setInterval(fvSecondTick,1000); setTimeout(()=>verifyTick(true),4000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') verifyTick(); });
+
+/* ---- alarm (supervisor): loud + vibrating until tapped ---- */
+let fvAlarmTimer=null, fvAudio=null;
+function fvBeep(){ try{ if(!fvAudio) fvAudio=new (window.AudioContext||window.webkitAudioContext)(); if(fvAudio.state==='suspended') fvAudio.resume(); const o=fvAudio.createOscillator(), g=fvAudio.createGain(); o.type='square'; o.frequency.value=880; g.gain.value=.3; o.connect(g); g.connect(fvAudio.destination); o.start(); o.stop(fvAudio.currentTime+.4); }catch(e){} }
+function fvAlarmCheck(){
+  const c=fvMyCheck(); const el=document.getElementById('fv-alarm');
+  const need=!!(c && S.profile.role==='supervisor' && S.verify.session.status==='calling' && c.status==='pending' && fvLeftMs()>0);
+  if(need&&!el) fvAlarmShow(c); else if(!need&&el) fvAlarmHide();
+}
+function fvAlarmShow(c){
+  const d=document.createElement('div'); d.id='fv-alarm'; d.className='fv-alarm';
+  d.innerHTML=`<div style="font-size:70px;animation:fvShake .5s infinite;">🔔</div><div style="font-size:22px;font-weight:800;line-height:1.7;">نداء التحقق من الهوية</div><div style="font-size:15px;opacity:.92;">الوقت المتاح <b>${FV_TIMER_MIN}</b> دقيقة</div><button id="fv-alarm-ok" style="font-size:18px;font-weight:800;padding:16px 26px;border-radius:999px;border:none;background:#fff;color:#a01414;max-width:92%;">جاري تنفيذ التحقق من هوية العمال — اضغط هنا</button>`;
+  document.body.appendChild(d);
+  document.getElementById('fv-alarm-ok').onclick=async()=>{ fvAlarmHide(); await fvAck(c.id); };
+  const pulse=()=>{ fvBeep(); try{ navigator.vibrate&&navigator.vibrate([500,200,500,200,900]); }catch(e){} };
+  pulse(); fvAlarmTimer=setInterval(pulse,2200);
+}
+function fvAlarmHide(){ clearInterval(fvAlarmTimer); fvAlarmTimer=null; const el=document.getElementById('fv-alarm'); if(el) el.remove(); try{ navigator.vibrate&&navigator.vibrate(0); }catch(e){} }
+async function fvAck(id){ await sb.from('verify_checks').update({ status:'acknowledged', ack_at:new Date().toISOString() }).eq('id',id); await loadVerify(); S.tab='verify'; render(); }
+
+/* ---- geometry / face helpers ---- */
+function fvDistM(a,b,c,d){ const R=6371000,rad=x=>x*Math.PI/180,dl=rad(c-a),dn=rad(d-b); const h=Math.sin(dl/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function fvZoneState(p){ const z=S.verify.zone; if(!z) return { ok:true, unknown:true }; const d=fvDistM(p.coords.latitude,p.coords.longitude,z.lat,z.lng); return { ok:d<=z.radius_m, d }; }
+function fvDist(a,b){ let s=0; for(let i=0;i<a.length;i++){ const x=a[i]-b[i]; s+=x*x; } return Math.sqrt(s); }
+function fvCrop(video,b){ const m=.28,w=b.width*(1+2*m),h=b.height*(1+2*m),x=Math.max(0,b.x-b.width*m),y=Math.max(0,b.y-b.height*m); const c=document.createElement('canvas'); c.width=112; c.height=112; try{ c.getContext('2d').drawImage(video,x,y,Math.min(w,video.videoWidth-x),Math.min(h,video.videoHeight-y),0,0,112,112); }catch(e){} return c.toDataURL('image/jpeg',.6); }
+function fvLoadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
+let fvEngineP=null;
+function fvEngine(){
+  if(fvEngineP) return fvEngineP;
+  fvEngineP=(async()=>{
+    let last; for(const base of FV_CDNS){ try{
+      if(!window.faceapi) await fvLoadScript(base+'dist/face-api.js');
+      const fa=window.faceapi, m=base+'model';
+      await fa.nets.tinyFaceDetector.loadFromUri(m); await fa.nets.faceLandmark68Net.loadFromUri(m); await fa.nets.faceRecognitionNet.loadFromUri(m);
+      return fa; }catch(e){ last=e; } }
+    throw last||new Error('engine');
+  })().catch(e=>{ fvEngineP=null; throw e; });
+  return fvEngineP;
+}
+
+/* ---- camera scanner overlay (not part of render(), so polling can't kill the stream) ---- */
+function fvOpenScanner(opt){
+  return new Promise(resolve=>{
+    const faces=[]; let stream=null, alive=true, pos=null, zoneOk=!opt.zoneCheck, watchId=null, fa=null, stable=0;
+    const ov=document.createElement('div'); ov.id='fv-scan'; ov.className='fv-ov';
+    ov.innerHTML=`<div class="fv-head"><b>${esc(opt.title)}</b><button class="fv-x" id="fv-cancel">✕</button></div>
+      <div class="fv-vwrap"><video id="fv-video" playsinline muted autoplay></video><div class="fv-badge"><span id="fv-count">0</span> وش</div></div>
+      <div class="fv-zone" id="fv-zone" style="display:${opt.zoneCheck?'block':'none'}">جاري تحديد موقعك...</div>
+      <div class="fv-msg" id="fv-msg">جاري تشغيل الكاميرا...</div>
+      <div class="fv-strip" id="fv-strip"></div>
+      <div class="fv-foot"><button class="primary-btn" id="fv-fin" style="width:100%;justify-content:center;" disabled>${esc(opt.finishLabel||'تم')}</button></div>`;
+    document.body.appendChild(ov);
+    const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin');
+    const close=res=>{ alive=false; try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} if(watchId!=null) try{ navigator.geolocation.clearWatch(watchId); }catch(e){} ov.remove(); resolve(res); };
+    const refresh=()=>{
+      $('#fv-count').textContent=faces.length;
+      $('#fv-strip').innerHTML=faces.map((f,i)=>`<div class="th"><img src="${f.t}"><button data-i="${i}">✕</button></div>`).join('');
+      $('#fv-strip').querySelectorAll('button').forEach(b=>b.onclick=()=>{ faces.splice(+b.dataset.i,1); stable=0; refresh(); });
+      fin.disabled=!(zoneOk && (opt.selfie? faces.length===1 : faces.length>0));
+    };
+    $('#fv-cancel').onclick=()=>{ if(!faces.length||confirm('تلغي المسح؟ الوشوش اللي اتصورت هتضيع')) close(null); };
+    fin.onclick=()=>close({ faces:faces.slice(), pos });
+    if(opt.zoneCheck){
+      const z=$('#fv-zone');
+      if(!navigator.geolocation){ z.textContent='الجهاز مش بيدعم تحديد الموقع'; zoneOk=false; }
+      else watchId=navigator.geolocation.watchPosition(p=>{ pos=p; const st=fvZoneState(p); zoneOk=st.ok;
+        z.textContent=st.unknown? 'لم يتم تحديد حدود المشروع بعد' : (st.ok? `✅ داخل حدود المشروع (${Math.round(st.d)} م من المركز)` : `⛔ خارج حدود المشروع (${Math.round(st.d)} م) — لازم تكون جوا الزون`);
+        z.style.background=st.ok?'#0f5132':'#842029'; refresh(); },
+        ()=>{ zoneOk=false; z.textContent='تعذّر تحديد موقعك — فعّل الـ GPS وصرّح للموقع'; z.style.background='#842029'; refresh(); },
+        { enableHighAccuracy:true, maximumAge:3000, timeout:20000 });
+    }
+    (async()=>{
+      try{ stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:opt.selfie?'user':'environment', width:{ideal:1280}, height:{ideal:720} }, audio:false }); video.srcObject=stream; await video.play(); }
+      catch(e){ msg.textContent='تعذّر تشغيل الكاميرا — صرّح للكاميرا من إعدادات المتصفح'; return; }
+      msg.textContent='جاري تحميل نموذج التعرف على الوجوه (أول مرة بياخد وقت)...';
+      try{ fa=await fvEngine(); }catch(e){ msg.textContent='فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
+      msg.textContent=opt.selfie?'قرّب وشك من الكاميرا':'وجّه الكاميرا على وجوه العمالة واحد واحد';
+      const loop=async()=>{
+        if(!alive) return;
+        try{
+          if(video.readyState>=2){
+            const vw=video.videoWidth;
+            const dets=await fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
+            if(opt.selfie){
+              const good=dets.filter(d=>d.detection.score>=.7 && d.detection.box.width>=vw*.2);
+              if(faces.length) msg.textContent='✓ تم التقاط السيلفي — اضغط للإنهاء (أو احذفه وأعد)';
+              else if(good.length===1){ if(++stable>=3){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); refresh(); } else msg.textContent='ثبّت وشك...'; }
+              else { stable=0; msg.textContent=good.length>1?'لازم وش واحد بس في الكادر':'قرّب وشك من الكاميرا وخليه واضح'; }
+            } else {
+              let added=0;
+              for(const d of dets){
+                if(d.detection.score<.6 || d.detection.box.width<vw*.07) continue;
+                const e=Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000);
+                if(faces.some(f=>fvDist(f.e,e)<FV_DEDUP)) continue;
+                faces.push({ e, t:fvCrop(video,d.detection.box) }); added++;
+              }
+              if(added){ refresh(); fvBeep(); }
+              msg.textContent=dets.length? `بيتم رصد ${dets.length} وش في الكادر — اتسجّل ${faces.length}` : 'وجّه الكاميرا على وجوه العمالة واحد واحد';
+            }
+          }
+        }catch(e){ console.warn('fv loop',e); }
+        if(alive) setTimeout(loop,250);
+      };
+      loop();
+    })();
+    refresh();
+  });
+}
+
+/* ---- zone picker (admin) ---- */
+async function fvOpenZone(){
+  const z=S.verify.zone||{ lat:30.0444, lng:31.2357, radius_m:300 };
+  const ov=document.createElement('div'); ov.id='fv-zone-ov'; ov.className='fv-ov'; ov.style.background='var(--paper,#fff)'; ov.style.color='var(--text,#111)';
+  ov.innerHTML=`<div class="fv-head" style="background:#0b1220;color:#fff"><b>تحديد زون المشروع</b><button class="fv-x" id="zv-cancel">✕</button></div>
+    <div id="zv-map" style="flex:1;min-height:240px;background:#dde;display:flex;align-items:center;justify-content:center;font-size:13px;">جاري تحميل الخريطة...</div>
+    <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div class="fgroup"><label>Lat</label><input id="zv-lat" type="number" step="0.00001" value="${z.lat}"></div>
+      <div class="fgroup"><label>Lng</label><input id="zv-lng" type="number" step="0.00001" value="${z.lng}"></div>
+      <div class="fgroup"><label>نصف القطر (متر)</label><input id="zv-r" type="number" min="30" step="10" value="${Math.round(z.radius_m)}"></div>
+    </div>
+    <div style="padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap;"><button class="ghost-btn" id="zv-me">📍 موقعي الحالي</button><button class="primary-btn" id="zv-save" style="flex:1;justify-content:center;">حفظ الزون</button></div>
+    <div style="padding:0 14px 14px;font-size:12px;color:var(--text-dim,#666);">دوس على الخريطة لتحديد مركز المشروع، وغيّر نصف القطر عشان الدايرة تغطي حدود الموقع.</div>`;
+  document.body.appendChild(ov);
+  const $=id=>ov.querySelector(id), lat=$('#zv-lat'), lng=$('#zv-lng'), rad=$('#zv-r');
+  let map=null, marker=null, circle=null;
+  const sync=()=>{ const a=parseFloat(lat.value), b=parseFloat(lng.value), r=parseFloat(rad.value)||300; if(!map||isNaN(a)||isNaN(b)) return; marker.setLatLng([a,b]); circle.setLatLng([a,b]); circle.setRadius(r); };
+  [lat,lng,rad].forEach(i=>i.oninput=()=>{ sync(); if(map&&!isNaN(parseFloat(lat.value))&&!isNaN(parseFloat(lng.value))) map.panTo([parseFloat(lat.value),parseFloat(lng.value)]); });
+  $('#zv-cancel').onclick=()=>ov.remove();
+  $('#zv-me').onclick=()=>{ navigator.geolocation.getCurrentPosition(p=>{ lat.value=p.coords.latitude.toFixed(6); lng.value=p.coords.longitude.toFixed(6); sync(); if(map) map.setView([p.coords.latitude,p.coords.longitude],17); },()=>toast('تعذّر تحديد موقعك',false),{ enableHighAccuracy:true,timeout:15000 }); };
+  $('#zv-save').onclick=async()=>{
+    const a=parseFloat(lat.value), b=parseFloat(lng.value), r=parseFloat(rad.value);
+    if(isNaN(a)||isNaN(b)||!(r>=30)){ toast('اكتب إحداثيات صحيحة ونصف قطر 30 متر أو أكتر',false); return; }
+    const {error}=await sb.from('verify_settings').upsert({ id:'zone', lat:a, lng:b, radius_m:r, updated_by:S.session.user.id, updated_at:new Date().toISOString() },{ onConflict:'id' });
+    if(error){ toast('تعذّر الحفظ: '+error.message,false); return; }
+    await loadVerify(); ov.remove(); render(); toast('تم حفظ الزون',true);
+  };
+  try{
+    if(!window.L){
+      const l=document.createElement('link'); l.rel='stylesheet'; l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(l);
+      await fvLoadScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js');
+    }
+    const mapEl=$('#zv-map'); mapEl.innerHTML=''; mapEl.style.display='block';
+    map=L.map(mapEl).setView([z.lat,z.lng],z.radius_m?16:12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
+    marker=L.marker([z.lat,z.lng]).addTo(map); circle=L.circle([z.lat,z.lng],{ radius:z.radius_m, color:'#e8603c', fillOpacity:.15 }).addTo(map);
+    map.on('click',e=>{ lat.value=e.latlng.lat.toFixed(6); lng.value=e.latlng.lng.toFixed(6); sync(); });
+    if(!S.verify.zone) navigator.geolocation&&navigator.geolocation.getCurrentPosition(p=>{ lat.value=p.coords.latitude.toFixed(6); lng.value=p.coords.longitude.toFixed(6); sync(); map.setView([p.coords.latitude,p.coords.longitude],17); },()=>{},{ timeout:8000 });
+  }catch(e){ $('#zv-map').textContent='تعذّر تحميل الخريطة — اكتب الإحداثيات يدويًا أو استخدم "موقعي الحالي"'; }
+}
+
+/* ---- site manager: enrolment ---- */
+async function fvSaveEnrol(kind,faces){
+  const v=S.verify, day=S.today;
+  if(v.session && ['calling','closed'].includes(v.session.status)){ toast('النداء بدأ بالفعل — مينفعش تعدّل الوشوش',false); return false; }
+  if(!v.session){ const r=await sb.from('verify_sessions').insert({ id:day, date:day, status:'enrolling' }); if(r.error){ toast('تعذّر إنشاء جلسة اليوم: '+r.error.message,false); return false; } }
+  let r=await sb.from('verify_faces').delete().eq('date',day).eq('kind',kind);
+  if(r.error){ toast('تعذّر مسح الوشوش القديمة: '+r.error.message,false); return false; }
+  const rows=faces.map(f=>({ id:uid('vf'), session_id:day, date:day, kind, emb:f.e, thumb:f.t }));
+  for(let i=0;i<rows.length;i+=15){ r=await sb.from('verify_faces').insert(rows.slice(i,i+15)); if(r.error){ toast('تعذّر رفع الوشوش: '+r.error.message,false); return false; } }
+  await loadVerify();
+  const w=v.faces.filter(f=>f.kind==='worker').length, s=v.faces.filter(f=>f.kind==='supervisor').length;
+  const patch={ workers_count:w, supervisors_count:s };
+  if(w>0&&s>0){ patch.status='enrolled'; patch.enrolled_by=S.session.user.id; patch.enrolled_at=new Date().toISOString(); }
+  await sb.from('verify_sessions').update(patch).eq('id',day);
+  await loadVerify(); return true;
+}
+async function fvEnrolScan(kind){
+  const v=S.verify; if(v.session&&['calling','closed'].includes(v.session.status)){ toast('النداء بدأ بالفعل',false); return; }
+  if(v.faces.some(f=>f.kind===kind) && !confirm('فيه وشوش متسجلة النهارده — المسح الجديد هيستبدلها. تكمل؟')) return;
+  const r=await fvOpenScanner({ title:kind==='worker'?'تحقق العمالة — مسح الوجوه':'تحقق المشرفين — مسح الوجوه', selfie:false, zoneCheck:false, finishLabel:'تم الانتهاء من مسح الوجوه الأولي — رفع للإدارة' });
+  if(!r) return;
+  if(!r.faces.length){ toast('مفيش وشوش اتسجلت',false); return; }
+  if(await fvSaveEnrol(kind,r.faces)){ render(); toast('تم رفع '+r.faces.length+' وش للإدارة',true); }
+}
+
+/* ---- admin: start the call ---- */
+async function fvStartCall(){
+  const v=S.verify, ses=v.session;
+  if(!v.zone){ toast('حدّد الزون من الخريطة الأول',false); return; }
+  if(!ses||ses.status!=='enrolled'){ toast('لازم مدير الموقع يخلّص رفع وشوش العمالة والمشرفين الأول',false); return; }
+  let sups=(S.users||[]).filter(u=>u.role==='supervisor'&&u.active);
+  const present=sups.filter(u=>{ const p=presenceOf(u.id); return p&&p.present===true; });
+  if(present.length) sups=present;
+  if(!sups.length){ toast('مفيش مشرفين',false); return; }
+  if(!confirm('هيتبعت النداء لـ '+sups.length+' مشرف ويبدأ تايمر '+FV_TIMER_MIN+' دقيقة. تكمل؟')) return;
+  const now=new Date(), dl=new Date(now.getTime()+FV_TIMER_MIN*60000);
+  let r=await sb.from('verify_sessions').update({ status:'calling', call_started_by:S.session.user.id, call_started_at:now.toISOString(), call_deadline:dl.toISOString() }).eq('id',S.today);
+  if(r.error){ toast('تعذّر بدء النداء: '+r.error.message,false); return; }
+  r=await sb.from('verify_checks').insert(sups.map(u=>({ id:uid('vc'), session_id:S.today, date:S.today, supervisor_id:u.id, supervisor_name:u.full_name||'' })));
+  if(r.error){ await sb.from('verify_sessions').update({ status:'enrolled', call_deadline:null, call_started_at:null }).eq('id',S.today); toast('تعذّر إرسال النداء: '+r.error.message,false); return; }
+  await loadVerify(); render(); toast('تم إرسال النداء لـ '+sups.length+' مشرف',true);
+}
+async function fvRunNow(){
+  if(!confirm('تشغّل المطابقة دلوقتي وتقفل الجلسة؟')) return;
+  const {error}=await sb.rpc('verify_run_matching',{ p_session:S.today });
+  if(error){ toast('تعذّر تشغيل المطابقة: '+error.message,false); return; }
+  await loadVerify(); render(); toast('تمت المطابقة',true);
+}
+
+/* ---- supervisor: selfie then workers ---- */
+async function fvSupStart(){
+  let c=fvMyCheck(); if(!c) return;
+  if(fvLeftMs()<=0){ toast('انتهى وقت التحقق',false); return; }
+  if(!['selfie_ok','submitted'].includes(c.status)){
+    const r=await fvOpenScanner({ title:'سيلفي للتحقق من هويتك (جوا حدود المشروع)', selfie:true, zoneCheck:true, finishLabel:'تأكيد السيلفي والمتابعة' });
+    if(!r) return;
+    const f=r.faces[0], p=r.pos&&r.pos.coords;
+    const {error}=await sb.from('verify_checks').update({ status:'selfie_ok', selfie_emb:f.e, selfie_thumb:f.t, selfie_lat:p?p.latitude:null, selfie_lng:p?p.longitude:null, selfie_at:new Date().toISOString() }).eq('id',c.id);
+    if(error){ toast('تعذّر رفع السيلفي: '+error.message,false); return; }
+    await loadVerify(); render();
+  }
+  if(fvLeftMs()<=0){ toast('انتهى وقت التحقق',false); return; }
+  const r2=await fvOpenScanner({ title:'مسح وجوه العمالة (جوا حدود المشروع)', selfie:false, zoneCheck:true, finishLabel:'تم الانتهاء من التحقق — رفع الحالة للإدارة' });
+  if(!r2) return;
+  const p2=r2.pos&&r2.pos.coords;
+  const {error:e2}=await sb.from('verify_checks').update({ status:'submitted', scan_faces:r2.faces, scan_lat:p2?p2.latitude:null, scan_lng:p2?p2.longitude:null, worker_count:r2.faces.length, submitted_at:new Date().toISOString() }).eq('id',fvMyCheck().id);
+  if(e2){ toast('تعذّر رفع التحقق: '+e2.message,false); return; }
+  await loadVerify(); render(); toast('تم رفع الحالة للإدارة — معلّق لحين المقارنة',true);
+}
+
+/* ---- rendering ---- */
+function fvThumbs(arr,color){ return (arr&&arr.length)? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px;">${arr.map(t=>`<img src="${t}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid ${color};">`).join('')}</div>`:''; }
+const FV_STATUS={ pending:'لم يفتح النداء', acknowledged:'فتح النداء', selfie_ok:'سيلفي تم', submitted:'معلّق للمقارنة', matched:'مطابق ✅', mismatch:'غير مطابق ⚠️', no_response:'لم يستجب ⛔' };
+function fvResultHtml(c){
+  const r=c.result||{};
+  if(c.status==='no_response') return `<div style="color:var(--coral);font-weight:800;">لم يتم التحقق في الوقت المحدد</div>`;
+  if(c.status==='matched') return `<div style="color:var(--mint);font-weight:800;font-size:15px;">✅ تمت المطابقة — كل عمالك كانوا موجودين الصبح (${r.matched||0} وش)</div>`;
+  const why=[];
+  if(r.selfie_ok===false) why.push('السيلفي لم يطابق الوش المسجّل صباحًا');
+  if(r.selfie_zone===false) why.push('كنت خارج حدود المشروع وقت السيلفي');
+  if(r.scan_zone===false) why.push('كنت خارج حدود المشروع وقت مسح العمالة');
+  return `<div style="color:var(--coral);font-weight:800;font-size:15px;margin-bottom:6px;">⚠️ تم وجود حالات غير مطابقة</div>
+    ${why.map(w=>`<div style="font-size:13px;margin:3px 0;">• ${w}</div>`).join('')}
+    ${r.new_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.new_n}</b> وش جديد لم يدخل النظام الصبح:</div>${fvThumbs(r.new,'#d9534f')}`:''}
+    ${r.dups_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.dups_n}</b> وش ظهر عند مشرف آخر كمان:</div>${fvThumbs(r.dups,'#e0a800')}`:''}
+    ${r.missing_n? `<div style="font-size:13px;margin-top:8px;"><b>${r.missing_n}</b> ظهروا الصبح ولم يظهروا في التحقق:</div>${fvThumbs((r.missing||[]).map(m=>m.t),'#6c757d')}`:''}`;
+}
+function renderVerify(){
+  const role=S.profile.role, v=S.verify, ses=v.session, z=v.zone;
+  const stLabel={ enrolling:'جاري تسجيل الوشوش الصباحية', enrolled:'تم رفع الوشوش الصباحية — جاهز للنداء', calling:'النداء شغّال', closed:'تم إغلاق جلسة اليوم' };
+  const note='<div style="font-size:11.5px;color:var(--text-dim);margin-top:8px;">الوشوش بتتحذف أوتوماتيك كل يوم، وكل يوم له جلسة خاصة.</div>';
+  if(role==='supervisor'){
+    const c=fvMyCheck();
+    if(!c||!ses||ses.status==='enrolled'||ses.status==='enrolling') return `<div class="card"><div class="empty-state"><span class="em">🧑‍🤝‍🧑</span>مفيش نداء تحقق دلوقتي — هيجيلك إشعار لما الإدارة تبدأ النداء</div></div>`;
+    let body='';
+    if(['pending','acknowledged','selfie_ok'].includes(c.status) && ses.status==='calling' && fvLeftMs()>0){
+      body=`<div style="font-size:34px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;" data-fvleft>${fvFmtLeft(fvLeftMs())}</div>
+        <div style="text-align:center;font-size:12.5px;color:var(--text-dim);margin-bottom:12px;">الوقت المتبقي للتحقق</div>
+        <div style="font-size:13px;line-height:2;">${c.status==='selfie_ok'?'✅':'①'} سيلفي لنفسك (جوا حدود المشروع)<br>② مسح وجوه عمالتك (جوا حدود المشروع)<br>③ رفع الحالة للإدارة</div>
+        <button class="primary-btn" id="fv-sup-start" style="width:100%;justify-content:center;margin-top:12px;">${ICON.faceScan(16)} ابدأ مسح وجوه العمالة</button>`;
+    } else if(c.status==='submitted'){
+      body=`<div style="text-align:center;padding:10px 0;"><div style="font-size:40px;">⏳</div><b>معلّق لحين الانتهاء من المقارنة</b><div style="font-size:12.5px;color:var(--text-dim);margin-top:6px;">تم رفع ${c.worker_count} وش — المقارنة مع وشوش الصبح هتتم أوتوماتيك لما التايمر يخلص${fvLeftMs()>0?` (<span data-fvleft>${fvFmtLeft(fvLeftMs())}</span>)`:''}</div></div>`;
+    } else if(['matched','mismatch','no_response'].includes(c.status)){ body=fvResultHtml(c); }
+    else body=`<div style="text-align:center;color:var(--coral);font-weight:800;">انتهى وقت التحقق</div>`;
+    return `<div class="card"><div style="font-weight:900;font-size:16px;margin-bottom:10px;">🔔 نداء التحقق من هوية العمال</div>${body}${note}</div>`;
+  }
+  // admin / opm / site manager
+  const mgr=(role==='hk_manager'||role==='admin');
+  const wF=v.faces.filter(f=>f.kind==='worker'), sF=v.faces.filter(f=>f.kind==='supervisor');
+  const locked=ses&&['calling','closed'].includes(ses.status);
+  let h='';
+  h+=`<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div><div style="font-weight:900;">📍 زون المشروع</div><div style="font-size:12.5px;color:var(--text-dim);margin-top:2px;">${z? `Lat ${(+z.lat).toFixed(5)} · Lng ${(+z.lng).toFixed(5)} · نصف القطر ${Math.round(z.radius_m)} م` : '<span style="color:var(--coral);font-weight:800;">لم يتم تحديد الزون بعد</span>'}</div></div>
+    ${role==='admin'?`<button class="ghost-btn" id="fv-zone-btn">🗺️ تحديد الزون من الخريطة</button>`:''}</div></div>`;
+  h+=`<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><div style="font-weight:900;">نداء التحقق العشوائي — ${esc(S.today)}</div><div style="font-size:13px;margin-top:2px;">${ses? stLabel[ses.status] : 'لم يبدأ تسجيل الوشوش الصباحية'}${ses&&ses.status==='calling'?` · المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b>`:''}</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">${role==='admin'&&ses&&ses.status==='enrolled'?`<button class="primary-btn" id="fv-call">🔔 بدء النداء</button>`:''}${role==='admin'&&ses&&ses.status==='calling'&&fvLeftMs()<=0?`<button class="primary-btn" id="fv-run">تشغيل المطابقة الآن</button>`:''}</div></div>
+    <div class="stat-row" style="margin-top:12px;"><div class="stat blue"><div class="num">${wF.length}</div><div class="lbl">وشوش العمالة الصباحية</div></div><div class="stat mint"><div class="num">${sF.length}</div><div class="lbl">وشوش المشرفين</div></div></div>${note}</div>`;
+  if(mgr){
+    const sups=(S.users||[]).filter(u=>u.role==='supervisor'&&u.active);
+    h+=`<div class="section-title"><h2>تحقق العمالة</h2></div><div class="card" style="margin-bottom:14px;">${fvThumbs(wF.map(f=>f.thumb),'#3b8be6')||'<div style="font-size:13px;color:var(--text-dim);">لم يتم مسح عمالة اليوم</div>'}
+      <button class="primary-btn" id="fv-enrol-worker" ${locked?'disabled':''}>${ICON.faceScan(16)} ${wF.length?'إعادة مسح وجوه العمالة':'ابدأ مسح وجوه العمالة'}</button></div>
+      <div class="section-title"><h2>تحقق المشرفين</h2></div><div class="card" style="margin-bottom:14px;">
+      ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
+      <button class="primary-btn" id="fv-enrol-sup" ${locked?'disabled':''}>${ICON.faceScan(16)} ${sF.length?'إعادة مسح وجوه المشرفين':'ابدأ مسح وجوه المشرفين'}</button></div>`;
+  }
+  if(ses&&['calling','closed'].includes(ses.status)){
+    h+=`<div class="section-title"><h2>${ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء'}</h2></div>`;
+    if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
+      h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وشوش الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وشوش اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وش مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وش جديد</div></div></div>`; }
+    h+=(v.checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(c.supervisor_name||'-')}</b><span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وش`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
+    const mis=(v.checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
+    if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
+  }
+  return h;
+}
+function bindVerify(){
+  const b=id=>document.getElementById(id);
+  if(b('fv-zone-btn')) b('fv-zone-btn').onclick=fvOpenZone;
+  if(b('fv-call')) b('fv-call').onclick=fvStartCall;
+  if(b('fv-run')) b('fv-run').onclick=fvRunNow;
+  if(b('fv-enrol-worker')) b('fv-enrol-worker').onclick=()=>fvEnrolScan('worker');
+  if(b('fv-enrol-sup')) b('fv-enrol-sup').onclick=()=>fvEnrolScan('supervisor');
+  if(b('fv-sup-start')) b('fv-sup-start').onclick=fvSupStart;
+  document.querySelectorAll('[data-fv-label]').forEach(sel=>sel.onchange=async()=>{ const {error}=await sb.from('verify_faces').update({ label_user_id:sel.value||null }).eq('id',sel.dataset.fvLabel); if(error) toast('تعذّر الحفظ: '+error.message,false); else { const f=S.verify.faces.find(x=>x.id===sel.dataset.fvLabel); if(f) f.label_user_id=sel.value||null; } });
+  verifyTick(true);
+}
+function fvBanner(){
+  const c=fvMyCheck(); if(!c||S.profile.role!=='supervisor'||!S.verify.session||S.verify.session.status!=='calling') return '';
+  if(!['pending','acknowledged','selfie_ok'].includes(c.status)||fvLeftMs()<=0) return '';
+  return `<div class="card" style="margin-bottom:14px;border:2px solid var(--coral);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b>🔔 نداء التحقق من هوية العمال</b><div style="font-size:12.5px;">المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b></div></div><button class="primary-btn" data-fv-open>افتح كرت التحقق</button></div>`;
+}
 
 /* ============================= GLASS MOTION: staggered entrance + number count-up ============================= */
 S._numPrev={}; S._gIntro=false;
@@ -1117,6 +1467,7 @@ function renderTabBody(){
     case 'home': return renderHome();
     case 'deliveries': return renderDeliveries();
     case 'sideservices': return renderSideServices();
+    case 'verify': return renderVerify();
     case 'orders': return renderOrders();
     case 'pest': return renderPest();
     case 'facade': return renderFacade();
@@ -1144,6 +1495,7 @@ function bindTabEvents(){
     case 'home': bindHome(); break;
     case 'deliveries': bindDeliveries(); break;
     case 'sideservices': bindSideServices(); break;
+    case 'verify': bindVerify(); break;
     case 'orders': bindOrders(); break;
     case 'pest': bindPest(); break;
     case 'facade': bindFacade(); break;
@@ -4361,7 +4713,8 @@ function supExtras(){
   + `<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b style="font-size:13.5px;">معايا كام عامل النهاردة للتشغيل الميداني؟</b><input type="number" min="0" id="wc-input" value="${wc?wc.workers:''}" placeholder="العدد" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;"><button class="primary-btn" id="wc-save">حفظ</button></div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">العدد بس — من غير أسماء.</div></div>`;
 }
 function addDaysStr(ds,n){ const d=new Date(ds+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
-function renderSupervisorToday(){
+function renderSupervisorToday(){ return fvBanner()+renderSupervisorTodayBase(); }
+function renderSupervisorTodayBase(){
   const uidMe = S.session.user.id;
   const myPresence = presenceOf(uidMe);
   const presentToday = !!(myPresence && myPresence.present===true);
@@ -4440,6 +4793,7 @@ function renderSupervisorToday(){
   return html;
 }
 function bindSupervisorToday(){
+  document.querySelectorAll('[data-fv-open]').forEach(b=>b.onclick=()=>{ S.tab='verify'; render(); });
   const rb=document.getElementById('refresh-my-locs');
   if(rb) rb.onclick=async ()=>{
     rb.disabled=true;
