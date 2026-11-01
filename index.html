@@ -603,6 +603,9 @@ function fmtDate(s){ const d=new Date(s+'T00:00:00'); return d.toLocaleDateStrin
 function fmtTime(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit',hour12:true}); }
 function fmtTimeOld(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
 /* ---- 12-hour clock (ص / م) ---- */
+// ترتيب وحدات التسليم: اللي هيوصل عميلها الأول فوق، والوحدات اللي من غير ميعاد في الآخر
+function arrivalMin(d){ const m=/^(\d{1,2}):(\d{2})/.exec((d&&d.client_arrival_time)||''); return m? (+m[1])*60+(+m[2]) : 99999; }
+function cmpArrival(a,b){ return arrivalMin(a)-arrivalMin(b) || String(a.unit_code||'').localeCompare(String(b.unit_code||''),'en',{numeric:true}); }
 function fmt12(hhmm, empty){
   const m=/^(\d{1,2}):(\d{2})/.exec(hhmm||''); if(!m) return empty==null?'-':empty;
   let h=+m[1]; const ap=h>=12?'م':'ص'; h=h%12; if(h===0) h=12; return h+':'+m[2]+' '+ap;
@@ -1714,7 +1717,7 @@ function renderDeliveries(){
   const canWrite = role==='admin'||role==='opm';
   const canChangeStatus = ['admin','opm','supervisor'].includes(role);
   const todayOnly = role==='fm_dispatcher';
-  const list = S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate));
+  const list = S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate)).sort(cmpArrival);
   return `
   <div class="toolbar">
     ${todayOnly? '<span style="font-size:13px;font-weight:800;">وحدات تسليم اليوم — للعلم فقط</span>' : `<div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>`}
@@ -4743,7 +4746,7 @@ function renderSupervisorTodayBase(){
 
   if(myScope==='units'){
     const lastDay = addDaysStr(S.today,2);
-    const myDelivAll = S.deliveries.filter(d=>d.date>=S.today && d.date<=lastDay).sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.client_arrival_time||'').localeCompare(String(b.client_arrival_time||'')));
+    const myDelivAll = S.deliveries.filter(d=>d.date>=S.today && d.date<=lastDay).sort((a,b)=>String(a.date).localeCompare(String(b.date)) || cmpArrival(a,b));
     const myDeliv = myDelivAll.filter(d=>d.date===S.today);
     const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && orderApproved(o));
     const doneOf = arr => arr.filter(x=>x.status==='completed').length;
