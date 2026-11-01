@@ -1119,7 +1119,12 @@ async function fvOpenZone(){
     }
     const mapEl=$('#zv-map'); mapEl.innerHTML=''; mapEl.style.display='block';
     map=L.map(mapEl).setView([z.lat,z.lng],z.radius_m?16:12);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
+    // الصفحة بتبعت no-referrer فسيرفر OSM كان بيرفض (403) — نبعت origin بس مع صور الخريطة، وضفنا طبقات بديلة
+    const ref={ referrerPolicy:'origin' };
+    const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{ maxZoom:19, attribution:'Tiles © Esri', ...ref });
+    const carto=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{ maxZoom:19, subdomains:'abcd', attribution:'© OpenStreetMap © CARTO', ...ref });
+    const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap', ...ref });
+    sat.addTo(map); L.control.layers({ 'قمر صناعي':sat, 'شوارع (Carto)':carto, 'شوارع (OSM)':osm }).addTo(map);
     marker=L.marker([z.lat,z.lng]).addTo(map); circle=L.circle([z.lat,z.lng],{ radius:z.radius_m, color:'#e8603c', fillOpacity:.15 }).addTo(map);
     map.on('click',e=>{ lat.value=e.latlng.lat.toFixed(6); lng.value=e.latlng.lng.toFixed(6); sync(); });
     if(!S.verify.zone) navigator.geolocation&&navigator.geolocation.getCurrentPosition(p=>{ lat.value=p.coords.latitude.toFixed(6); lng.value=p.coords.longitude.toFixed(6); sync(); map.setView([p.coords.latitude,p.coords.longitude],17); },()=>{},{ timeout:8000 });
