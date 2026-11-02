@@ -930,11 +930,11 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
@@ -1560,6 +1560,7 @@ function renderTabBody(){
     case 'deliveries': return renderDeliveries();
     case 'sideservices': return renderSideServices();
     case 'verify': return renderVerify();
+    case 'logs': return renderLogs();
     case 'orders': return renderOrders();
     case 'pest': return renderPest();
     case 'facade': return renderFacade();
@@ -1588,6 +1589,7 @@ function bindTabEvents(){
     case 'deliveries': bindDeliveries(); break;
     case 'sideservices': bindSideServices(); break;
     case 'verify': bindVerify(); break;
+    case 'logs': bindLogs(); break;
     case 'orders': bindOrders(); break;
     case 'pest': bindPest(); break;
     case 'facade': bindFacade(); break;
@@ -1823,7 +1825,7 @@ function renderDeliveries(){
       </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
       <td>${esc(d.notes||'-')}</td>
       <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
-      <td>${canWrite?`<button class="ghost-btn" data-dv-edit="${d.id}">تعديل</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
+      <td>${audHistBtn('delivery_units',d.id,d.unit_code)} ${canWrite?`<button class="ghost-btn" data-dv-edit="${d.id}">تعديل</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات ${todayOnly?'النهاردة':'في هذا اليوم'}</td></tr>`}
   </tbody></table></div>`;
@@ -2073,7 +2075,7 @@ function renderSideServices(){
   </div>
   <div class="stat-row" style="margin-bottom:14px;"><div class="stat mint"><div class="num">${cnt('integrated')}</div><div class="lbl">Integrated</div></div><div class="stat blue"><div class="num">${cnt('modifications')}</div><div class="lbl">Modifications</div></div><div class="stat ink"><div class="num">${day.filter(x=>x.status==='completed').length}/${day.length}</div><div class="lbl">منتهية</div></div></div>
   <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>النوع</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
-  ${list.length? list.map(x=>`<tr><td>${esc(x.unit_code)}</td><td>${ssTypeTag(x.service_type)}</td><td>${(canWrite||S.profile.role==='supervisor')? ssStatusSelect('data-ss-status',x) : statusBadge(x.status)}</td><td style="white-space:normal;min-width:140px;">${esc(x.notes||'-')}</td><td>${canWrite?`<button class="ghost-btn" data-ss-edit="${x.id}">تعديل</button> <button class="ghost-btn danger" data-ss-del="${x.id}">${ICON.trash()}</button>`:''}</td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  ${list.length? list.map(x=>`<tr><td>${esc(x.unit_code)}</td><td>${ssTypeTag(x.service_type)}</td><td>${(canWrite||S.profile.role==='supervisor')? ssStatusSelect('data-ss-status',x) : statusBadge(x.status)}</td><td style="white-space:normal;min-width:140px;">${esc(x.notes||'-')}</td><td>${audHistBtn('side_service_units',x.id,x.unit_code)} ${canWrite?`<button class="ghost-btn" data-ss-edit="${x.id}">تعديل</button> <button class="ghost-btn danger" data-ss-del="${x.id}">${ICON.trash()}</button>`:''}</td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
 }
 function bindSideServices(){
@@ -2213,6 +2215,7 @@ function renderOrders(){
       +kv('التاريخ',o.scheduled_date)+kv('الميعاد',fmt12(o.scheduled_time,'-'))+kv('الحالة',statusBadge(o.status))
       +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')
       +kv('ملاحظات',esc(o.opm_notes||'-'))
+      +(fvAdm()?`<div style="margin-top:14px;">${audHistBtn('paid_service_orders',o.id,o.unit_code||'')} <span style="font-size:12px;color:var(--text-dim);">سجل التغييرات (مين عدّل وإمتى)</span></div>`:'')
       +((canManage||role==='fm_dispatcher')?`<div style="display:flex;gap:8px;margin-top:14px;"><button class="primary-btn" data-ord-edit="${o.id}">تعديل</button>${canManage?`<button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)} حذف</button>`:''}</div>`:'')); })()}`;
 }
 function bindOrders(){
@@ -3830,6 +3833,164 @@ function bindReports(){
 }
 
 
+/* ============================= سجل النشاط (Audit Log) ============================= */
+// بيقرا من جدول audit_log (التسجيل بيتم جوه الداتا بيز بتريجر، شغّل update_v22_audit_log.sql مرة واحدة). للأدمن وOPM بس.
+Object.assign(S,{ logs:{ date:'', rows:[], logins:[], loaded:false, busy:false, err:'', user:'', sect:'', q:'' }, audHist:{ loading:false, rows:[], err:'' } });
+const AUD_T={ delivery_units:'وحدة التسليم', unit_notes:'ملاحظة على وحدة', paid_service_orders:'أوردر خدمة مدفوعة', side_service_units:'وحدة خدمات جانبية', pest_control_requests:'طلب مكافحة', task_lists:'قائمة مهام', task_items:'بند مهمة', task_runs:'تنفيذ قائمة مهام', task_run_items:'بند مهمة', svc_lists:'قائمة', svc_items:'بند', pest_schedule_rows:'بند جدول المكافحة', pest_schedule_done:'بند مكافحة', attendance_records:'سجل حضور', attendance_edit_requests:'طلب تعديل حضور', daily_presence:'حضور اليوم', hk_zone_assignments:'توزيع زون', hk_supervisor_assignments:'توزيع مشرف', hk_worker_counts:'عدد عمال', hk_labor_distribution:'توزيع عمالة', urgent_tasks:'تاسك مستعجل', emergency_alerts:'بلاغ طوارئ', complaints:'شكوى', client_violations:'مخالفة عميل', suppliers:'مورد', supplier_kpi:'تقييم مورد', supplier_invoices:'فاتورة مورد', card_handover:'استلام كرت', profiles:'مستخدم', user_qr_tokens:'كود QR', verify_sessions:'جلسة تحقق', verify_checks:'رد تحقق', verify_settings:'نطاق التحقق', manpower_settings:'إعدادات العمالة', login:'تسجيل دخول' };
+const AUD_SECT={ 'وحدات التسليم':['delivery_units','unit_notes'], 'الخدمة المدفوعة':['paid_service_orders'], 'خدمات جانبية':['side_service_units'], 'المهام المجدولة':['task_lists','task_items','task_runs','task_run_items'], 'مكافحة الحشرات':['pest_control_requests','pest_schedule_rows','pest_schedule_done'], 'الواجهات والمخلفات':['svc_lists','svc_items'], 'الحضور والتوزيع':['attendance_records','attendance_edit_requests','daily_presence','hk_zone_assignments','hk_supervisor_assignments','hk_worker_counts','hk_labor_distribution'], 'التحقق من الهوية':['verify_sessions','verify_checks','verify_settings'], 'المخالفات والشكاوى والطوارئ':['client_violations','complaints','urgent_tasks','emergency_alerts'], 'الموردين':['suppliers','supplier_kpi','supplier_invoices'], 'المستخدمين والدخول':['profiles','user_qr_tokens','card_handover','login'], 'إعدادات':['manpower_settings'] };
+const AUD_F={ status:'الحالة', notes:'الملاحظات', note:'الملاحظة', unit_code:'كود الوحدة', date:'التاريخ', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', postpone_reason:'سبب التأجيل', assigned_supervisor_id:'المشرف المسؤول', assigned_to:'المسؤول', price:'السعر', payment_status:'حالة الدفع', payment_photo:'صورة الدفع', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', opm_notes:'ملاحظات OPM', client_info:'بيانات العميل', scheduled_date:'تاريخ التنفيذ', scheduled_time:'ميعاد التنفيذ', order_type:'نوع الخدمة', service_type:'نوع الخدمة', photo:'الصورة', done:'تم التنفيذ', done_by_name:'نفّذه', name:'الاسم', label:'البند', active:'نشط', role:'الدور', full_name:'الاسم', shift:'الوردية', phase:'المرحلة', title:'العنوان', details:'التفاصيل', description:'الوصف', open_time:'وقت الفتح', close_time:'وقت الإغلاق', frequency:'التكرار', supervisor_marked_done:'علّم المشرف إنه خلّص', review_status:'مراجعة المشرف الأول', review_note:'ملاحظة المراجعة', rework_count:'عدد مرات الإعادة', completed_at:'وقت الإنجاز', verified_by:'اعتمده', reviewed_by:'راجعه', holder_name:'اسم المستلم', amount:'المبلغ', discount:'الخصم', score:'التقييم', month:'الشهر', budget:'الميزانية', workers:'عدد العمال', place:'المكان', present:'حاضر', actual_name:'الاسم الفعلي', moved_to_evening:'اتنقل للمسائية', workers_count:'عدد العمال', supervisors_count:'عدد المشرفين', building:'العمارة', floor_no:'الدور', apartment:'الشقة', type:'النوع', location:'المكان', message:'الرسالة', reason:'السبب', request_reason:'السبب', changes:'التعديلات', token:'التوكن', email:'الإيميل', value:'القيمة', radius_m:'نصف القطر (م)', lat:'خط العرض', lng:'خط الطول', task:'البند', weekday:'اليوم', start_time:'من', end_time:'إلى', position:'الترتيب', paid_at:'تاريخ السداد', invoice_date:'تاريخ الفاتورة', supervisor_name:'المشرف', worker_count:'عدد العمال', summary:'الملخص' };
+const AUD_HIDE=new Set(['id','created_by','delivery_unit_id','list_id','run_id','item_id','session_id','row_id','user_id','supervisor_id','record_id','requested_by','decided_by','updated_by','approved_by','assigned_by','completed_by','marked_by','done_by','status_by','key','photo_count','has_photo','sort_order','zone_id','unit_label','last_reset_at','service','kind']);
+const AUD_VAL={ payment_status:{ paid:'مدفوع', unpaid:'غير مدفوع' }, approval_status:{ approved:'معتمد', pending:'بانتظار الاعتماد', rejected:'مرفوض' }, shift:{ morning:'صباحية', evening:'مسائية', both:'الاتنين', emergency:'طوارئ' }, order_type:{ soft_cleaning:'نظافة عادية', deep_cleaning:'نظافة عميقة' }, service_type:{ integrated:'خدمة متكاملة', modifications:'تعديلات', full_service:'خدمة كاملة', inspection:'معاينة', flying_spray:'رش طائر', crawling_spray:'رش زاحف', specialized_spray:'رش متخصص', rodent_control:'مكافحة قوارض' }, review_status:{ ok:'مطابق', not_ok:'غير مطابق' }, frequency:{ daily:'يومي', weekly:'أسبوعي', monthly:'شهري' } };
+const AUD_STATUS_EXTRA={ pending:'معلّق', approved:'معتمد', rejected:'مرفوض', enrolling:'تسجيل وجوه', enrolled:'جاهز', calling:'شغّال', closed:'مقفول', matched:'مطابق', mismatch:'غير مطابق', no_response:'لم يستجب', acknowledged:'استلم النداء', selfie_ok:'السيلفي تمام', submitted:'اتبعت', resolved:'تم الحل', submitted_:'', not_done:'ما اتنفّذش', paid:'مدفوع' };
+function audCairoTime(iso){ try{ return new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit' }); }catch(e){ return ''; } }
+function audCairoDate(iso){ try{ return new Date(iso).toLocaleDateString('ar-EG',{ timeZone:'Africa/Cairo', day:'numeric', month:'long', year:'numeric' }); }catch(e){ return ''; } }
+function audUserName(id){ const u=(S.users||[]).find(x=>x.id===id); return u? (cardHolderOf(id)||u.full_name) : ''; }
+function audVal(col,v){
+  if(v===null||v===undefined||v==='') return '—';
+  if(typeof v==='boolean') return v?'نعم':'لا';
+  if(col==='status') return STATUS_LABEL[v]||AUD_STATUS_EXTRA[v]||String(v);
+  if(col==='role') return ROLE_LABEL[v]||String(v);
+  if(AUD_VAL[col]&&AUD_VAL[col][v]) return AUD_VAL[col][v];
+  if(/_time$/.test(col)&&/^\d{1,2}:\d{2}/.test(String(v))) return fmt12(String(v).slice(0,5),'—');
+  if(typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(v)){ const n=audUserName(v); if(n) return n; }
+  if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(v)) return audCairoDate(v)+' '+audCairoTime(v);
+  return String(v);
+}
+function audChanges(r){
+  const ch=r.changes||{}; const out=[];
+  Object.keys(ch).forEach(k=>{
+    if(AUD_HIDE.has(k)) return; const lab=AUD_F[k]||k, c=ch[k]||{};
+    if(r.action==='update') out.push({ f:lab, o:audVal(k,c.o), n:audVal(k,c.n), k });
+    else if(r.action==='insert') out.push({ f:lab, n:audVal(k,c.n), k });
+    else out.push({ f:lab, o:audVal(k,c.o), k });
+  });
+  return out;
+}
+function audWho(r){
+  const holder=r.user_id? cardHolderOf(r.user_id) : '';
+  const nm=r.user_name||'—';
+  return holder && holder!==nm ? `${holder} <span style="color:var(--text-dim);font-size:11.5px;">(${esc(nm)})</span>` : esc(nm);
+}
+function audWhoPlain(r){ const holder=r.user_id? cardHolderOf(r.user_id) : ''; const nm=r.user_name||'—'; return holder&&holder!==nm? holder+' ('+nm+')' : nm; }
+function audText(r){
+  const tl=AUD_T[r.table_name]||r.table_name, lbl=r.row_label? ' «'+r.row_label+'»' : '';
+  const ch=r.changes||{};
+  if(r.table_name==='login') return 'سجّل دخول'+(r.method? ' ('+(r.method==='qr'?'بالـQR':'بكلمة السر')+')':'');
+  if(r.action==='insert' && (r.table_name==='task_run_items'||r.table_name==='svc_items') && ch.done) return (ch.done.n? 'علّم بند':'أضاف بند غير معلّم')+lbl;
+  if(r.action==='insert') return (r.table_name==='pest_schedule_done'?'سجّل تنفيذ بند مكافحة':'أضاف '+tl)+lbl;
+  if(r.action==='delete') return (r.table_name==='pest_schedule_done'?'ألغى تنفيذ بند مكافحة':'حذف '+tl)+lbl;
+  const keys=Object.keys(ch).filter(k=>!AUD_HIDE.has(k));
+  if((r.table_name==='task_run_items'||r.table_name==='svc_items') && ch.done) return (ch.done.n? 'علّم بند':'شال العلامة عن بند')+lbl;
+  if(keys.length===1 && keys[0]==='status') return `غيّر حالة ${tl}${lbl}: ${audVal('status',ch.status.o)} ← ${audVal('status',ch.status.n)}`;
+  if(keys.length===1 && keys[0]==='photo') return `غيّر صورة ${tl}${lbl}`;
+  return 'عدّل '+tl+lbl;
+}
+function audSectOf(tbl){ for(const k of Object.keys(AUD_SECT)) if(AUD_SECT[k].includes(tbl)) return k; return 'أخرى'; }
+function audRowHtml(r,showDate){
+  const det=audChanges(r);
+  const detHtml=det.length? `<div style="margin-top:6px;font-size:12.5px;line-height:1.9;">${det.map(d=> r.action==='update'? `<div><b>${esc(d.f)}:</b> <span style="color:var(--text-dim);text-decoration:line-through;">${esc(d.o)}</span> ← <b>${esc(d.n)}</b></div>` : `<div><b>${esc(d.f)}:</b> ${esc(r.action==='insert'?d.n:d.o)}</div>`).join('')}</div>` : '';
+  const when=(showDate? audCairoDate(r.at)+' · ' : '')+audCairoTime(r.at);
+  const tag= r.action==='insert'?'#2e9e5b': r.action==='delete'?'#e5534b':'#3b7dd8';
+  return `<div style="border-inline-start:4px solid ${tag};background:var(--glass-bg-strong,#fff);border-radius:12px;padding:9px 12px;margin-bottom:8px;">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b style="font-size:13.5px;">${audWho(r)}</b><span style="font-size:12px;color:var(--text-dim);">${esc(when)}</span></div>
+    <div style="font-size:13px;margin-top:3px;">${esc(audText(r))}${r.user_role&&r.user_role!=='system'?` <span style="font-size:11px;color:var(--text-dim);">· ${esc(ROLE_LABEL[r.user_role]||r.user_role)}</span>`:''}</div>
+    ${detHtml}</div>`;
+}
+
+/* ---------- شاشة السجل ---------- */
+function audDayRange(date){ // بداية ونهاية اليوم بتوقيت القاهرة كـ ISO UTC
+  const off=h=>{ const d=new Date(date+'T12:00:00Z'); const s=d.toLocaleString('en-US',{ timeZone:'Africa/Cairo', timeZoneName:'shortOffset' }); const m=/GMT([+-]\d+)/.exec(s); return m? +m[1] : 2; };
+  const o=off(); const st=new Date(Date.parse(date+'T00:00:00Z')-o*3600000);
+  return { from:st.toISOString(), to:new Date(st.getTime()+86400000).toISOString() };
+}
+async function audLoad(){
+  const L=S.logs; if(!L.date) L.date=S.today; L.busy=true; L.err='';
+  if(!(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(e){} }
+  const rg=audDayRange(L.date);
+  const [a,b]=await Promise.all([
+    sb.from('audit_log').select('*').eq('day',L.date).order('at',{ascending:false}).range(0,4999),
+    sb.from('login_events').select('user_id,method,created_at').gte('created_at',rg.from).lt('created_at',rg.to).order('created_at',{ascending:false}).limit(500)
+  ]);
+  L.busy=false;
+  if(a.error){ L.err=a.error.message; L.rows=[]; L.logins=[]; L.loaded=true; render(); return; }
+  L.rows=a.data||[];
+  L.logins=(b.error? [] : (b.data||[])).map(x=>({ id:'lg'+x.created_at+x.user_id, at:x.created_at, user_id:x.user_id, user_name:(S.users||[]).find(u=>u.id===x.user_id)?.full_name||'—', user_role:(S.users||[]).find(u=>u.id===x.user_id)?.role||'', table_name:'login', action:'insert', changes:{}, method:x.method }));
+  L.loaded=true; render();
+}
+function audFiltered(){
+  const L=S.logs; const q=(L.q||'').trim().toLowerCase();
+  return [...(L.rows||[]),...(L.logins||[])].filter(r=>{
+    if(L.user && r.user_id!==L.user) return false;
+    if(L.sect && audSectOf(r.table_name)!==L.sect) return false;
+    if(q){ const hay=(audWhoPlain(r)+' '+audText(r)+' '+(r.row_label||'')+' '+audChanges(r).map(d=>d.f+' '+(d.n||'')+' '+(d.o||'')).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  }).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+function renderLogs(){
+  if(!fvAdm()) return '';
+  const L=S.logs; if(!L.date) L.date=S.today;
+  if(!L.loaded && !L.busy){ audLoad(); }
+  const all=[...(L.rows||[]),...(L.logins||[])];
+  const list=L.loaded? audFiltered() : [];
+  const users={}; all.forEach(r=>{ if(r.user_id) users[r.user_id]=audWhoPlain(r); else users['sys']='النظام'; });
+  const byUser={}; all.forEach(r=>{ const k=r.user_id||'sys'; byUser[k]=(byUser[k]||0)+1; });
+  const top=Object.entries(byUser).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  return `<div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+      <div class="form-row" style="margin:0;"><label>التاريخ</label><input type="date" id="aud-date" value="${esc(L.date)}" max="${esc(S.today)}"></div>
+      <div class="form-row" style="margin:0;"><label>المستخدم</label><select id="aud-user"><option value="">الكل</option>${Object.entries(users).sort((a,b)=>a[1].localeCompare(b[1],'ar')).map(([id,nm])=>`<option value="${esc(id==='sys'?'':id)}" ${L.user===id?'selected':''}>${esc(nm)}</option>`).join('')}</select></div>
+      <div class="form-row" style="margin:0;"><label>القسم</label><select id="aud-sect"><option value="">الكل</option>${Object.keys(AUD_SECT).map(s=>`<option ${L.sect===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div>
+      <div class="form-row" style="margin:0;flex:1;min-width:140px;"><label>بحث (كود وحدة / اسم)</label><input id="aud-q" value="${esc(L.q||'')}" placeholder="مثلًا E2-J1"></div>
+      <button class="ghost-btn" id="aud-reload">تحديث</button>
+      <button class="ghost-btn" id="aud-xlsx">تصدير Excel</button>
+    </div>
+    ${L.busy?'<p style="color:var(--text-dim);font-size:13px;margin:10px 0 0;">جارٍ التحميل...</p>':''}
+    ${L.err?`<p style="color:var(--coral);font-size:13px;margin:10px 0 0;">تعذّر التحميل: ${esc(L.err)} — لو أول مرة، شغّل <b>update_v22_audit_log.sql</b> في Supabase.</p>`:''}
+  </div>
+  ${L.loaded&&!L.err? `<div class="stat-row" style="margin-bottom:14px;"><div class="stat ink"><div class="num">${all.length}</div><div class="lbl">إجراء في اليوم</div></div>${top.slice(0,3).map(([id,n])=>`<div class="stat blue"><div class="num">${n}</div><div class="lbl">${esc(users[id]||'—')}</div></div>`).join('')}</div>
+  <div class="section-title"><h2>${list.length} إجراء${list.length!==all.length?' (بعد الفلتر)':''} — ${esc(fmtDate(L.date))}</h2></div>
+  ${list.length? list.slice(0,600).map(r=>audRowHtml(r,false)).join('')+(list.length>600?'<p style="font-size:12px;color:var(--text-dim);">اتعرض أحدث 600 إجراء — استخدم الفلتر أو التصدير للباقي.</p>':'') : '<div class="empty-state">مفيش إجراءات مسجّلة بالفلتر ده.</div>'}
+  <p style="font-size:11.5px;color:var(--text-dim);line-height:1.8;margin-top:10px;">السجل بيتكتب تلقائيًا من الداتا بيز ومينفعش يتعدّل أو يتمسح من التطبيق، وبيتحفظ 180 يوم. الصور والبصمات مش بتتسجّل (بتظهر "محجوب").</p>` : ''}`;
+}
+function bindLogs(){
+  const g=id=>document.getElementById(id), L=S.logs;
+  if(g('aud-date')) g('aud-date').onchange=()=>{ L.date=g('aud-date').value||S.today; L.loaded=false; render(); };
+  if(g('aud-user')) g('aud-user').onchange=()=>{ L.user=g('aud-user').value; render(); };
+  if(g('aud-sect')) g('aud-sect').onchange=()=>{ L.sect=g('aud-sect').value; render(); };
+  if(g('aud-q')) g('aud-q').oninput=()=>{ L.q=g('aud-q').value; clearTimeout(bindLogs._t); bindLogs._t=setTimeout(()=>{ const pos=g('aud-q')&&g('aud-q').selectionStart; render(); const e=g('aud-q'); if(e){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch(_){} } },350); };
+  if(g('aud-reload')) g('aud-reload').onclick=()=>{ L.loaded=false; render(); };
+  if(g('aud-xlsx')) g('aud-xlsx').onclick=()=>{
+    const list=audFiltered(); if(!list.length){ toast('مفيش بيانات للتصدير',false); return; }
+    const rows=[['الوقت','المستخدم','الدور','القسم','الإجراء','التفاصيل']].concat(list.map(r=>[audCairoTime(r.at),audWhoPlain(r),ROLE_LABEL[r.user_role]||r.user_role||'',audSectOf(r.table_name),audText(r),audChanges(r).map(d=>r.action==='update'? d.f+': '+d.o+' ← '+d.n : d.f+': '+(r.action==='insert'?d.n:d.o)).join(' | ')]));
+    const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=[{wch:10},{wch:26},{wch:14},{wch:22},{wch:52},{wch:70}]; XLSX.utils.book_append_sheet(wb,ws,'Activity Log');
+    const blob=new Blob([XLSX.write(wb,{ bookType:'xlsx', type:'array' })],{ type:'application/octet-stream' });
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='activity_log_'+L.date+'.xlsx'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+  };
+}
+
+/* ---------- سجل تغييرات وحدة / أوردر (من زرار 🕘 جنب الصف) ---------- */
+function audHistBtn(table,id,label){
+  if(!fvAdm()) return '';
+  return `<button class="ghost-btn" title="سجل التغييرات" data-aud-hist="${esc(table)}|${esc(id)}|${esc(label||'')}">${ICON.clock(13)}</button>`;
+}
+function bindAudHist(){
+  document.querySelectorAll('[data-aud-hist]').forEach(b=>b.onclick=async (e)=>{
+    e.stopPropagation(); const [table,id,label]=b.dataset.audHist.split('|');
+    S.modal={ type:'auditHist', table, id, label }; S.audHist={ loading:true, rows:[], err:'' }; render();
+    if(!(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(_){} }
+    const q=sb.from('audit_log').select('*').or(`and(table_name.eq.${table},row_id.eq.${id}),and(parent_table.eq.${table},parent_id.eq.${id})`).order('at',{ascending:true}).limit(500);
+    const r=await q; S.audHist={ loading:false, rows:r.data||[], err:r.error? r.error.message : '' }; if(S.modal&&S.modal.type==='auditHist') render();
+  });
+}
+function renderAuditHist(){
+  const m=S.modal, H=S.audHist;
+  const body= H.loading? '<p style="color:var(--text-dim);">جارٍ التحميل...</p>'
+    : H.err? `<p style="color:var(--coral);">تعذّر التحميل: ${esc(H.err)}</p>`
+    : H.rows.length? H.rows.map(r=>audRowHtml(r,true)).join('') + '<p style="font-size:11.5px;color:var(--text-dim);">الأقدم فوق. بيشمل ملاحظات المشرفين على الوحدة.</p>'
+    : '<div class="empty-state">مفيش تغييرات مسجّلة على العنصر ده (السجل بيبدأ من لحظة تشغيل update_v22).</div>';
+  return modalWrap('سجل التغييرات'+(m.label?' — '+m.label:''), body, true);
+}
+
 /* ============================= WASTE DAILY REPORT ============================= */
 Object.assign(S,{ wasteRep:null });
 const SVC_REP_NAME={ waste:'رفع المخلفات', facade:'نظافة الواجهات', pest:'مكافحة الحشرات' };
@@ -4949,6 +5110,7 @@ function bindMyName(){
 function renderModal(){
   if(!S.modal) return '';
   const m=S.modal;
+  if(m.type==='auditHist') return renderAuditHist();
   if(m.type==='ssForm') return renderSsForm();
   if(m.type==='dvExport') return renderDvExport();
   if(m.type==='monthlyFinance') return modalWrap('Monthly Finance Breakdown', renderMonthlyFinance(), 'full');
@@ -5407,6 +5569,7 @@ function supervisorOptions(){
 }
 
 function bindModalEvents(){
+  bindAudHist();
   bindTime12();
   document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=(e)=>{ if(e.target!==b && !b.classList.contains('close')) return; stopScanner(); pendingPhoto=null; S.modal=(S.modal&&S.modal.type==='viewPhoto'&&S.modal.back)?S.modal.back:null; S.scanCtx=null; render(); });
   if(S.modal && S.modal.type==='violForm') bindViolModal();
