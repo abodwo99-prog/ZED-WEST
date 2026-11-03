@@ -553,7 +553,7 @@ let S = {
 };
 const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK', facade_sv:'Facade Cleaning SV', pest_sv:'Pest Control SV', waste_sv:'Waste Removal SV' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين', emergency:'طوارئ' };
-const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ' };
+const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', cancelled:'تم الإلغاء', incomplete:'لم يُنفذ' };
 const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
 const SUPPLIER_CAT_LABEL = { housekeeping:'Housekeeping', pest_control:'Pest Control', waste_mgt:'Waste MGT', facade_cleaning:'Facade Cleaning', scent_diffusers:'Scent Diffusers', yd_operator:'YD Operator' };
 const INVOICE_STATUS_LABEL = { pending:'معلّقة', submitted:'تم رفعها للحسابات', paid:'تم الدفع' };
@@ -2071,7 +2071,7 @@ function renderOrgChart(){
   el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;min-width:280px;"><div style="display:flex;flex-wrap:wrap;justify-content:center;">${mgr}</div>${vline}<div style="width:100%;">${blocks}</div><div style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">آخر تحديث ${new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
 }
 function statusBadge(s){
-  const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending' };
+  const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', cancelled:'postponed', incomplete:'pending' };
   return `<span class="badge ${map[s]||'pending'}"><span class="dot"></span>${STATUS_LABEL[s]||s}</span>`;
 }
 
@@ -2109,6 +2109,11 @@ function renderDeliveries(){
   </tbody></table></div>`;
 }
 async function handleStatusSelectChange(table, id, value, reload){
+  if(table==='paid_service_orders' && value==='cancelled'){
+    const role=S.profile&&S.profile.role;
+    if(!['admin','opm','fm_dispatcher','supervisor'].includes(role)){ toast('مش مسموح لك تلغي الأوردر',false); await reload(); render(); return; }
+    S.modal={type:'cancelOrderReason', table, id}; render(); return;
+  }
   if(value==='postponed'){
     S.modal={type:'postponeReason', table, id};
     render();
@@ -2443,6 +2448,7 @@ function renderOrders(){
       <div class="stat blue"><div class="num">${cnt('in_progress')}</div><div class="lbl">جاري العمل</div></div>
       <div class="stat amber"><div class="num">${cnt('scheduled')}</div><div class="lbl">مجدولة</div></div>
       <div class="stat coral"><div class="num">${cnt('postponed')}</div><div class="lbl">تم التأجيل</div></div>
+      <div class="stat coral"><div class="num">${cnt('cancelled')}</div><div class="lbl">تم الإلغاء</div></div>
     </div>
     <div class="stat-row" style="margin-bottom:14px;">
       <div class="stat blue"><div class="num" style="font-size:19px;">${fmtM(sum(done))}</div><div class="lbl">إجمالي المبالغ (المنتهي فقط)</div></div>
@@ -2462,6 +2468,7 @@ function renderOrders(){
   <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th>${hideMoney?'':'<th>السعر</th><th>الدفع</th>'}<th>التاريخ والميعاد</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.slice(0,S.ordLimit||30).map(o=>{
     const canChangeStatus = (isApprover||role==='supervisor') && orderApproved(o);
+    const canCancelOrder = ['admin','opm','supervisor','fm_dispatcher'].includes(role) && orderApproved(o);
     const extraTag = o.extra_reason ? ' <span class="tag-shift evening">إضافية</span>' : '';
     const statusCell = o.approval_status==='pending' ? '<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'
       : o.approval_status==='rejected' ? '<span class="badge postponed"><span class="dot"></span>مرفوض</span>'
@@ -2470,7 +2477,8 @@ function renderOrders(){
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}` : statusBadge(o.status));
+        ${canCancelOrder?`<option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>`:''}
+      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}` : (canCancelOrder?`${statusBadge(o.status)}${o.status!=='cancelled'?`<button class="ghost-btn danger" style="padding:3px 8px;font-size:11px;margin-top:4px;" data-ord-cancel="${o.id}">إلغاء الأوردر</button>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}`:statusBadge(o.status)));
     return `<tr style="${o.approval_status==='rejected'?'opacity:.6;':''}">
       <td>${esc(o.unit_code||'-')}${extraTag}</td>
       <td>${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</td>
@@ -2492,7 +2500,7 @@ function renderOrders(){
       kv('رقم الوحدة',esc(o.unit_code||'-'))+kv('النوع',ORDER_TYPE_LABEL[o.order_type]||o.order_type)+kv('رقم Sales Force',esc(o.client_info||'-'))
       +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.payment_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
       +kv('التاريخ',o.scheduled_date)+kv('الميعاد',fmt12(o.scheduled_time,'-'))+kv('الحالة',statusBadge(o.status))
-      +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')
+      +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')+(o.cancel_reason?kv('سبب الإلغاء',esc(o.cancel_reason)):'')
       +kv('ملاحظات',esc(o.opm_notes||'-'))
       +(fvAdm()?`<div style="margin-top:14px;">${audHistBtn('paid_service_orders',o.id,o.unit_code||'')} <span style="font-size:12px;color:var(--text-dim);">سجل التغييرات (مين عدّل وإمتى)</span></div>`:'')
       +((canManage||role==='fm_dispatcher')?`<div style="display:flex;gap:8px;margin-top:14px;"><button class="primary-btn" data-ord-edit="${o.id}">تعديل</button>${canManage?`<button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)} حذف</button>`:''}</div>`:'')); })()}`;
@@ -2506,6 +2514,7 @@ function bindOrders(){
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
   const ex=document.getElementById('ord-extra'); if(ex) ex.onclick=()=>{ S.modal={type:'addOrder', extra:true}; render(); };
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
+  document.querySelectorAll('[data-ord-cancel]').forEach(b=>b.onclick=()=>{ S.modal={type:'cancelOrderReason',table:'paid_service_orders',id:b.dataset.ordCancel}; render(); });
   document.querySelectorAll('[data-ord-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editOrder', id:b.dataset.ordEdit}; render(); });
   document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
   document.querySelectorAll('[data-ord-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordPayment, {payment_status:sel.value}); await loadOrders(); render(); toast('تم تحديث حالة الدفع',true); });
@@ -2587,7 +2596,7 @@ function priceDisplayHtml(price, isSpecialized){
   return `<span style="color:var(--mint);font-weight:700;">السعر: ${price.toLocaleString('en-US')} ج.م</span>`;
 }
 const MAX_ORDERS_PER_DAY = 2;
-function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && o.status!=='postponed' && orderApproved(o) && !o.extra_reason).length; }
+function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && !['postponed','cancelled'].includes(o.status) && orderApproved(o) && !o.extra_reason).length; }
 function findNextAvailableOrderDate(fromDate){
   let d = new Date(fromDate+'T00:00:00');
   for(let i=0;i<60;i++){
@@ -4118,7 +4127,7 @@ function bindReports(){
 Object.assign(S,{ logs:{ date:'', rows:[], logins:[], loaded:false, busy:false, err:'', user:'', sect:'', q:'' }, audHist:{ loading:false, rows:[], err:'' } });
 const AUD_T={ delivery_units:'وحدة التسليم', unit_notes:'ملاحظة على وحدة', paid_service_orders:'أوردر خدمة مدفوعة', side_service_units:'وحدة خدمات جانبية', pest_control_requests:'طلب مكافحة', task_lists:'قائمة مهام', task_items:'بند مهمة', task_runs:'تنفيذ قائمة مهام', task_run_items:'بند مهمة', svc_lists:'قائمة', svc_items:'بند', pest_schedule_rows:'بند جدول المكافحة', pest_schedule_done:'بند مكافحة', attendance_records:'سجل حضور', attendance_edit_requests:'طلب تعديل حضور', daily_presence:'حضور اليوم', hk_zone_assignments:'توزيع زون', hk_supervisor_assignments:'توزيع مشرف', hk_worker_counts:'عدد عمال', hk_labor_distribution:'توزيع عمالة', urgent_tasks:'تاسك مستعجل', emergency_alerts:'بلاغ طوارئ', complaints:'شكوى', client_violations:'مخالفة عميل', suppliers:'مورد', supplier_kpi:'تقييم مورد', supplier_invoices:'فاتورة مورد', card_handover:'استلام كرت', profiles:'مستخدم', user_qr_tokens:'كود QR', verify_sessions:'جلسة تحقق', verify_checks:'رد تحقق', verify_settings:'نطاق التحقق', manpower_settings:'إعدادات العمالة', login:'تسجيل دخول' };
 const AUD_SECT={ 'وحدات التسليم':['delivery_units','unit_notes'], 'الخدمة المدفوعة':['paid_service_orders'], 'خدمات جانبية':['side_service_units'], 'المهام المجدولة':['task_lists','task_items','task_runs','task_run_items'], 'مكافحة الحشرات':['pest_control_requests','pest_schedule_rows','pest_schedule_done'], 'الواجهات والمخلفات':['svc_lists','svc_items'], 'الحضور والتوزيع':['attendance_records','attendance_edit_requests','daily_presence','hk_zone_assignments','hk_supervisor_assignments','hk_worker_counts','hk_labor_distribution'], 'التحقق من الهوية':['verify_sessions','verify_checks','verify_settings'], 'المخالفات والشكاوى والطوارئ':['client_violations','complaints','urgent_tasks','emergency_alerts'], 'الموردين':['suppliers','supplier_kpi','supplier_invoices'], 'المستخدمين والدخول':['profiles','user_qr_tokens','card_handover','login'], 'إعدادات':['manpower_settings'] };
-const AUD_F={ status:'الحالة', notes:'الملاحظات', note:'الملاحظة', unit_code:'كود الوحدة', date:'التاريخ', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', postpone_reason:'سبب التأجيل', assigned_supervisor_id:'المشرف المسؤول', assigned_to:'المسؤول', price:'السعر', payment_status:'حالة الدفع', payment_photo:'صورة الدفع', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', opm_notes:'ملاحظات OPM', client_info:'بيانات العميل', scheduled_date:'تاريخ التنفيذ', scheduled_time:'ميعاد التنفيذ', order_type:'نوع الخدمة', service_type:'نوع الخدمة', photo:'الصورة', done:'تم التنفيذ', done_by_name:'نفّذه', name:'الاسم', label:'البند', active:'نشط', role:'الدور', full_name:'الاسم', shift:'الوردية', phase:'المرحلة', title:'العنوان', details:'التفاصيل', description:'الوصف', open_time:'وقت الفتح', close_time:'وقت الإغلاق', frequency:'التكرار', supervisor_marked_done:'علّم المشرف إنه خلّص', review_status:'مراجعة المشرف الأول', review_note:'ملاحظة المراجعة', rework_count:'عدد مرات الإعادة', completed_at:'وقت الإنجاز', verified_by:'اعتمده', reviewed_by:'راجعه', holder_name:'اسم المستلم', amount:'المبلغ', discount:'الخصم', score:'التقييم', month:'الشهر', budget:'الميزانية', workers:'عدد العمال', place:'المكان', present:'حاضر', actual_name:'الاسم الفعلي', moved_to_evening:'اتنقل للمسائية', workers_count:'عدد العمال', supervisors_count:'عدد المشرفين', building:'العمارة', floor_no:'الدور', apartment:'الشقة', type:'النوع', location:'المكان', message:'الرسالة', reason:'السبب', request_reason:'السبب', changes:'التعديلات', token:'التوكن', email:'الإيميل', value:'القيمة', radius_m:'نصف القطر (م)', lat:'خط العرض', lng:'خط الطول', task:'البند', weekday:'اليوم', start_time:'من', end_time:'إلى', position:'الترتيب', paid_at:'تاريخ السداد', invoice_date:'تاريخ الفاتورة', supervisor_name:'المشرف', worker_count:'عدد العمال', summary:'الملخص' };
+const AUD_F={ status:'الحالة', notes:'الملاحظات', note:'الملاحظة', unit_code:'كود الوحدة', date:'التاريخ', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', postpone_reason:'سبب التأجيل', cancel_reason:'سبب الإلغاء', assigned_supervisor_id:'المشرف المسؤول', assigned_to:'المسؤول', price:'السعر', payment_status:'حالة الدفع', payment_photo:'صورة الدفع', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', opm_notes:'ملاحظات OPM', client_info:'بيانات العميل', scheduled_date:'تاريخ التنفيذ', scheduled_time:'ميعاد التنفيذ', order_type:'نوع الخدمة', service_type:'نوع الخدمة', photo:'الصورة', done:'تم التنفيذ', done_by_name:'نفّذه', name:'الاسم', label:'البند', active:'نشط', role:'الدور', full_name:'الاسم', shift:'الوردية', phase:'المرحلة', title:'العنوان', details:'التفاصيل', description:'الوصف', open_time:'وقت الفتح', close_time:'وقت الإغلاق', frequency:'التكرار', supervisor_marked_done:'علّم المشرف إنه خلّص', review_status:'مراجعة المشرف الأول', review_note:'ملاحظة المراجعة', rework_count:'عدد مرات الإعادة', completed_at:'وقت الإنجاز', verified_by:'اعتمده', reviewed_by:'راجعه', holder_name:'اسم المستلم', amount:'المبلغ', discount:'الخصم', score:'التقييم', month:'الشهر', budget:'الميزانية', workers:'عدد العمال', place:'المكان', present:'حاضر', actual_name:'الاسم الفعلي', moved_to_evening:'اتنقل للمسائية', workers_count:'عدد العمال', supervisors_count:'عدد المشرفين', building:'العمارة', floor_no:'الدور', apartment:'الشقة', type:'النوع', location:'المكان', message:'الرسالة', reason:'السبب', request_reason:'السبب', changes:'التعديلات', token:'التوكن', email:'الإيميل', value:'القيمة', radius_m:'نصف القطر (م)', lat:'خط العرض', lng:'خط الطول', task:'البند', weekday:'اليوم', start_time:'من', end_time:'إلى', position:'الترتيب', paid_at:'تاريخ السداد', invoice_date:'تاريخ الفاتورة', supervisor_name:'المشرف', worker_count:'عدد العمال', summary:'الملخص' };
 const AUD_HIDE=new Set(['id','created_by','delivery_unit_id','list_id','run_id','item_id','session_id','row_id','user_id','supervisor_id','record_id','requested_by','decided_by','updated_by','approved_by','assigned_by','completed_by','marked_by','done_by','status_by','key','photo_count','has_photo','sort_order','zone_id','unit_label','last_reset_at','service','kind']);
 const AUD_VAL={ payment_status:{ paid:'مدفوع', unpaid:'غير مدفوع' }, approval_status:{ approved:'معتمد', pending:'بانتظار الاعتماد', rejected:'مرفوض' }, shift:{ morning:'صباحية', evening:'مسائية', both:'الاتنين', emergency:'طوارئ' }, order_type:{ soft_cleaning:'نظافة عادية', deep_cleaning:'نظافة عميقة' }, service_type:{ integrated:'خدمة متكاملة', modifications:'تعديلات', full_service:'خدمة كاملة', inspection:'معاينة', flying_spray:'رش طائر', crawling_spray:'رش زاحف', specialized_spray:'رش متخصص', rodent_control:'مكافحة قوارض' }, review_status:{ ok:'مطابق', not_ok:'غير مطابق' }, frequency:{ daily:'يومي', weekly:'أسبوعي', monthly:'شهري' } };
 const AUD_STATUS_EXTRA={ pending:'معلّق', approved:'معتمد', rejected:'مرفوض', enrolling:'تسجيل وجوه', enrolled:'جاهز', calling:'شغّال', closed:'مقفول', matched:'مطابق', mismatch:'غير مطابق', no_response:'لم يستجب', acknowledged:'استلم النداء', selfie_ok:'السيلفي تمام', submitted:'اتبعت', resolved:'تم الحل', submitted_:'', not_done:'ما اتنفّذش', paid:'مدفوع' };
@@ -5264,7 +5273,7 @@ function renderReportsMain(){
 
   const tables = {
     deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
-    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
+    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']] },
     pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
@@ -5332,7 +5341,7 @@ function exportReportExcel(){
   const shiftFmt = v => SHIFT_LABEL[v]||v;
   const payFmt = v => PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
   if(want('deliveries')) addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['client_arrival_time','ميعاد وصول العميل',v=>fmt12(v,'')],['special_instructions','تعليمات خاصة'],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['notes','ملاحظات']]);
-  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
+  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']]);
   if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',(v,r)=>v==='completed'?'تم اعتمادها':(r.supervisor_marked_done?'بانتظار اعتماد المشرف الأول':((r.date<S.today || taskMissed((S.taskLists||[]).find(l=>l.id===r.list_id),r))?'أُغلقت قبل الإنجاز':'قيد التنفيذ'))],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
   if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
@@ -5422,7 +5431,8 @@ function renderSupervisorTodayBase(){
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>
+        <option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>
+      </select>${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:11px;color:var(--coral);margin-top:4px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}
     </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة</p>`}`;
     return html;
   }
@@ -5736,6 +5746,10 @@ function renderModal(){
   if(m.type==='postponeReason') return modalWrap('سبب التأجيل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-postpone-generic-reason" placeholder="اكتب سبب التأجيل"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
+  if(m.type==='cancelOrderReason') return modalWrap('تأكيد إلغاء الأوردر', `
+    <p style="font-size:13px;line-height:1.8;color:var(--text-dim);">بعد تأكيد الإلغاء، الأوردر هيخرج من حجوزات اليوم، وهيبقى فيه مكان متاح لحجز أوردر بديل. الأوردر القديم هيفضل محفوظ في السجل.</p>
+    <div class="form-row"><label>سبب الإلغاء (إلزامي)</label><textarea id="m-cancel-order-reason" placeholder="اكتب سبب الإلغاء"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">تأكيد الإلغاء</button>`);
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
@@ -6239,6 +6253,15 @@ async function handleModalSave(){
     const row={ id:uid('wr'), description, date:document.getElementById('m-wr-date').value, assigned_supervisor_id:document.getElementById('m-wr-sup').value, status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('waste_removal_jobs',[row])){ await loadWaste(); S.modal=null; render(); toast('تمت الإضافة',true); }
   }
+  else if(m.type==='cancelOrderReason'){
+    const role=S.profile&&S.profile.role;
+    if(!['admin','opm','fm_dispatcher','supervisor'].includes(role)){ toast('مش مسموح لك تلغي الأوردر',false); S.modal=null; render(); return; }
+    const reason=document.getElementById('m-cancel-order-reason').value.trim();
+    if(!reason){ toast('لازم تكتب سبب الإلغاء',false); return; }
+    if(await dbUpdate('paid_service_orders', m.id, {status:'cancelled', cancel_reason:reason, updated_at:new Date().toISOString()})){
+      await loadOrders(); S.modal=null; S.drawer=null; render(); toast('تم إلغاء الأوردر وإتاحة مكانه للحجز',true);
+    }
+  }
   else if(m.type==='postponeReason'){
     const reason=document.getElementById('m-postpone-generic-reason').value.trim();
     if(!reason){ toast('لازم تكتب سبب التأجيل',false); return; }
@@ -6715,28 +6738,21 @@ function notifTarget(tab){
   if(role==='supervisor' && ['deliveries','orders','distribution'].includes(tab)) tab='today';
   return allowed.includes(tab) ? tab : (allowed[0]||null);
 }
-let notifLoadInFlight=false;
 async function loadNotifications(initial){
-  if(!S.session||!S.profile||notifLoadInFlight) return;
-  notifLoadInFlight=true;
-  try{
-    // Fetch only fields consumed by the notification UI to reduce response payload.
-    const {data,error}=await sb.from('notifications')
-      .select('id,read,title,body,tab,created_at,kind')
-      .order('created_at',{ascending:false}).limit(40);
-    if(error){ console.warn('notifications',error.message); return; }
-    const seen=S.notifSeen||new Set();
-    const fresh=(data||[]).filter(n=>!n.read && !seen.has(n.id));
-    (data||[]).forEach(n=>seen.add(n.id)); S.notifSeen=seen;
-    S.notifications=(data||[]).map(n=>({ id:n.id, text:(n.title||'')+(n.body?' — '+n.body:''), tab:n.tab, time:n.created_at, read:!!n.read, kind:n.kind }));
-    if(!initial && fresh.length){
-      playAlertSound(); toast('🔔 '+(fresh[0].title||'إشعار جديد'), true);
-      if(!S.pushActive) fresh.forEach(n=>notifyDevice(n.title||'إشعار', n.body||'', 'ntf-'+n.id));
-    }
-    const sig=(data||[]).map(n=>n.id+(n.read?'r':'u')).join(',');
-    const changed = sig!==S._ntfSig; S._ntfSig=sig;
-    if(!initial && changed && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()) render();
-  } finally { notifLoadInFlight=false; }
+  if(!S.session||!S.profile) return;
+  const {data,error}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(40);
+  if(error){ console.warn('notifications',error.message); return; }
+  const seen=S.notifSeen||new Set();
+  const fresh=(data||[]).filter(n=>!n.read && !seen.has(n.id));
+  (data||[]).forEach(n=>seen.add(n.id)); S.notifSeen=seen;
+  S.notifications=(data||[]).map(n=>({ id:n.id, text:(n.title||'')+(n.body?' — '+n.body:''), tab:n.tab, time:n.created_at, read:!!n.read, kind:n.kind }));
+  if(!initial && fresh.length){
+    playAlertSound(); toast('🔔 '+(fresh[0].title||'إشعار جديد'), true);
+    if(!S.pushActive) fresh.forEach(n=>notifyDevice(n.title||'إشعار', n.body||'', 'ntf-'+n.id));
+  }
+  const sig=(data||[]).map(n=>n.id+(n.read?'r':'u')).join(',');
+  const changed = sig!==S._ntfSig; S._ntfSig=sig;
+  if(!initial && changed && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()) render();
 }
 async function markNotifReadByTag(tag){
   const id=String(tag||'').replace(/^ntf-/,''); if(!id||!S.session) return;
@@ -6751,30 +6767,20 @@ async function markNotificationsRead(){
   if(ids.length){ const {error}=await sb.from('notifications').update({ read:true }).in('id',ids); if(error) console.warn('notifications read',error.message); }
 }
 let notifPollStarted=false;
-function startNotifPoll(){
-  if(notifPollStarted) return; notifPollStarted=true;
-  // Poll once per minute, and do not spend requests while the tab is in the background.
-  setInterval(()=>{
-    if(S.session&&S.profile&&document.visibilityState==='visible') loadNotifications(false);
-  },60000);
-}
+function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(()=>{ if(S.session&&S.profile) loadNotifications(false); },15000); }
 let distPollStarted=false;
-let distPollInFlight=false;
 function startDistPoll(){
   if(distPollStarted) return; distPollStarted=true;
   setInterval(async ()=>{
-    if(distPollInFlight||!S.session||!S.profile||document.visibilityState!=='visible'||S.modal) return;
+    if(!S.session||!S.profile||document.visibilityState!=='visible'||S.modal) return;
     if(!['home','distribution','today'].includes(S.tab)) return;
     if(!['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','supervisor'].includes(S.profile.role)) return;
     if(hasUnsavedInput()) return;
-    distPollInFlight=true;
-    try{
-      await refreshAssignments();
-      if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
-      if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
-      if(!S.modal && !hasUnsavedInput()) render();
-    } finally { distPollInFlight=false; }
-  },60000);
+    await refreshAssignments();
+    if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
+    if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
+    if(!S.modal && !hasUnsavedInput()) render();
+  },30000);
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
