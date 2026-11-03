@@ -204,7 +204,8 @@ button.go:disabled{opacity:.55;cursor:default}
       $('go').disabled=false; $('go').textContent='إرسال الطلب';
       if(!r||!r.ok){ showErr((r&&r.msg)||'تعذّر الإرسال — جرّب تاني'); return; }
       showDone(r,d,unit,ph);
-    }).catch(function(){ $('go').disabled=false; $('go').textContent='إرسال الطلب'; showErr('تعذّر الاتصال — اتأكد من النت وجرّب تاني'); });
+    }).catch(function(e){ $('go').disabled=false; $('go').textContent='إرسال الطلب'; try{ console.error('public_req_submit',e); }catch(_){}
+      showErr(e&&e.name==='TypeError' ? 'تعذّر الاتصال — اتأكد من النت وجرّب تاني' : 'حصل خطأ أثناء إرسال الطلب — جرّب بعد شوية أو كلّم الإدارة'); });
   };
   function showDone(r,d,unit,ph){
     var full=!!r.full, v=$('doneView');
