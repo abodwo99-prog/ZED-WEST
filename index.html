@@ -6715,21 +6715,28 @@ function notifTarget(tab){
   if(role==='supervisor' && ['deliveries','orders','distribution'].includes(tab)) tab='today';
   return allowed.includes(tab) ? tab : (allowed[0]||null);
 }
+let notifLoadInFlight=false;
 async function loadNotifications(initial){
-  if(!S.session||!S.profile) return;
-  const {data,error}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(40);
-  if(error){ console.warn('notifications',error.message); return; }
-  const seen=S.notifSeen||new Set();
-  const fresh=(data||[]).filter(n=>!n.read && !seen.has(n.id));
-  (data||[]).forEach(n=>seen.add(n.id)); S.notifSeen=seen;
-  S.notifications=(data||[]).map(n=>({ id:n.id, text:(n.title||'')+(n.body?' — '+n.body:''), tab:n.tab, time:n.created_at, read:!!n.read, kind:n.kind }));
-  if(!initial && fresh.length){
-    playAlertSound(); toast('🔔 '+(fresh[0].title||'إشعار جديد'), true);
-    if(!S.pushActive) fresh.forEach(n=>notifyDevice(n.title||'إشعار', n.body||'', 'ntf-'+n.id));
-  }
-  const sig=(data||[]).map(n=>n.id+(n.read?'r':'u')).join(',');
-  const changed = sig!==S._ntfSig; S._ntfSig=sig;
-  if(!initial && changed && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()) render();
+  if(!S.session||!S.profile||notifLoadInFlight) return;
+  notifLoadInFlight=true;
+  try{
+    // Fetch only fields consumed by the notification UI to reduce response payload.
+    const {data,error}=await sb.from('notifications')
+      .select('id,read,title,body,tab,created_at,kind')
+      .order('created_at',{ascending:false}).limit(40);
+    if(error){ console.warn('notifications',error.message); return; }
+    const seen=S.notifSeen||new Set();
+    const fresh=(data||[]).filter(n=>!n.read && !seen.has(n.id));
+    (data||[]).forEach(n=>seen.add(n.id)); S.notifSeen=seen;
+    S.notifications=(data||[]).map(n=>({ id:n.id, text:(n.title||'')+(n.body?' — '+n.body:''), tab:n.tab, time:n.created_at, read:!!n.read, kind:n.kind }));
+    if(!initial && fresh.length){
+      playAlertSound(); toast('🔔 '+(fresh[0].title||'إشعار جديد'), true);
+      if(!S.pushActive) fresh.forEach(n=>notifyDevice(n.title||'إشعار', n.body||'', 'ntf-'+n.id));
+    }
+    const sig=(data||[]).map(n=>n.id+(n.read?'r':'u')).join(',');
+    const changed = sig!==S._ntfSig; S._ntfSig=sig;
+    if(!initial && changed && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()) render();
+  } finally { notifLoadInFlight=false; }
 }
 async function markNotifReadByTag(tag){
   const id=String(tag||'').replace(/^ntf-/,''); if(!id||!S.session) return;
@@ -6744,20 +6751,30 @@ async function markNotificationsRead(){
   if(ids.length){ const {error}=await sb.from('notifications').update({ read:true }).in('id',ids); if(error) console.warn('notifications read',error.message); }
 }
 let notifPollStarted=false;
-function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(()=>{ if(S.session&&S.profile) loadNotifications(false); },15000); }
+function startNotifPoll(){
+  if(notifPollStarted) return; notifPollStarted=true;
+  // Poll once per minute, and do not spend requests while the tab is in the background.
+  setInterval(()=>{
+    if(S.session&&S.profile&&document.visibilityState==='visible') loadNotifications(false);
+  },60000);
+}
 let distPollStarted=false;
+let distPollInFlight=false;
 function startDistPoll(){
   if(distPollStarted) return; distPollStarted=true;
   setInterval(async ()=>{
-    if(!S.session||!S.profile||document.visibilityState!=='visible'||S.modal) return;
+    if(distPollInFlight||!S.session||!S.profile||document.visibilityState!=='visible'||S.modal) return;
     if(!['home','distribution','today'].includes(S.tab)) return;
     if(!['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','supervisor'].includes(S.profile.role)) return;
     if(hasUnsavedInput()) return;
-    await refreshAssignments();
-    if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
-    if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
-    if(!S.modal && !hasUnsavedInput()) render();
-  },30000);
+    distPollInFlight=true;
+    try{
+      await refreshAssignments();
+      if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
+      if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
+      if(!S.modal && !hasUnsavedInput()) render();
+    } finally { distPollInFlight=false; }
+  },60000);
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
