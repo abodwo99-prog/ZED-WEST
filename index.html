@@ -1370,6 +1370,284 @@ function fvBanner(){
   return `<div class="card" style="margin-bottom:14px;border:2px solid var(--coral);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b>🔔 نداء التحقق من هوية العمال</b><div style="font-size:12.5px;">المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b></div></div><button class="primary-btn" data-fv-open>افتح كرت التحقق</button></div>`;
 }
 
+/* ===== FM Monthly Report — PowerPoint builder (same design as the board deck; native editable charts) ===== */
+function fmFmt(n,d){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+function fmPct(x){ return (x==null||isNaN(x))?'—':Math.round(x*100)+'%'; }
+function fmBuildPptx(Pptx,m){
+  const pres=new Pptx(); pres.layout='LAYOUT_16x9'; pres.title='Soft Services – Monthly Performance Report – '+m.label; pres.author='ORA Property Management'; pres.company='ORA';
+  const NAVY='14213D',CREAM='F4F1EA',GOLD='B8924A',BLUE='2F4B7C',RED='C0504D',GREEN='3E8E7E',GREY='555555',SLATE='7A8CA5',WHITE='FFFFFF',FONT='Calibri';
+  let n=1;
+  const T=(s,txt,o)=>s.addText(txt,Object.assign({fontFace:FONT,margin:0,isTextBox:true},o));
+  const R=(s,x,y,w,h,c)=>s.addShape('rect',{x,y,w,h,fill:{color:c},line:{color:c}});
+  const base=(title,take)=>{ const s=pres.addSlide(); n++; s.background={color:WHITE}; R(s,0,0,10,.75,NAVY); R(s,0,.75,10,.03,GOLD);
+    T(s,title,{x:.5,y:.12,w:9,h:.5,fontSize:20,bold:true,color:WHITE,valign:'middle'});
+    if(take){ R(s,.5,4.55,9,.55,NAVY); T(s,take,{x:.7,y:4.55,w:8.6,h:.55,fontSize:11,color:WHITE,valign:'middle'}); }
+    T(s,'ORA | Soft Services | '+m.label,{x:.5,y:5.28,w:6,h:.25,fontSize:8,color:SLATE}); T(s,String(n),{x:9,y:5.28,w:.5,h:.25,fontSize:8,color:SLATE,align:'right'}); return s; };
+  const bar=(s,x,y,w,h,title,labels,values,colors,fmt)=>{
+    T(s,title,{x,y,w,h:.3,fontSize:11,bold:true,color:NAVY});
+    s.addChart(pres.charts.BAR,[{name:title,labels,values}],{x,y:y+.3,w,h:h-.3,barDir:'col',chartColors:colors,showValue:true,dataLabelFontSize:9,dataLabelColor:NAVY,dataLabelFormatCode:fmt||'#,##0',catAxisLabelFontSize:8,valAxisLabelFontSize:8,valAxisLabelFormatCode:fmt||'#,##0',valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:false,barGapWidthPct:55,valAxisMinVal:0}); };
+  // ---- 1 title
+  { const s=pres.addSlide(); s.background={color:NAVY}; R(s,0,0,.18,5.625,GOLD);
+    T(s,'SOFT SERVICES',{x:.9,y:1.6,w:8,h:.7,fontSize:36,bold:true,color:WHITE});
+    T(s,'Monthly Performance Report – '+m.label,{x:.9,y:2.35,w:8,h:.5,fontSize:20,color:'C9D1E0'});
+    R(s,.9,3.0,1.2,.04,GOLD);
+    T(s,'Facility Management Presentation  |  '+m.reportDate,{x:.9,y:3.2,w:8,h:.35,fontSize:11,color:'C9D1E0'}); }
+  // ---- 2 executive summary
+  { const s=base('Executive Summary',m.execTake); const pc=m.complaints.cur;
+    const cards=[
+      [fmFmt(m.rev.total)+' EGP','Total '+m.monthName+' revenue',GOLD],
+      [m.occ.cur!=null? fmFmt(m.occ.cur)+' units':'—', m.occ.cur!=null&&m.occ.prev!=null? 'Occupancy (up from '+fmFmt(m.occ.prev)+' in '+m.prevMonthName+', '+(m.occ.cur>=m.occ.prev?'+':'')+(m.occ.prev? ((m.occ.cur-m.occ.prev)/m.occ.prev*100).toFixed(1):'0')+'%)' : 'Occupancy (enter in manual section)',BLUE],
+      [m.sr.total? fmFmt(m.sr.total):'—','Service requests received'+(m.sr.total? ', '+Math.round(m.sr.status.resolved/m.sr.total*100)+'% resolved':''),GREEN],
+      [fmPct(m.compliance.cur),'Compliance with cleaning plans',GOLD],
+      [String(pc.recv),'Complaints in '+m.monthName+' ('+pc.rect+' rectified)',RED],
+      [m.vendorRange,'Monthly vendor scores',BLUE]];
+    cards.forEach((c,i)=>{ const x=[.5,3.55,6.6][i%3], y=i<3?1.3:2.85; R(s,x,y,2.85,1.35,CREAM); R(s,x,y,.07,1.35,c[2]);
+      T(s,c[0],{x:x+.2,y:y+.1,w:2.55,h:.68,fontSize:26,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); T(s,c[1],{x:x+.2,y:y+.78,w:2.55,h:.47,fontSize:11,color:GREY,valign:'top'}); }); }
+  // ---- 3 housekeeping & facade
+  { const s=base('Housekeeping & Façade Cleaning',m.hkTake); const hk=m.hk;
+    bar(s,.5,.95,4.4,3.5,'Housekeeping – YTD',['Handover','Soft Cleaning','Deep Cleaning','After Modifications','DLP Visits','TOTAL Units YTD'],[hk.handover,hk.soft,hk.deep,hk.mods,hk.dlp,hk.total],[GOLD,GOLD,GOLD,GOLD,GOLD,NAVY]);
+    if(m.facade.length) bar(s,5.1,.95,4.4,3.5,'Façade Cleaning – YTD',m.facade.map(f=>f.name),m.facade.map(f=>f.pct),[BLUE],'0%'); else T(s,'No façade lists in the system yet.',{x:5.1,y:2.3,w:4.4,h:.5,fontSize:11,color:GREY,align:'center'}); }
+  // ---- 4 pest & waste
+  { const s=base('Pest Control & Waste Management',m.pwTake);
+    bar(s,.5,.95,4.4,3.5,'Pest Control – '+m.label,['Resolved','Pending','Canceled'],[m.pest.resolved,m.pest.pending,m.pest.canceled],[GREEN]);
+    bar(s,5.1,.95,4.4,3.5,'Waste Management – '+m.label,m.waste.map(w=>w.name).concat(['TOTAL VISITS']),m.waste.map(w=>w.visits).concat([m.wasteTotal]),[GOLD,GOLD,NAVY]); }
+  // ---- 5 complaints & compliance
+  { const s=base('Complaints & Compliance',m.ccTake); const c=m.complaints;
+    T(s,'Total complaints received',{x:.5,y:.95,w:4.4,h:.3,fontSize:11,bold:true,color:NAVY});
+    s.addChart(pres.charts.BAR,[{name:'Received',labels:[m.prevMon,m.mon],values:[c.prev.recv,c.cur.recv]},{name:'Rectification',labels:[m.prevMon,m.mon],values:[c.prev.rect,c.cur.rect]}],{x:.5,y:1.25,w:4.4,h:3.2,barDir:'col',barGrouping:'clustered',chartColors:[NAVY,GOLD],showValue:true,dataLabelFontSize:9,catAxisLabelFontSize:9,valAxisLabelFontSize:8,valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:9,valAxisMinVal:0,barGapWidthPct:60});
+    bar(s,5.1,.95,4.4,3.5,'Compliance Rate with cleaning plans',[m.prevMon,m.mon],[m.compliance.prev||0,m.compliance.cur||0],[GREEN],'0%'); }
+  // ---- 6 occupancy & response time
+  { const s=base('Occupancy & Response Time',m.orTake);
+    bar(s,.5,.95,4.4,3.5,'Occupancy Status – units',[m.prevMon,m.mon],[m.occ.prev||0,m.occ.cur||0],[BLUE]);
+    T(s,'Avg. response time to rectify complaints',{x:5.1,y:.95,w:4.4,h:.3,fontSize:11,bold:true,color:NAVY});
+    R(s,5.1,1.5,4.4,2.6,CREAM); R(s,5.1,1.5,.07,2.6,GOLD);
+    T(s,fmFmt(m.respHours)+' hours',{x:5.4,y:1.8,w:3.9,h:.9,fontSize:40,bold:true,color:NAVY,valign:'middle'});
+    T(s,'Fixed service level: '+(m.respHours/24)+' days from complaint to rectification.',{x:5.4,y:2.85,w:3.9,h:.8,fontSize:12,color:GREY}); }
+  // ---- 7 service requests
+  { const s=base('Service Requests – '+m.monthName,m.srTake); const st=m.sr.status, so=m.sr.source;
+    bar(s,.5,.95,4.4,3.5,m.mon+' Soft Service SRs – by status',['Resolved','Pending action','Pending customer','Canceled','Open','Wrong assignment','TOTAL'],[st.resolved,st.pendingAction,st.pendingCustomer,st.canceled,st.open,st.wrong,m.sr.total],[GREEN,GREEN,GREEN,GREEN,GREEN,GREEN,NAVY]);
+    bar(s,5.1,.95,4.4,3.5,'Number of Requests – by source',['Quality','Call Center','CM','DLP','Integrated'],[so.quality,so.callCenter,so.cm,so.dlp,so.integrated],[NAVY]); }
+  // ---- 8 revenue
+  { const s=base(m.mon+' Total Revenue',m.revTake); const r=m.rev;
+    T(s,fmFmt(r.total,2)+' EGP',{x:.5,y:1.0,w:5,h:.7,fontSize:30,bold:true,color:NAVY,valign:'middle'}); T(s,m.monthName+' Total Revenue',{x:.5,y:1.7,w:5,h:.3,fontSize:11,color:GREY});
+    [[fmFmt(r.handover)+' EGP','Handover units',GOLD,.5,2.15],[fmFmt(r.paid)+' EGP','Paid services',BLUE,3.0,2.15],[fmFmt(r.soft)+' EGP','Soft Cleaning',GOLD,.5,3.35],[fmFmt(r.deep)+' EGP','Deep Cleaning',BLUE,3.0,3.35]].forEach(c=>{ R(s,c[3],c[4],2.35,1.05,CREAM); R(s,c[3],c[4],.07,1.05,c[2]); T(s,c[0],{x:c[3]+.2,y:c[4]+.1,w:2.05,h:.5,fontSize:18,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); T(s,c[1],{x:c[3]+.2,y:c[4]+.62,w:2.05,h:.3,fontSize:10,color:GREY}); });
+    T(s,'Paid services breakdown',{x:5.7,y:.95,w:3.8,h:.3,fontSize:11,bold:true,color:NAVY});
+    if(r.paid>0) s.addChart(pres.charts.DOUGHNUT,[{name:'Paid',labels:['Soft Cleaning','Deep Cleaning'],values:[r.soft,r.deep]}],{x:5.7,y:1.25,w:3.8,h:3.2,holeSize:58,chartColors:[GOLD,NAVY],showPercent:true,showLegend:true,legendPos:'b',legendFontSize:9,dataLabelColor:WHITE,dataLabelFontSize:10}); else T(s,'No completed paid orders this month.',{x:5.7,y:2.4,w:3.8,h:.5,fontSize:11,color:GREY,align:'center'}); }
+  // ---- 9 cost management
+  { const s=base('Cost Management',m.costTake); m.vendors.slice(0,6).forEach((v,i)=>{ const x=[.5,3.55,6.6][i%3], y=i<3?.95:2.75;
+      T(s,v.name+'  ('+v.cat+')',{x,y,w:2.9,h:.3,fontSize:10,bold:true,color:NAVY,fit:'shrink'});
+      s.addChart(pres.charts.BAR,[{name:'EGP',labels:['Requested Payment','Approved Payment'],values:[v.req,v.appr]}],{x,y:y+.28,w:2.9,h:1.45,barDir:'col',chartColors:[GOLD,GOLD],showValue:true,dataLabelFontSize:8,dataLabelFormatCode:'#,##0',catAxisLabelFontSize:7,valAxisHidden:true,valGridLine:{style:'none'},catGridLine:{style:'none'},showLegend:false,barGapWidthPct:70,valAxisMinVal:0}); }); }
+  // ---- 10 vendor scores
+  { const s=base('Monthly Score – Vendors',m.scoreTake); const V=m.vendors.filter(v=>v.cur!=null||v.prev!=null);
+    T(s,'Monthly Score – '+m.prevMon+' vs '+m.mon,{x:.5,y:.95,w:5.6,h:.3,fontSize:11,bold:true,color:NAVY});
+    if(V.length) s.addChart(pres.charts.BAR,[{name:m.prevMon,labels:V.map(v=>v.name),values:V.map(v=>(v.prev||0)/100)},{name:m.mon,labels:V.map(v=>v.name),values:V.map(v=>(v.cur||0)/100)}],{x:.5,y:1.25,w:5.6,h:3.2,barDir:'col',barGrouping:'clustered',chartColors:[NAVY,GOLD],showValue:true,dataLabelFontSize:7,dataLabelFormatCode:'0%',catAxisLabelFontSize:8,valAxisLabelFontSize:8,valAxisLabelFormatCode:'0%',valAxisMinVal:.8,valAxisMaxVal:1,valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:9,barGapWidthPct:45});
+    const hd={bold:true,color:WHITE,fill:{color:NAVY},fontFace:FONT,fontSize:10}; const cell=(t,o)=>({text:String(t),options:Object.assign({fontFace:FONT,fontSize:10,color:NAVY},o||{})});
+    s.addTable([[{text:'Vendor',options:hd},{text:m.prevMon,options:hd},{text:m.mon,options:hd}]].concat(V.map(v=>[cell(v.name,{bold:true}),cell(v.prev!=null?Math.round(v.prev)+'%':'—',{align:'center'}),cell(v.cur!=null?Math.round(v.cur)+'%':'—',{align:'center'})])),{x:6.3,y:1.3,w:3.2,colW:[1.5,.85,.85],rowH:.32,border:{type:'solid',color:'D9D4C7',pt:.5}}); }
+  // ---- 11 attention
+  { const s=base('Points for Management Attention',null); const cols={gold:GOLD,blue:BLUE,red:RED,green:GREEN,navy:NAVY};
+    m.attention.slice(0,6).forEach((a,i)=>{ const x=i%2? 5.1:.5, y=1.0+Math.floor(i/2)*1.25; R(s,x,y,4.4,1.1,CREAM); R(s,x,y,.07,1.1,cols[a.c]||GOLD);
+      T(s,a.t,{x:x+.22,y:y+.1,w:4.05,h:.45,fontSize:13,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); if(a.d) T(s,a.d,{x:x+.22,y:y+.58,w:4.05,h:.45,fontSize:10.5,color:GREY,valign:'top'}); }); }
+  return pres;
+}
+
+/* ============================= FM Monthly Report (inside Reports) ============================= */
+const FM_UNIT_RATE=1500, FM_RESP_HOURS=48;
+const FM_MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const FM_MONTH_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const FM_CAT_LABEL={ housekeeping:'Housekeeping', facade_cleaning:'Facade Operations', pest_control:'Pest Control', waste_mgt:'Waste MGT', scent_diffusers:'Scent Diffusers', yd_operator:'Serviced Apt Operator' };
+const FM_CAT_ORDER=['housekeeping','facade_cleaning','pest_control','waste_mgt','scent_diffusers','yd_operator'];
+Object.assign(S,{ fm:{ open:false, month:'', busy:false, err:'', model:null, draft:{}, rows:[] } });
+function fmShift(m,d){ let [y,mo]=m.split('-').map(Number); mo+=d; while(mo>12){ mo-=12; y++; } while(mo<1){ mo+=12; y--; } return y+'-'+String(mo).padStart(2,'0'); }
+function fmAllRows(build){ return (async()=>{ let out=[]; for(let i=0;;i+=1000){ const {data,error}=await build().range(i,i+999); if(error) throw error; out=out.concat(data||[]); if(!data||data.length<1000) break; } return out; })(); }
+async function fmSafe(p){ try{ return await p; }catch(e){ console.warn('fm',e&&e.message); return []; } }
+async function fmCollect(month){
+  const y=month.slice(0,4), ys=y+'-01-01', from=month+'-01', to=fmShift(month,1)+'-01', pfrom=fmShift(month,-1)+'-01', prev=fmShift(month,-1);
+  const [dv,ord,ss,cmp,runs,lists,items,logs,sups,invs,kpis,inps]=await Promise.all([
+    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',ys).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',ys).lt('scheduled_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',ys).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('complaints').select('date,status').gte('date',pfrom).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('task_runs').select('date,status').gte('date',pfrom).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('svc_lists').select('id,service,name,position').in('service',['facade','waste']))),
+    fmSafe(fmAllRows(()=>sb.from('svc_items').select('id,list_id,service').in('service',['facade','waste']))),
+    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',ys).lt('log_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('suppliers').select('id,name,category'))),
+    fmSafe(fmAllRows(()=>sb.from('supplier_invoices').select('supplier_id,amount,discount,invoice_date').gte('invoice_date',from).lt('invoice_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('supplier_kpi').select('supplier_id,month,overall_score,score').in('month',[month,prev]))),
+    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').gte('month',y+'-01').lte('month',month)))
+  ]);
+  return { month, prev, from, to, pfrom, dv, ord, ss, cmp, runs, lists, items, logs, sups, invs, kpis, inps };
+}
+function fmBuildModel(r,draft){
+  const mi=+r.month.slice(5)-1, pi=+r.prev.slice(5)-1;
+  const ov=k=>{ const v=draft['ov_'+k]; return (v===undefined||v===null||v==='')? null : +v; };
+  const num=k=>{ const v=draft[k]; return (v===undefined||v===null||v==='')? null : +v; };
+  const n0=k=>num(k)||0;
+  const inMonth=d=>d>=r.from && d<r.to;
+  const norm=c=>String(c||'').trim().toUpperCase();
+  // revenue
+  const uMonth=new Set(r.dv.filter(x=>inMonth(x.date)).map(x=>norm(x.unit_code)).filter(Boolean));
+  const uYtd=new Set(r.dv.map(x=>norm(x.unit_code)).filter(Boolean));
+  const okOrd=r.ord.filter(o=>orderApproved(o));
+  const sumType=(t,f)=>okOrd.filter(o=>o.order_type===t && f(o.scheduled_date)).reduce((s,o)=>s+(+o.price||0),0);
+  const cntType=t=>okOrd.filter(o=>o.order_type===t).length;
+  const hoUnits=ov('handoverUnits')!=null?ov('handoverUnits'):uMonth.size;
+  const soft=ov('soft')!=null?ov('soft'):sumType('soft_cleaning',inMonth), deep=ov('deep')!=null?ov('deep'):sumType('deep_cleaning',inMonth);
+  const rev={ handoverUnits:hoUnits, handover:hoUnits*FM_UNIT_RATE, soft, deep, paid:soft+deep, total:hoUnits*FM_UNIT_RATE+soft+deep };
+  // housekeeping YTD
+  const dlpYtd=r.inps.filter(x=>x.month!==r.month).reduce((s,x)=>s+(+((x.data||{}).dlp)||0),0)+n0('dlp');
+  const hk={ handover:ov('hkHandover')!=null?ov('hkHandover'):uYtd.size, soft:ov('hkSoft')!=null?ov('hkSoft'):cntType('soft_cleaning'), deep:ov('hkDeep')!=null?ov('hkDeep'):cntType('deep_cleaning'),
+    mods:ov('hkMods')!=null?ov('hkMods'):r.ss.filter(x=>x.service_type==='modifications'&&x.status==='completed').length, dlp:dlpYtd };
+  hk.total=hk.handover+hk.soft+hk.deep+hk.mods+hk.dlp;
+  // facade (every façade list = one zone)
+  const facade=r.lists.filter(l=>l.service==='facade').sort((a,b)=>(a.position||0)-(b.position||0)||String(a.name).localeCompare(String(b.name),'en',{numeric:true})).map(l=>{
+    const total=r.items.filter(i=>i.list_id===l.id).length; const done=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id).map(x=>x.item_id)).size;
+    return { name:l.name, pct: total? Math.min(1,done/total):0 }; });
+  // waste visits per phase (list name contains E1 / E2)
+  const wl=r.lists.filter(l=>l.service==='waste'); const phaseOf=name=>/e\s*-?1/i.test(name)?'Phase E1':/e\s*-?2/i.test(name)?'Phase E2':'Other';
+  const wmap={'Phase E1':new Set(),'Phase E2':new Set(),'Other':new Set()};
+  r.logs.filter(x=>x.service==='waste'&&inMonth(x.log_date)).forEach(x=>{ const nm=(wl.find(l=>l.id===x.list_id)||{}).name||x.list_name||''; wmap[phaseOf(nm)].add(x.log_date); });
+  const waste=[{name:'Phase E1',visits:wmap['Phase E1'].size},{name:'Phase E2',visits:wmap['Phase E2'].size}]; if(wmap['Other'].size) waste.push({name:'Other',visits:wmap['Other'].size});
+  const wasteTotal=waste.reduce((s,w)=>s+w.visits,0);
+  // complaints / compliance
+  const cmpOf=(a,b)=>{ const l=r.cmp.filter(c=>c.date>=a&&c.date<b); return { recv:l.length, rect:l.filter(c=>c.status==='resolved').length }; };
+  const complaints={ prev:cmpOf(r.pfrom,r.from), cur:cmpOf(r.from,r.to) };
+  if(ov('cRecv')!=null) complaints.cur.recv=ov('cRecv'); if(ov('cRect')!=null) complaints.cur.rect=ov('cRect');
+  const compOf=(a,b)=>{ const l=r.runs.filter(x=>x.date>=a&&x.date<b); return l.length? l.filter(x=>x.status==='completed').length/l.length : null; };
+  const compliance={ prev:compOf(r.pfrom,r.from), cur: ov('compliance')!=null? ov('compliance')/100 : compOf(r.from,r.to) };
+  // occupancy (current from the form, previous from last month's saved entry)
+  const prevIn=(r.inps.find(x=>x.month===r.prev)||{}).data||{};
+  const occ={ cur:num('occ'), prev: prevIn.occ!==undefined&&prevIn.occ!==''&&prevIn.occ!==null? +prevIn.occ : null };
+  // service requests
+  const status={ resolved:n0('sr_resolved'), pendingAction:n0('sr_pendingAction'), pendingCustomer:n0('sr_pendingCustomer'), canceled:n0('sr_canceled'), open:n0('sr_open'), wrong:n0('sr_wrong') };
+  const integAuto=r.ss.filter(x=>x.service_type==='integrated'&&inMonth(x.date)).length;
+  const source={ quality:n0('so_quality'), callCenter:n0('so_callCenter'), cm:n0('so_cm'), dlp:n0('so_dlp'), integrated: ov('integrated')!=null? ov('integrated'):integAuto };
+  const sr={ status, source, total:Object.values(status).reduce((a,b)=>a+b,0) };
+  const pest={ resolved:n0('pest_resolved'), pending:n0('pest_pending'), canceled:n0('pest_canceled') }; pest.total=pest.resolved+pest.pending+pest.canceled;
+  // vendors
+  const vendors=r.sups.filter(s=>FM_CAT_LABEL[s.category]).map(s=>{
+    const inv=r.invs.filter(i=>i.supplier_id===s.id); const req=inv.reduce((t,i)=>t+(+i.amount||0),0), appr=inv.reduce((t,i)=>t+(+i.amount||0)-(+i.discount||0),0);
+    const sc=mm=>{ const l=r.kpis.filter(k=>k.supplier_id===s.id&&k.month===mm).map(k=>+(k.overall_score!=null&&k.overall_score!==''?k.overall_score:k.score)).filter(v=>!isNaN(v)); return l.length? l.reduce((a,b)=>a+b,0)/l.length : null; };
+    const norm01=v=>v==null?null:(v<=1?v*100:v);
+    return { name:s.name, cat:FM_CAT_LABEL[s.category], catKey:s.category, req, appr, prev:norm01(sc(r.prev)), cur:norm01(sc(r.month)), has:inv.length>0 };
+  }).filter(v=>v.has||v.cur!=null||v.prev!=null).sort((a,b)=>FM_CAT_ORDER.indexOf(a.catKey)-FM_CAT_ORDER.indexOf(b.catKey));
+  const curScores=vendors.map(v=>v.cur).filter(v=>v!=null).map(Math.round);
+  const vendorRange=curScores.length? (Math.min(...curScores)===Math.max(...curScores)? Math.min(...curScores)+'%' : Math.min(...curScores)+'–'+Math.max(...curScores)+'%') : '—';
+  // texts
+  const monthName=FM_MONTH_EN[mi], prevMonthName=FM_MONTH_EN[pi], label=monthName+' '+r.month.slice(0,4), td=new Date();
+  const notRect=Math.max(0,complaints.cur.recv-complaints.cur.rect), pct=(a,b)=>b?Math.round(a/b*100):0;
+  const follow=[]; if(status.pendingCustomer) follow.push(status.pendingCustomer+' requests pending customer'); if(notRect) follow.push(notRect+' open complaint'+(notRect>1?'s':''));
+  const execTake='Revenue '+fmFmt(rev.total)+' EGP, compliance '+fmPct(compliance.cur)+', vendor scores '+vendorRange+(follow.length? '; follow-up needed on '+follow.join(' and ')+'.' : '; no open follow-ups.');
+  const fp=facade.map(f=>f.pct);
+  const hkTake=hk.total+' units serviced YTD ('+hk.handover+' handover, '+hk.soft+' soft cleaning, '+hk.deep+' deep cleaning).'+(fp.length? ' Façade completion '+Math.round(Math.min(...fp)*100)+'–'+Math.round(Math.max(...fp)*100)+'%.':'');
+  const pwTake=(pest.total? pest.resolved+' of '+pest.total+' pest-control requests resolved ('+pct(pest.resolved,pest.total)+'%); ' : 'Pest-control requests not entered; ')+wasteTotal+' waste-collection visits across Phases E1 and E2.';
+  const ccTake='Compliance with cleaning plans '+fmPct(compliance.cur)+' in '+monthName+'; '+complaints.cur.rect+' of '+complaints.cur.recv+' '+monthName+' complaints rectified.';
+  const orTake=occ.cur!=null&&occ.prev!=null? 'Occupancy '+(occ.cur>=occ.prev?'grew':'fell')+' from '+occ.prev+' to '+occ.cur+' units ('+(occ.cur-occ.prev>=0?'+':'')+(occ.cur-occ.prev)+', '+(occ.prev?((occ.cur-occ.prev)/occ.prev*100).toFixed(1):'0')+'%).' : 'Occupancy: enter this month\'s units in the manual section.';
+  const srTake=sr.total? sr.total+' requests received, '+status.resolved+' resolved ('+pct(status.resolved,sr.total)+'%); '+source.callCenter+' via Call Center, '+source.cm+' via CM, '+source.integrated+' Integrated.' : 'Service requests not entered yet (manual section).';
+  const revTake='Handover units '+pct(rev.handover,rev.total)+'% of revenue; paid services '+pct(rev.paid,rev.total)+'%'+(rev.paid? ', of which deep cleaning is '+pct(rev.deep,rev.paid)+'%.' : '.');
+  const sumReq=vendors.reduce((t,v)=>t+v.req,0), sumAppr=vendors.reduce((t,v)=>t+v.appr,0);
+  const costTake='Total requested: '+fmFmt(sumReq)+' · approved: '+fmFmt(sumAppr)+(sumReq===sumAppr? ' — every payment approved in full.' : ' — difference '+fmFmt(sumReq-sumAppr)+' (discounts).');
+  const scoreTake=curScores.length? 'All '+curScores.length+' vendors at '+vendorRange+'.' : 'No vendor scores recorded for '+monthName+'.';
+  // attention points
+  const att=[];
+  if(status.pendingCustomer) att.push({ t:status.pendingCustomer+' SRs pending customer', d:pct(status.pendingCustomer,sr.total)+'% of '+monthName+' requests await customer response.', c:'gold' });
+  if(status.wrong) att.push({ t:status.wrong+' wrong-assignment SRs', d:'Routing errors to correct between teams.', c:'blue' });
+  if(notRect) att.push({ t:notRect+' complaint'+(notRect>1?'s':'')+' not rectified', d:complaints.cur.recv+' received in '+monthName+', '+complaints.cur.rect+' rectified.', c:'red' });
+  const lowF=facade.filter(f=>f.pct<1).sort((a,b)=>a.pct-b.pct); if(lowF.length) att.push({ t:'Façade: '+lowF.slice(0,3).map(f=>f.name+' '+Math.round(f.pct*100)+'%').join(', '), d:'Remaining zones need completion.', c:'blue' });
+  const zero=[['After Modifications',hk.mods],['DLP Visits',hk.dlp],['Soft Cleaning',hk.soft],['Deep Cleaning',hk.deep]].filter(x=>!x[1]).map(x=>x[0]); if(zero.length) att.push({ t:'Housekeeping: '+zero.length+' categor'+(zero.length>1?'ies':'y')+' at 0', d:zero.join(', ')+': none YTD.', c:'gold' });
+  if(pest.pending) att.push({ t:'Pest control: '+pest.pending+' pending request'+(pest.pending>1?'s':''), d:pest.resolved+' of '+pest.total+' resolved ('+pct(pest.resolved,pest.total)+'%).', c:'green' });
+  String(draft.notes||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>att.push({ t:x, d:'', c:'navy' }));
+  if(!att.length) att.push({ t:'No open points', d:'All indicators are on target for '+monthName+'.', c:'green' });
+  return { month:r.month, label, monthName, prevMonthName, mon:FM_MON[mi], prevMon:FM_MON[pi], reportDate:td.getDate()+' '+FM_MONTH_EN[td.getMonth()]+' '+td.getFullYear(),
+    rev, hk, facade, pest, waste, wasteTotal, complaints, compliance, occ, respHours:FM_RESP_HOURS, sr, vendors, vendorRange, attention:att,
+    execTake, hkTake, pwTake, ccTake, orTake, srTake, revTake, costTake, scoreTake, integAuto,
+    missing:[ occ.cur==null?'Occupancy':null, sr.total?null:'Service requests (statuses)', pest.total?null:'Pest control requests' ].filter(Boolean) };
+}
+async function fmLoad(){
+  const f=S.fm; if(!f.month) f.month=fmShift((S.today||todayStr()).slice(0,7),-1);
+  f.busy=true; f.err=''; render();
+  try{
+    const raw=await fmCollect(f.month); f.raw=raw;
+    const saved=(raw.inps.find(x=>x.month===f.month)||{}).data||{};
+    f.draft=Object.assign({},saved); f.model=fmBuildModel(raw,f.draft);
+  }catch(e){ f.err='تعذّر تحميل البيانات: '+(e&&e.message||e); }
+  f.busy=false; render();
+}
+function fmRecalc(){ const f=S.fm; if(f.raw) f.model=fmBuildModel(f.raw,f.draft); }
+async function fmSave(){
+  const f=S.fm; const {error}=await sb.from('fm_monthly_inputs').upsert({ month:f.month, data:f.draft, updated_by:S.session.user.id, updated_at:new Date().toISOString() },{ onConflict:'month' });
+  if(error){ toast('تعذّر الحفظ: '+error.message,false); return false; }
+  toast('تم حفظ الإدخال اليدوي',true); await fmLoad(); return true;
+}
+function fmLoadPptx(){
+  if(window.PptxGenJS) return Promise.resolve();
+  const srcs=['https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js','https://unpkg.com/pptxgenjs@4.0.1/dist/pptxgen.bundle.js','https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'];
+  return (async()=>{ for(const s of srcs){ try{ await fvLoadScript(s); if(window.PptxGenJS) return; }catch(e){} } throw new Error('pptx lib'); })();
+}
+async function fmExport(){
+  const f=S.fm; if(!f.raw){ toast('استنى لحد ما البيانات تتحمل',false); return; }
+  fmRecalc();
+  if(f.model.missing.length && !confirm('لسه ناقص إدخال يدوي: '+f.model.missing.join('، ')+'\nتكمل التصدير بالأرقام الحالية؟')) return;
+  toast('جاري تجهيز ملف PowerPoint...',true);
+  try{ await fmLoadPptx(); const pres=fmBuildPptx(window.PptxGenJS,f.model); await pres.writeFile({ fileName:'FM_Monthly_Report_'+f.model.label.replace(/ /g,'_')+'.pptx' }); }
+  catch(e){ console.error(e); toast('تعذّر تجهيز الملف — تأكد من الإنترنت وجرّب تاني',false); }
+}
+const FM_FIELDS={
+  occ:'Occupancy — عدد الوحدات المشغولة (هذا الشهر)',
+  sr_resolved:'Resolved', sr_pendingAction:'Pending action', sr_pendingCustomer:'Pending customer', sr_canceled:'Canceled', sr_open:'Open', sr_wrong:'Wrong assignment',
+  so_quality:'Quality', so_callCenter:'Call Center', so_cm:'CM', so_dlp:'DLP',
+  pest_resolved:'Resolved', pest_pending:'Pending', pest_canceled:'Canceled', dlp:'DLP Visits (هذا الشهر)' };
+const FM_OV={ handoverUnits:'وحدات Handover (الشهر)', soft:'إيراد Soft (EGP)', deep:'إيراد Deep (EGP)', hkHandover:'Handover YTD', hkSoft:'Soft YTD', hkDeep:'Deep YTD', hkMods:'After Modifications YTD', compliance:'الالتزام % (0-100)', cRecv:'شكاوى مستلمة', cRect:'شكاوى معالجة', integrated:'Integrated SRs' };
+function fmInput(k,label){ const v=S.fm.draft[k]; return `<div class="form-row" style="margin:0;min-width:120px;flex:1;"><label style="font-size:11px;">${label}</label><input type="number" min="0" data-fm-in="${k}" value="${v==null?'':esc(v)}"></div>`; }
+function fmCardRow(lbl,val,manual){ return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--text-dim);">${lbl}${manual?' <span style="font-size:10px;background:#fff3cd;color:#8a6d00;border-radius:999px;padding:1px 7px;">يدوي</span>':''}</span><b>${val}</b></div>`; }
+function fmReportCard(){
+  const role=S.profile&&S.profile.role; if(role!=='admin'&&role!=='opm') return '';
+  const f=S.fm;
+  if(!f.open) return `<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><h3 style="margin:0;">📑 FM Monthly Report</h3><div style="font-size:12px;color:var(--text-dim);margin-top:3px;">ريبورت الإدارة الشهري (Soft Services) — بيتجمّع من النظام + إدخال يدوي للناقص، ويتصدّر PowerPoint.</div></div><button class="primary-btn" id="fm-open">فتح</button></div>`;
+  const m=f.model;
+  let body='';
+  if(f.busy) body='<div style="padding:20px;text-align:center;color:var(--text-dim);">جاري تجميع بيانات الشهر...</div>';
+  else if(f.err) body=`<div style="padding:16px;color:var(--coral);">${esc(f.err)}</div>`;
+  else if(m){
+    const sec=(t,rows)=>`<div class="card" style="margin:0;padding:12px 14px;"><b style="font-size:13px;">${t}</b>${rows}</div>`;
+    body=`${m.missing.length?`<div style="background:#fff3cd;color:#6b5300;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;">⚠️ ناقص إدخال يدوي: ${m.missing.join('، ')}</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px;">
+      ${sec('الإيراد',fmCardRow('Handover ('+m.rev.handoverUnits+' وحدة × '+FM_UNIT_RATE+')',fmFmt(m.rev.handover)+' ج.م')+fmCardRow('Soft Cleaning',fmFmt(m.rev.soft))+fmCardRow('Deep Cleaning',fmFmt(m.rev.deep))+fmCardRow('الإجمالي',fmFmt(m.rev.total)+' ج.م'))}
+      ${sec('Housekeeping YTD',fmCardRow('Handover',m.hk.handover)+fmCardRow('Soft / Deep',m.hk.soft+' / '+m.hk.deep)+fmCardRow('After Modifications',m.hk.mods)+fmCardRow('DLP Visits',m.hk.dlp,true)+fmCardRow('الإجمالي',m.hk.total))}
+      ${sec('الواجهات (YTD)',m.facade.length? m.facade.map(x=>fmCardRow(esc(x.name),Math.round(x.pct*100)+'%')).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش قوائم واجهات</div>')}
+      ${sec('Pest & Waste',fmCardRow('Pest: تم / معلق / ملغي',m.pest.resolved+' / '+m.pest.pending+' / '+m.pest.canceled,true)+m.waste.map(w=>fmCardRow('Waste '+w.name,w.visits+' زيارة')).join(''))}
+      ${sec('الشكاوى والالتزام',fmCardRow(m.mon+' شكاوى (مستلمة / معالجة)',m.complaints.cur.recv+' / '+m.complaints.cur.rect)+fmCardRow(m.prevMon+' شكاوى',m.complaints.prev.recv+' / '+m.complaints.prev.rect)+fmCardRow('الالتزام بخطط النظافة',fmPct(m.compliance.cur))+fmCardRow('زمن الاستجابة','48 ساعة (ثابت)'))}
+      ${sec('Occupancy & SRs',fmCardRow('Occupancy',m.occ.cur!=null?m.occ.cur:'—',true)+fmCardRow('الشهر السابق',m.occ.prev!=null?m.occ.prev:'—')+fmCardRow('إجمالي SRs',m.sr.total||'—',true)+fmCardRow('Integrated (تلقائي من خدمات جانبية)',m.sr.source.integrated))}
+      ${sec('الموردين',m.vendors.length? m.vendors.map(v=>fmCardRow(esc(v.name),'طلب '+fmFmt(v.req)+' · موافق '+fmFmt(v.appr)+' · تقييم '+(v.cur!=null?Math.round(v.cur)+'%':'—'))).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش فواتير أو تقييمات للشهر</div>')}
+    </div>
+    <div class="card" style="margin:0 0 12px;padding:12px 14px;"><b>✍️ الإدخال اليدوي — ${esc(m.label)}</b>
+      <div style="font-size:12px;color:var(--text-dim);margin:4px 0 8px;">الحاجات اللي مش موجودة في النظام. الأرقام بتتحفظ للشهر ده، وOccupancy الشهر اللي فات بيتسحب لوحده.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">${fmInput('occ',FM_FIELDS.occ)}${fmInput('dlp',FM_FIELDS.dlp)}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">Service Requests (من Salesforce) — الحالات</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['sr_resolved','sr_pendingAction','sr_pendingCustomer','sr_canceled','sr_open','sr_wrong'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">المصادر (Integrated تلقائي)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['so_quality','so_callCenter','so_cm','so_dlp'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">Pest Control</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['pest_resolved','pest_pending','pest_canceled'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div class="form-row" style="margin:10px 0 0;"><label>نقاط إضافية للإدارة (سطر لكل نقطة)</label><textarea data-fm-in="notes" rows="3">${esc(f.draft.notes||'')}</textarea></div>
+      <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;">تعديل يدوي لأرقام تلقائية (اتركها فاضية للحساب التلقائي)</summary>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${Object.keys(FM_OV).map(k=>fmInput('ov_'+k,FM_OV[k])).join('')}</div></details>
+    </div>`;
+  }
+  return `<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><h3 style="margin:0;">📑 FM Monthly Report</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;"><div class="fgroup"><label>الشهر</label><input type="month" id="fm-month" value="${esc(f.month)}"></div>
+    <button class="ghost-btn" id="fm-save" ${f.busy||!m?'disabled':''}>💾 حفظ الإدخال اليدوي</button><button class="primary-btn" id="fm-export" ${f.busy||!m?'disabled':''}>⬇️ تصدير PowerPoint</button><button class="ghost-btn" id="fm-close">إغلاق</button></div></div>${body}</div>`;
+}
+function bindFmReport(){
+  const b=id=>document.getElementById(id);
+  if(b('fm-open')) b('fm-open').onclick=()=>{ S.fm.open=true; fmLoad(); };
+  if(b('fm-close')) b('fm-close').onclick=()=>{ S.fm.open=false; render(); };
+  if(b('fm-month')) b('fm-month').onchange=e=>{ if(e.target.value){ S.fm.month=e.target.value; fmLoad(); } };
+  if(b('fm-save')) b('fm-save').onclick=fmSave;
+  if(b('fm-export')) b('fm-export').onclick=fmExport;
+  document.querySelectorAll('[data-fm-in]').forEach(el=>el.oninput=()=>{ S.fm.draft[el.dataset.fmIn]=el.value; });
+}
+
 /* ============================= GLASS MOTION: staggered entrance + number count-up ============================= */
 S._numPrev={}; S._gIntro=false;
 function glassCount(el, fromTxt){
@@ -3785,7 +4063,7 @@ function renderReports(){
     </div>
     ${rows||'<div style="font-size:12.5px;color:var(--text-dim);">مفيش تقارير محفوظة لسه.</div>'}
   </div>`;
-  return card + renderReportsMain();
+  return fmReportCard() + card + renderReportsMain();
 }
 async function generateDailyReport(openAfter){
   toast('جارٍ توليد التقرير...',true);
@@ -3823,6 +4101,7 @@ function bindDailyReportModal(){
   const pr=document.getElementById('dr-modal-print'); if(pr) pr.onclick=()=>printReportHtml(m);
 }
 function bindReports(){
+  bindFmReport();
   bindReportsMain();
   const g=document.getElementById('dr-gen'); if(g) g.onclick=()=>generateDailyReport();
   const ml=document.getElementById('dr-mail'); if(ml) ml.onclick=()=>generateDailyReport();
