@@ -2345,7 +2345,7 @@ Object.assign(S,{ sideSvc:[], ssDate:todayStr(), ssType:'all' });
 async function sideSvcFetch(){ try{ const {data,error}=await sb.from('side_service_units').select('*'); if(error){ console.warn('side_service_units',error.message); return null; } return data||[]; }catch(e){ return null; } }
 async function loadSideSvc(){ const d=await sideSvcFetch(); if(d) S.sideSvc=d; }
 function ssTypeTag(t){ return `<span class="tag-shift ${t==='integrated'?'morning':'evening'}">${SS_TYPES[t]||esc(t)}</span>`; }
-function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option></select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
+function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option>${x.status==='cancelled'?'<option value="cancelled" selected>تم الإلغاء</option>':''}${x.status==='pending_review'?'<option value="pending_review" selected>قيد المراجعة</option>':''}</select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
 function renderSideServices(){
   const canWrite=S.profile.role==='admin'||S.profile.role==='opm';
   const day=(S.sideSvc||[]).filter(x=>x.date===S.ssDate);
@@ -4283,7 +4283,7 @@ function renderAuditHist(){
 /* ============================= طلبات الأوردرات الخارجية (لينك request.html) ============================= */
 Object.assign(S,{ modReqs:[], modReqsLoaded:false, modReqsErr:'', mrRej:null });
 const MR_WORKS={ modification:'تعديل', painting:'دهان', plumbing:'سباكة', installations:'تركيبات', electrical:'كهرباء', carpentry:'نجارة', other:'أخرى' };
-const MR_ST={ pending:['معلّق','#d98a14'], waitlist:['اليوم محجوز — قائمة انتظار','#c2410c'], approved:['اتقبل','#1f9d57'], rejected:['اترفض','#d64545'] };
+const MR_ST={ pending:['معلّق','#d98a14'], waitlist:['اليوم محجوز — قائمة انتظار','#c2410c'], approved:['اتقبل','#1f9d57'], rejected:['اترفض','#d64545'], cancelled:['تم الإلغاء','#6b7280'] };
 function mrLink(){ try{ return new URL('request.html', location.href).href.split('#')[0]; }catch(e){ return 'request.html'; } }
 function mrDateAr(d){ try{ return new Date(d+'T12:00:00Z').toLocaleDateString('ar-EG',{ weekday:'long', day:'numeric', month:'long', timeZone:'UTC' }); }catch(e){ return d; } }
 function mrAddDays(s,n){ const d=new Date(s+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
@@ -4291,7 +4291,7 @@ function mrAddDays(s,n){ const d=new Date(s+'T12:00:00Z'); d.setUTCDate(d.getUTC
 function mrNearestFree(reqDate){
   const taken=new Set();
   (S.modReqs||[]).forEach(r=>{ if(r.status==='pending'||r.status==='approved') taken.add(r.req_date); });
-  (S.sideSvc||[]).forEach(x=>{ if(x.service_type==='modifications' && x.status!=='postponed') taken.add(x.date); });
+  (S.sideSvc||[]).forEach(x=>{ if(x.service_type==='modifications' && !['postponed','cancelled'].includes(x.status)) taken.add(x.date); });
   for(let k=1;k<=60;k++){ for(const c of [mrAddDays(reqDate,k), mrAddDays(reqDate,-k)]){ if(c>S.today && !taken.has(c)) return c; } }
   return mrAddDays(S.today,1);
 }
@@ -4303,6 +4303,9 @@ async function loadModReqs(){
 function mrWa(r,kind){
   let msg;
   if(kind==='ok') msg=`أهلًا ${r.requester_name}،\nتم قبول طلبك رقم #${r.ref_no} لوحدة ${r.unit_code} يوم ${mrDateAr(r.req_date)}.\nبرجاء تحضير المفتاح مع الشخص طالب الخدمة (ضروري)، والتأكد من عدم وجود مخلفات بناء.\nشكرًا — قسم Soft Services`;
+  else if(kind==='cancel') msg=`أهلًا ${r.requester_name}،\nبخصوص طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}: تم إلغاء الطلب${r.reject_reason?' ('+r.reject_reason+')':''}.\nلو محتاج ميعاد جديد برجاء عمل طلب جديد من اللينك.\nشكرًا — قسم Soft Services`;
+  else if(kind==='editok') msg=`أهلًا ${r.requester_name}،\nتم قبول تعديل طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}، والميعاد الجديد يوم ${mrDateAr(r.req_date)}.${r.edit_result_note?'\n'+r.edit_result_note:''}\nبرجاء تحضير المفتاح مع الشخص طالب الخدمة (ضروري).\nشكرًا — قسم Soft Services`;
+  else if(kind==='editno') msg=`أهلًا ${r.requester_name}،\nبخصوص طلب تعديل الطلب رقم #${r.ref_no}: نعتذر، لم نتمكن من قبول التعديل${r.edit_result_note?' ('+r.edit_result_note+')':''}، والطلب الأصلي يوم ${mrDateAr(r.req_date)} كما هو.\nشكرًا — قسم Soft Services`;
   else msg=`أهلًا ${r.requester_name}،\nبخصوص طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}: نعتذر، يوم ${mrDateAr(r.req_date)} غير متاح${r.reject_reason?' ('+r.reject_reason+')':''}.\n`+(r.suggested_date? `أقرب ميعاد متاح: ${mrDateAr(r.suggested_date)}.\nلو مناسب لك برجاء الرد بالتأكيد.` : 'برجاء اختيار يوم آخر من اللينك.')+`\nشكرًا — قسم Soft Services`;
   return 'https://wa.me/'+String(r.phone||'').replace(/\D/g,'')+'?text='+encodeURIComponent(msg);
 }
@@ -4313,6 +4316,14 @@ function mrCard(r){
   const open=r.status==='pending'||r.status==='waitlist';
   const rej=S.mrRej===r.id;
   const sug=mrNearestFree(r.req_date);
+  const ep=r.edit_payload, live=['pending','waitlist','approved'].includes(r.status);
+  const mrKey=v=>v===true?'هيجيبه':v===false?'مش هيجيبه':'—';
+  const mrDiff=(l,a,b)=>{ a=(a==null||a==='')?'—':String(a); b=(b==null||b==='')?'—':String(b); return a===b?'':`<div>• ${l}: <s style=\"color:var(--text-dim);\">${esc(a)}</s> ← <b>${esc(b)}</b></div>`; };
+  const editBlock= ep? `<div style="margin-top:8px;background:#fff6e5;border:1px solid #f1dfae;border-radius:10px;padding:10px;font-size:13px;line-height:1.9;">
+      <b>✏️ العميل طلب تعديل على الطلب (محتاج موافقتك)</b>
+      ${mrDiff('الوحدة',r.unit_code,ep.unit)}${mrDiff('التاريخ',r.req_date,ep.date)}${mrDiff('الاسم',r.requester_name,ep.name)}${mrDiff('الخدمة',r.want_text,ep.want)}${mrDiff('الميعاد',r.preferred_time,ep.time)}${mrDiff('المفتاح',mrKey(r.key_bring),mrKey(ep.key_bring))}${mrDiff('ملاحظات',r.extra_notes,ep.note)}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button class="primary-btn" data-mr-eok="${esc(r.id)}">✅ موافقة على التعديل</button><button class="ghost-btn danger" data-mr-eno="${esc(r.id)}">رفض التعديل</button></div></div>` : '';
+  const manage=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${live?`<button class="ghost-btn" data-mr-edit="${esc(r.id)}">✏️ تعديل</button><button class="ghost-btn danger" data-mr-cancel="${esc(r.id)}">🚫 إلغاء الطلب</button>`:''}<button class="ghost-btn danger" data-mr-del="${esc(r.id)}">🗑 حذف</button></div>`;
   return `<div style="border-inline-start:4px solid ${st[1]};background:var(--glass-bg-strong,#fff);border-radius:12px;padding:10px 12px;margin-bottom:8px;">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>#${r.ref_no} · ${esc(r.unit_code)}</b><span style="font-size:12px;font-weight:800;color:${st[1]};">${esc(stLabel)}</span></div>
     <div style="font-size:13px;line-height:1.9;margin-top:4px;">
@@ -4341,14 +4352,17 @@ function mrCard(r){
         <button class="ghost-btn" data-mr-no-cancel="1">إلغاء</button>
       </div>
     </div>`:''}
-    ${!open?`<div style="margin-top:6px;"><a class="ghost-btn" style="text-decoration:none;" href="${esc(mrWa(r,r.status==='approved'?'ok':'no'))}" target="_blank" rel="noopener">رد على الواتس</a></div>`:''}
+    ${editBlock}
+    ${!open?`<div style="margin-top:6px;"><a class="ghost-btn" style="text-decoration:none;" href="${esc(mrWa(r,r.status==='approved'?'ok':r.status==='cancelled'?'cancel':'no'))}" target="_blank" rel="noopener">رد على الواتس</a></div>`:''}
+    ${rej?'':manage}
   </div>`;
 }
 function renderModReqs(){
   if(!fvAdm()) return '';
   if(!S.modReqsLoaded && !S._mrLoading){ S._mrLoading=true; loadModReqs().then(()=>{ S._mrLoading=false; if(S.tab==='sideservices' && !S.modal && !hasUnsavedInput()) render(); }); }
-  const open=(S.modReqs||[]).filter(r=>r.status==='pending'||r.status==='waitlist');
-  const done=(S.modReqs||[]).filter(r=>r.status==='approved'||r.status==='rejected').slice(0,8);
+  const pe=(S.modReqs||[]).filter(r=>r.status==='approved'&&r.edit_payload);
+  const open=[...pe,...(S.modReqs||[]).filter(r=>r.status==='pending'||r.status==='waitlist')];
+  const done=(S.modReqs||[]).filter(r=>['approved','rejected','cancelled'].includes(r.status)&&!r.edit_payload).slice(0,15);
   const link=mrLink();
   return `<div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -4390,6 +4404,63 @@ function bindModReqs(){
   };
   document.querySelectorAll('[data-mr-no-go]').forEach(b=>b.onclick=()=>doReject(b.dataset.mrNoGo,true));
   document.querySelectorAll('[data-mr-no-only]').forEach(b=>b.onclick=()=>doReject(b.dataset.mrNoOnly,false));
+  const after=async (msg)=>{ toast(msg,true); await Promise.all([loadModReqs(), loadSideSvc()]); render(); };
+  document.querySelectorAll('[data-mr-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'mrEdit', id:b.dataset.mrEdit}; render(); });
+  document.querySelectorAll('[data-mr-cancel]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.mrCancel, r=(S.modReqs||[]).find(x=>x.id===id); if(!r) return;
+    const why=prompt('سبب إلغاء الطلب #'+r.ref_no+' (اختياري):',''); if(why===null) return;
+    if(!confirm('تلغي الطلب #'+r.ref_no+'؟'+(r.status==='approved'?' الأوردر المرتبط هيتلغي واليوم هيرجع متاح.':''))) return;
+    const w=window.open('','_blank');
+    const {error}=await sb.rpc('mod_req_cancel',{ p_id:id, p_reason:why.trim() });
+    if(error){ if(w) w.close(); toast(error.message,false); return; }
+    await after('تم إلغاء الطلب');
+    const nr=(S.modReqs||[]).find(x=>x.id===id); if(nr){ if(w) w.location.href=mrWa(nr,'cancel'); }
+  });
+  document.querySelectorAll('[data-mr-del]').forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.mrDel, r=(S.modReqs||[]).find(x=>x.id===id); if(!r) return;
+    if(!confirm('تحذف الطلب #'+r.ref_no+' نهائيًا؟')) return;
+    let delUnit=false;
+    if(r.side_unit_id) delUnit=confirm('الطلب ده ليه أوردر في الخدمات الجانبية. تحذف الأوردر كمان؟\n(موافق = يتحذف الاتنين، إلغاء = يتحذف الطلب بس)');
+    const {error}=await sb.rpc('mod_req_delete',{ p_id:id, p_delete_unit:delUnit });
+    if(error){ toast(error.message,false); return; }
+    await after('تم الحذف');
+  });
+  const editDecide=async (id,ok)=>{
+    const r=(S.modReqs||[]).find(x=>x.id===id); if(!r) return;
+    const note=prompt(ok?'ملاحظة للعميل (اختياري):':'سبب رفض التعديل (اختياري):',''); if(note===null) return;
+    const w=window.open('','_blank');
+    const {error}=await sb.rpc('mod_req_edit_decide',{ p_id:id, p_approve:ok, p_note:note.trim() });
+    if(error){ if(w) w.close(); toast(error.message,false); return; }
+    await after(ok?'تم قبول التعديل ونزل مكان القديم':'تم رفض التعديل');
+    const nr=(S.modReqs||[]).find(x=>x.id===id); if(nr){ if(w) w.location.href=mrWa(nr,ok?'editok':'editno'); }
+  };
+  document.querySelectorAll('[data-mr-eok]').forEach(b=>b.onclick=()=>editDecide(b.dataset.mrEok,true));
+  document.querySelectorAll('[data-mr-eno]').forEach(b=>b.onclick=()=>editDecide(b.dataset.mrEno,false));
+}
+function renderMrEdit(){
+  const r=(S.modReqs||[]).find(x=>x.id===S.modal.id); if(!r) return '';
+  return modalWrap('تعديل الطلب #'+r.ref_no, `
+    <div class="form-row"><label>كود الوحدة</label><input id="mre-unit" value="${esc(r.unit_code)}"></div>
+    <div class="form-row"><label>الاسم</label><input id="mre-name" value="${esc(r.requester_name)}"></div>
+    <div class="form-row"><label>رقم الواتس</label><input id="mre-phone" dir="ltr" value="${esc(r.phone)}"></div>
+    <div class="form-row"><label>الخدمة المطلوبة</label><textarea id="mre-want" rows="2">${esc(r.want_text||'')}</textarea></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="mre-date" value="${esc(r.req_date)}" min="${esc(S.today)}"></div>
+    <div class="form-row"><label>الميعاد المطلوب</label><input id="mre-time" value="${esc(r.preferred_time||'')}"></div>
+    <div class="form-row"><label>المفتاح</label><select id="mre-key"><option value="" ${r.key_bring==null?'selected':''}>—</option><option value="1" ${r.key_bring===true?'selected':''}>هيجيبه</option><option value="0" ${r.key_bring===false?'selected':''}>مش هيجيبه</option></select></div>
+    <div class="form-row"><label>ملاحظات</label><textarea id="mre-note" rows="2">${esc(r.extra_notes||r.works_note||'')}</textarea></div>
+    ${r.status==='approved'?'<p style="font-size:12px;color:var(--text-dim);">الطلب مقبول: التعديل هيتحدّث في الأوردر المرتبط (الوحدة والتاريخ والملاحظات).</p>':''}
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="mre-save">${ICON.check(14)} حفظ</button>`);
+}
+function bindMrEdit(){
+  const b=document.getElementById('mre-save'); if(!b) return;
+  b.onclick=async ()=>{
+    const g=id=>document.getElementById(id).value; const k=g('mre-key');
+    b.disabled=true;
+    const {error}=await sb.rpc('mod_req_update',{ p_id:S.modal.id, p_date:g('mre-date'), p_unit:g('mre-unit'), p_name:g('mre-name'), p_phone:g('mre-phone'),
+      p_want:g('mre-want'), p_key_bring:k===''?null:k==='1', p_time:g('mre-time'), p_note:g('mre-note') });
+    if(error){ b.disabled=false; toast(error.message,false); return; }
+    S.modal=null; await Promise.all([loadModReqs(), loadSideSvc()]); render(); toast('تم الحفظ',true);
+  };
 }
 
 /* ============================= WASTE DAILY REPORT ============================= */
@@ -5514,6 +5585,7 @@ function renderModal(){
   const m=S.modal;
   if(m.type==='auditHist') return renderAuditHist();
   if(m.type==='ssForm') return renderSsForm();
+  if(m.type==='mrEdit') return renderMrEdit();
   if(m.type==='dvExport') return renderDvExport();
   if(m.type==='monthlyFinance') return modalWrap('Monthly Finance Breakdown', renderMonthlyFinance(), 'full');
   if(m.type==='addDelivery') return modalWrap('إضافة وحدة تسليم', `
@@ -5983,6 +6055,7 @@ function bindModalEvents(){
   if(S.modal && S.modal.type==='monthlyFinance') bindMonthlyFinance();
   if(S.modal && S.modal.type==='dvExport') bindDvExport();
   if(S.modal && S.modal.type==='ssForm') bindSsForm();
+  if(S.modal && S.modal.type==='mrEdit') bindMrEdit();
   if(S.modal && S.modal.type==='supplierDetail') bindMpSection();
   if(S.modal && S.modal.type==='wasteReport') bindWasteReport();
   if(S.modal && S.modal.type==='dailyReportView') bindDailyReportModal();
