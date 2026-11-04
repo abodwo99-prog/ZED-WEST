@@ -55,6 +55,11 @@ button.go:disabled{opacity:.55;cursor:default}
 .done.block{padding:30px 18px}
 .done.block h2{color:var(--bad)}
 .done.block .why{background:#fff6e5;border-radius:12px;padding:12px;margin:14px 0;font-size:14.5px;line-height:1.9}
+.choice{display:block;width:100%;text-align:right;border:2px solid var(--line);background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;font:inherit;cursor:pointer;color:var(--ink)}
+.choice:hover{border-color:var(--brand)}
+.choice b{display:block;font-size:17px;margin-bottom:2px}
+.choice span{font-size:13px;color:var(--dim)}
+.editbar{background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
 .link{color:var(--brand-d);font-weight:700;cursor:pointer;background:none;border:0;font:inherit;text-decoration:underline;margin-top:6px}
 </style>
 </head>
@@ -65,9 +70,28 @@ button.go:disabled{opacity:.55;cursor:default}
     <div><h1>طلب أوردر</h1><p>قسم Soft Services — ORA Property Management</p></div>
   </div>
 
-  <div id="formView">
+  <div id="startView">
+    <button class="choice" id="chNew" type="button"><b>🆕 طلب جديد</b><span>احجز أوردر جديد لوحدتك</span></button>
+    <button class="choice" id="chEdit" type="button"><b>✏️ مراجعة وتعديل طلب</b><span>عندك رقم طلب؟ راجعه أو اطلب تعديله</span></button>
+  </div>
 
+  <div id="lookupView" style="display:none">
     <div class="card">
+      <h2>مراجعة وتعديل طلب</h2>
+      <label class="f" for="lkRef">رقم الطلب</label>
+      <input type="tel" id="lkRef" inputmode="numeric" placeholder="مثال: 12">
+      <label class="f" for="lkPh">رقم الواتس اللي اتسجّل بيه الطلب</label>
+      <input type="tel" id="lkPh" inputmode="tel" placeholder="01xxxxxxxxx">
+      <div class="err" id="lkErr"></div>
+      <button class="go" id="lkGo" type="button" style="margin-top:14px">عرض الطلب</button>
+      <div style="text-align:center"><button class="link" id="lkBack" type="button">رجوع</button></div>
+    </div>
+  </div>
+
+  <div id="formView" style="display:none">
+    <div id="editBar" class="editbar" style="display:none"></div>
+
+    <div class="card" id="hwCard">
       <h2>هل هناك أعمال صيانة متبقية؟</h2>
       <div class="seg">
         <label><input type="radio" name="hw" value="1"><span>نعم، فيه أعمال صيانة</span></label>
@@ -151,7 +175,7 @@ button.go:disabled{opacity:.55;cursor:default}
     var h={'Content-Type':'application/json','apikey':KEY}; if(KEY.slice(0,3)==='eyJ') h['Authorization']='Bearer '+KEY;
     return fetch(URL_+'/rest/v1/rpc/'+name,{method:'POST',headers:h,body:JSON.stringify(body)}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error((j&&j.message)||'خطأ'); return j; }); });
   }
-  var today=cairoToday(), minD=addDays(today,1), maxD=addDays(today,60);
+  var mode='new', editRef=0, editPhone='', today=cairoToday(), minD=addDays(today,1), maxD=addDays(today,60);
   $('d').min=minD; $('d').max=maxD;
 
   function updateDay(){
@@ -170,6 +194,36 @@ button.go:disabled{opacity:.55;cursor:default}
   rpc('public_req_booked',{p_from:minD,p_to:maxD}).then(function(arr){ (arr||[]).forEach(function(x){ booked[x]=1; }); bookedLoaded=true; updateDay(); drawChips(); }).catch(function(){ bookedLoaded=false; });
   $('d').addEventListener('change',updateDay);
 
+  // ===== أول شاشة: طلب جديد / مراجعة وتعديل طلب =====
+  function show(id){ ['startView','lookupView','formView','blockView','doneView'].forEach(function(x){ $(x).style.display=(x===id)?'block':'none'; }); window.scrollTo(0,0); }
+  $('chNew').onclick=function(){ mode='new'; $('editBar').style.display='none'; $('hwCard').style.display=''; $('ph').disabled=false; $('go').textContent='إرسال الطلب'; show('formView'); };
+  $('chEdit').onclick=function(){ show('lookupView'); };
+  $('lkBack').onclick=function(){ show('startView'); };
+  function lkErr(t){ var e=$('lkErr'); e.textContent=t; e.style.display=t?'block':'none'; }
+  var STL={pending:'قيد المراجعة',waitlist:'قيد المراجعة (اليوم محجوز)',approved:'مقبول',rejected:'مرفوض',cancelled:'ملغي'};
+  $('lkGo').onclick=function(){
+    lkErr(''); var ref=parseInt($('lkRef').value.replace(/\D/g,''),10), ph=$('lkPh').value.trim();
+    if(!ref) return lkErr('اكتب رقم الطلب'); if(ph.replace(/\D/g,'').length<10) return lkErr('اكتب رقم الواتس صح');
+    $('lkGo').disabled=true; $('lkGo').textContent='جارٍ البحث...';
+    rpc('public_req_lookup',{p_ref:ref,p_phone:ph}).then(function(r){
+      $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب';
+      if(!r||!r.ok) return lkErr((r&&r.msg)||'مفيش طلب بالرقم ده');
+      if(!r.can_edit){
+        var m='حالة الطلب #'+r.ref+': '+(STL[r.status]||r.status)+'.';
+        if(r.status==='rejected'&&r.suggested_date) m+=' الميعاد المقترح من الإدارة: '+fmt(r.suggested_date)+'.';
+        if(r.status==='rejected'&&r.reject_reason) m+=' السبب: '+r.reject_reason+'.';
+        if(r.status==='approved'||r.status==='pending') m+=' الأوردر بدأ تنفيذه أو اتقفل، فمينفعش يتعدّل — كلّم الإدارة.';
+        return lkErr(m);
+      }
+      if(r.has_pending_edit) return lkErr('فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.');
+      mode='edit'; editRef=r.ref; editPhone=ph;
+      $('nm').value=r.name||''; $('ph').value=ph; $('ph').disabled=true; $('want').value=r.want||''; $('unit').value=r.unit||''; $('d').value=(r.date&&r.date>=minD)?r.date:''; $('note').value=r.note||'';
+      $('tm').value=r.time||''; var kr=document.querySelector('input[name=key][value="'+(r.key_bring===false?'0':'1')+'"]'); if(kr) kr.checked=true;
+      $('editBar').innerHTML='✏️ بتطلب تعديل على الطلب <b>#'+r.ref+'</b> (الحالة: '+(STL[r.status]||r.status)+'). التعديل بيتبعت للمراجعة، والأوردر الحالي يفضل زي ما هو لحد الموافقة.'; $('editBar').style.display='block';
+      $('hwCard').style.display='none'; $('go').textContent='إرسال طلب التعديل'; updateDay(); show('formView');
+    }).catch(function(){ $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب'; lkErr('تعذّر الاتصال — جرّب تاني'); });
+  };
+
   // لو فيه أعمال صيانة متبقية: نقفل الشاشة ونطلّع الرسالة
   Array.prototype.forEach.call(document.querySelectorAll('input[name=hw]'),function(r){ r.addEventListener('change',function(){
     if(this.value==='1'&&this.checked){ $('formView').style.display='none'; $('blockView').style.display='block'; window.scrollTo(0,0); }
@@ -187,8 +241,10 @@ button.go:disabled{opacity:.55;cursor:default}
     var d=$('d').value, unit=$('unit').value.trim(), nm=$('nm').value.trim(), ph=$('ph').value.trim(), want=$('want').value.trim();
     var hwEl=document.querySelector('input[name=hw]:checked'), keyEl=document.querySelector('input[name=key]:checked');
     var dg=function(s){ return s.replace(/\D/g,''); };
-    if(!hwEl) return showErr('اختار: هل هناك أعمال صيانة متبقية؟');
-    if(hwEl.value==='1'){ $('formView').style.display='none'; $('blockView').style.display='block'; window.scrollTo(0,0); return; }
+    if(mode==='new'){
+      if(!hwEl) return showErr('اختار: هل هناك أعمال صيانة متبقية؟');
+      if(hwEl.value==='1'){ $('formView').style.display='none'; $('blockView').style.display='block'; window.scrollTo(0,0); return; }
+    }
     if(nm.length<2) return showErr('اكتب الاسم');
     if(dg(ph).length<10) return showErr('اكتب رقم الواتس صح');
     if(want.length<2) return showErr('اكتب الخدمة المطلوبة');
@@ -199,14 +255,29 @@ button.go:disabled{opacity:.55;cursor:default}
     var note=$('note').value.trim();
     if(!$('ack').checked) return showErr('لازم توافق على التنبيهات الأول');
     $('go').disabled=true; $('go').textContent='جارٍ الإرسال...';
-    rpc('public_req_submit',{ p_date:d, p_unit:unit, p_name:nm, p_phone:ph, p_want:want, p_key_bring:keyEl.value==='1', p_has_works:false, p_works:[], p_note:note, p_time:$('tm').value, p_ack:true, p_hp:$('hp').value })
-    .then(function(r){
-      $('go').disabled=false; $('go').textContent='إرسال الطلب';
+    var call = mode==='edit'
+      ? rpc('public_req_edit',{ p_ref:editRef, p_phone:editPhone, p_date:d, p_unit:unit, p_name:nm, p_want:want, p_key_bring:keyEl.value==='1', p_note:note, p_time:$('tm').value, p_ack:true, p_hp:$('hp').value })
+      : rpc('public_req_submit',{ p_date:d, p_unit:unit, p_name:nm, p_phone:ph, p_want:want, p_key_bring:keyEl.value==='1', p_has_works:false, p_works:[], p_note:note, p_time:$('tm').value, p_ack:true, p_hp:$('hp').value });
+    var label = mode==='edit' ? 'إرسال طلب التعديل' : 'إرسال الطلب';
+    call.then(function(r){
+      $('go').disabled=false; $('go').textContent=label;
       if(!r||!r.ok){ showErr((r&&r.msg)||'تعذّر الإرسال — جرّب تاني'); return; }
-      showDone(r,d,unit,ph);
-    }).catch(function(e){ $('go').disabled=false; $('go').textContent='إرسال الطلب'; try{ console.error('public_req_submit',e); }catch(_){}
+      if(mode==='edit') showEditDone(r,d,unit); else showDone(r,d,unit,ph);
+    }).catch(function(e){ $('go').disabled=false; $('go').textContent=label; try{ console.error('request',e); }catch(_){}
       showErr(e&&e.name==='TypeError' ? 'تعذّر الاتصال — اتأكد من النت وجرّب تاني' : 'حصل خطأ أثناء إرسال الطلب — جرّب بعد شوية أو كلّم الإدارة'); });
   };
+  function showEditDone(r,d,unit){
+    var v=$('doneView'), taken=!!r.date_taken;
+    v.innerHTML='<div class="card done'+(taken?' warn':'')+'"><div class="ico">'+(taken?'📅':'✅')+'</div>'
+      +'<h2>تم إرسال طلب التعديل</h2>'
+      +(taken?'<p>اليوم الجديد محجوز في أوردرات تانية، لكن طلب التعديل اتسجّل.</p>':'')
+      +'<div class="box">رقم الطلب: <b>#'+r.ref+'</b><br>الوحدة: <b></b><br>اليوم المطلوب بعد التعديل: <b>'+fmt(d)+'</b></div>'
+      +'<p><b>هيتم المراجعة والرد عليك عن طريق الواتس.</b></p>'
+      +'<p style="font-size:12.5px;color:#66758a">الأوردر الحالي يفضل زي ما هو لحد الموافقة على التعديل.</p>'
+      +'<button class="link" id="again">رجوع للرئيسية</button></div>';
+    v.querySelector('.box b:nth-of-type(2)').textContent=unit;
+    show('doneView'); $('again').onclick=function(){ location.reload(); };
+  }
   function showDone(r,d,unit,ph){
     var full=!!r.full, v=$('doneView');
     v.innerHTML='<div class="card done'+(full?' warn':'')+'"><div class="ico">'+(full?'📅':'✅')+'</div>'
@@ -214,6 +285,7 @@ button.go:disabled{opacity:.55;cursor:default}
       +(full?'<p>اليوم ده محجوز في أوردرات تانية، لكن طلبك اتسجّل.</p>':'')
       +'<div class="box">رقم الطلب: <b>#'+(r.ref||'')+'</b><br>الوحدة: <b></b><br>اليوم المطلوب: <b>'+fmt(d)+'</b></div>'
       +'<p><b>هيتم المراجعة والرد عليك عن طريق الواتس.</b></p>'
+      +'<p style="font-size:12.5px;color:#66758a">احتفظ برقم الطلب <b>#'+(r.ref||'')+'</b> لو حبيت تراجعه أو تطلب تعديله (من "مراجعة وتعديل طلب" بنفس رقم الواتس).</p>'
       +'<p style="font-size:12.5px;color:#66758a">لا تتعامل مباشرة مع مقدم الخدمة قبل الرد.</p>'
       +'<button class="link" id="again">طلب جديد</button></div>';
     v.querySelector('.box b:nth-of-type(2)').textContent=unit;
