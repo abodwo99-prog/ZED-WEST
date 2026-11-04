@@ -208,19 +208,24 @@ button.go:disabled{opacity:.55;cursor:default}
     rpc('public_req_lookup',{p_ref:ref,p_phone:ph}).then(function(r){
       $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب';
       if(!r||!r.ok) return lkErr((r&&r.msg)||'مفيش طلب بالرقم ده');
-      if(!r.can_edit){
+      if(r.status==='rejected'||r.status==='cancelled'){
         var m='حالة الطلب #'+r.ref+': '+(STL[r.status]||r.status)+'.';
         if(r.status==='rejected'&&r.suggested_date) m+=' الميعاد المقترح من الإدارة: '+fmt(r.suggested_date)+'.';
-        if(r.status==='rejected'&&r.reject_reason) m+=' السبب: '+r.reject_reason+'.';
-        if(r.status==='approved'||r.status==='pending') m+=' الأوردر بدأ تنفيذه أو اتقفل، فمينفعش يتعدّل — كلّم الإدارة.';
+        if(r.reject_reason) m+=' السبب: '+r.reject_reason+'.';
+        m+=' تقدر تعمل طلب جديد من \"طلب جديد\".';
         return lkErr(m);
       }
-      if(r.has_pending_edit) return lkErr('فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.');
+      if(r.edit_pending) return lkErr('فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.');
+      var approved=(r.status==='approved');
       mode='edit'; editRef=r.ref; editPhone=ph;
       $('nm').value=r.name||''; $('ph').value=ph; $('ph').disabled=true; $('want').value=r.want||''; $('unit').value=r.unit||''; $('d').value=(r.date&&r.date>=minD)?r.date:''; $('note').value=r.note||'';
-      $('tm').value=r.time||''; var kr=document.querySelector('input[name=key][value="'+(r.key_bring===false?'0':'1')+'"]'); if(kr) kr.checked=true;
-      $('editBar').innerHTML='✏️ بتطلب تعديل على الطلب <b>#'+r.ref+'</b> (الحالة: '+(STL[r.status]||r.status)+'). التعديل بيتبعت للمراجعة، والأوردر الحالي يفضل زي ما هو لحد الموافقة.'; $('editBar').style.display='block';
-      $('hwCard').style.display='none'; $('go').textContent='إرسال طلب التعديل'; updateDay(); show('formView');
+      $('tm').value=r.time||''; var kr=document.querySelector('input[name=key][value=\"'+(r.key_bring===false?'0':'1')+'\"]'); if(kr) kr.checked=true;
+      var bar='✏️ بتعدّل الطلب <b>#'+r.ref+'</b> (الحالة: '+(STL[r.status]||r.status)+'). ';
+      bar+= approved ? 'الطلب مقبول، فالتعديل بيتبعت للإدارة للموافقة والأوردر الحالي يفضل زي ما هو لحد الموافقة.' : 'الطلب لسه تحت المراجعة فالتعديل بيتطبق على طول.';
+      if(r.edit_result==='rejected') bar+='<br>⚠️ طلب التعديل السابق اترفض'+(r.edit_result_note?(': '+r.edit_result_note):'')+'.';
+      if(r.edit_result==='approved') bar+='<br>✅ طلب التعديل السابق اتقبل'+(r.edit_result_note?(': '+r.edit_result_note):'')+'.';
+      $('editBar').innerHTML=bar; $('editBar').style.display='block';
+      $('hwCard').style.display='none'; $('go').textContent= approved ? 'إرسال طلب التعديل' : 'حفظ التعديل'; updateDay(); show('formView');
     }).catch(function(){ $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب'; lkErr('تعذّر الاتصال — جرّب تاني'); });
   };
 
@@ -254,11 +259,11 @@ button.go:disabled{opacity:.55;cursor:default}
     if(!keyEl) return showErr('أكّد تحضير المفتاح معاك لضمان الوقت');
     var note=$('note').value.trim();
     if(!$('ack').checked) return showErr('لازم توافق على التنبيهات الأول');
-    $('go').disabled=true; $('go').textContent='جارٍ الإرسال...';
+    var label0=$('go').textContent; $('go').disabled=true; $('go').textContent='جارٍ الإرسال...';
     var call = mode==='edit'
       ? rpc('public_req_edit',{ p_ref:editRef, p_phone:editPhone, p_date:d, p_unit:unit, p_name:nm, p_want:want, p_key_bring:keyEl.value==='1', p_note:note, p_time:$('tm').value, p_ack:true, p_hp:$('hp').value })
       : rpc('public_req_submit',{ p_date:d, p_unit:unit, p_name:nm, p_phone:ph, p_want:want, p_key_bring:keyEl.value==='1', p_has_works:false, p_works:[], p_note:note, p_time:$('tm').value, p_ack:true, p_hp:$('hp').value });
-    var label = mode==='edit' ? 'إرسال طلب التعديل' : 'إرسال الطلب';
+    var label = label0;
     call.then(function(r){
       $('go').disabled=false; $('go').textContent=label;
       if(!r||!r.ok){ showErr((r&&r.msg)||'تعذّر الإرسال — جرّب تاني'); return; }
@@ -267,14 +272,14 @@ button.go:disabled{opacity:.55;cursor:default}
       showErr(e&&e.name==='TypeError' ? 'تعذّر الاتصال — اتأكد من النت وجرّب تاني' : 'حصل خطأ أثناء إرسال الطلب — جرّب بعد شوية أو كلّم الإدارة'); });
   };
   function showEditDone(r,d,unit){
-    var v=$('doneView'), taken=!!r.date_taken;
-    v.innerHTML='<div class="card done'+(taken?' warn':'')+'"><div class="ico">'+(taken?'📅':'✅')+'</div>'
-      +'<h2>تم إرسال طلب التعديل</h2>'
-      +(taken?'<p>اليوم الجديد محجوز في أوردرات تانية، لكن طلب التعديل اتسجّل.</p>':'')
-      +'<div class="box">رقم الطلب: <b>#'+r.ref+'</b><br>الوحدة: <b></b><br>اليوم المطلوب بعد التعديل: <b>'+fmt(d)+'</b></div>'
-      +'<p><b>هيتم المراجعة والرد عليك عن طريق الواتس.</b></p>'
-      +'<p style="font-size:12.5px;color:#66758a">الأوردر الحالي يفضل زي ما هو لحد الموافقة على التعديل.</p>'
-      +'<button class="link" id="again">رجوع للرئيسية</button></div>';
+    var v=$('doneView'), taken=!!r.full, applied=!!r.applied;
+    v.innerHTML='<div class=\"card done'+(taken?' warn':'')+'\"><div class=\"ico\">'+(taken?'📅':'✅')+'</div>'
+      +'<h2>'+(applied?'تم تعديل طلبك':'تم إرسال طلب التعديل')+'</h2>'
+      +(taken?'<p>اليوم الجديد محجوز في أوردرات تانية، لكن التعديل اتسجّل.</p>':'')
+      +'<div class=\"box\">رقم الطلب: <b>#'+editRef+'</b><br>الوحدة: <b></b><br>اليوم المطلوب بعد التعديل: <b>'+fmt(d)+'</b></div>'
+      +'<p><b>'+(applied?'هيتم الرد عليك عن طريق الواتس.':'هيتم المراجعة والرد عليك عن طريق الواتس.')+'</b></p>'
+      +(applied?'':'<p style=\"font-size:12.5px;color:#66758a\">الأوردر الحالي يفضل زي ما هو لحد الموافقة على التعديل.</p>')
+      +'<button class=\"link\" id=\"again\">رجوع للرئيسية</button></div>';
     v.querySelector('.box b:nth-of-type(2)').textContent=unit;
     show('doneView'); $('again').onclick=function(){ location.reload(); };
   }
