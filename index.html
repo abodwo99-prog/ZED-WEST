@@ -553,7 +553,7 @@ let S = {
 };
 const ROLE_LABEL = { admin:'الإدارة', opm:'مسئول OPM', fm_dispatcher:'OPM Dispatcher', supervisor:'مشرف HK', hk_manager:'مدير HK', hk_admin:'إداري HK', hk_senior_supervisor:'مشرف أول HK', facade_sv:'Facade Cleaning SV', pest_sv:'Pest Control SV', waste_sv:'Waste Removal SV' };
 const SHIFT_LABEL = { morning:'صباحي', evening:'مسائي', both:'الاثنين', emergency:'طوارئ' };
-const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', incomplete:'لم يُنفذ', pending_review:'طلب جديد — مراجعة', cancelled:'تم الإلغاء' };
+const STATUS_LABEL = { scheduled:'مجدولة', in_progress:'جاري العمل', completed:'تم الانتهاء', postponed:'تم التأجيل', cancelled:'تم الإلغاء', incomplete:'لم يُنفذ' };
 const CHANNEL_LABEL = { email:'إيميل', cm:'CM', phone:'تليفون', callcenter:'كول سنتر', other:'أخرى' };
 const SUPPLIER_CAT_LABEL = { housekeeping:'Housekeeping', pest_control:'Pest Control', waste_mgt:'Waste MGT', facade_cleaning:'Facade Cleaning', scent_diffusers:'Scent Diffusers', yd_operator:'YD Operator' };
 const INVOICE_STATUS_LABEL = { pending:'معلّقة', submitted:'تم رفعها للحسابات', paid:'تم الدفع' };
@@ -1370,6 +1370,284 @@ function fvBanner(){
   return `<div class="card" style="margin-bottom:14px;border:2px solid var(--coral);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b>🔔 نداء التحقق من هوية العمال</b><div style="font-size:12.5px;">المتبقي <b data-fvleft>${fvFmtLeft(fvLeftMs())}</b></div></div><button class="primary-btn" data-fv-open>افتح كرت التحقق</button></div>`;
 }
 
+/* ===== FM Monthly Report — PowerPoint builder (same design as the board deck; native editable charts) ===== */
+function fmFmt(n,d){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+function fmPct(x){ return (x==null||isNaN(x))?'—':Math.round(x*100)+'%'; }
+function fmBuildPptx(Pptx,m){
+  const pres=new Pptx(); pres.layout='LAYOUT_16x9'; pres.title='Soft Services – Monthly Performance Report – '+m.label; pres.author='ORA Property Management'; pres.company='ORA';
+  const NAVY='14213D',CREAM='F4F1EA',GOLD='B8924A',BLUE='2F4B7C',RED='C0504D',GREEN='3E8E7E',GREY='555555',SLATE='7A8CA5',WHITE='FFFFFF',FONT='Calibri';
+  let n=1;
+  const T=(s,txt,o)=>s.addText(txt,Object.assign({fontFace:FONT,margin:0,isTextBox:true},o));
+  const R=(s,x,y,w,h,c)=>s.addShape('rect',{x,y,w,h,fill:{color:c},line:{color:c}});
+  const base=(title,take)=>{ const s=pres.addSlide(); n++; s.background={color:WHITE}; R(s,0,0,10,.75,NAVY); R(s,0,.75,10,.03,GOLD);
+    T(s,title,{x:.5,y:.12,w:9,h:.5,fontSize:20,bold:true,color:WHITE,valign:'middle'});
+    if(take){ R(s,.5,4.55,9,.55,NAVY); T(s,take,{x:.7,y:4.55,w:8.6,h:.55,fontSize:11,color:WHITE,valign:'middle'}); }
+    T(s,'ORA | Soft Services | '+m.label,{x:.5,y:5.28,w:6,h:.25,fontSize:8,color:SLATE}); T(s,String(n),{x:9,y:5.28,w:.5,h:.25,fontSize:8,color:SLATE,align:'right'}); return s; };
+  const bar=(s,x,y,w,h,title,labels,values,colors,fmt)=>{
+    T(s,title,{x,y,w,h:.3,fontSize:11,bold:true,color:NAVY});
+    s.addChart(pres.charts.BAR,[{name:title,labels,values}],{x,y:y+.3,w,h:h-.3,barDir:'col',chartColors:colors,showValue:true,dataLabelFontSize:9,dataLabelColor:NAVY,dataLabelFormatCode:fmt||'#,##0',catAxisLabelFontSize:8,valAxisLabelFontSize:8,valAxisLabelFormatCode:fmt||'#,##0',valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:false,barGapWidthPct:55,valAxisMinVal:0}); };
+  // ---- 1 title
+  { const s=pres.addSlide(); s.background={color:NAVY}; R(s,0,0,.18,5.625,GOLD);
+    T(s,'SOFT SERVICES',{x:.9,y:1.6,w:8,h:.7,fontSize:36,bold:true,color:WHITE});
+    T(s,'Monthly Performance Report – '+m.label,{x:.9,y:2.35,w:8,h:.5,fontSize:20,color:'C9D1E0'});
+    R(s,.9,3.0,1.2,.04,GOLD);
+    T(s,'Facility Management Presentation  |  '+m.reportDate,{x:.9,y:3.2,w:8,h:.35,fontSize:11,color:'C9D1E0'}); }
+  // ---- 2 executive summary
+  { const s=base('Executive Summary',m.execTake); const pc=m.complaints.cur;
+    const cards=[
+      [fmFmt(m.rev.total)+' EGP','Total '+m.monthName+' revenue',GOLD],
+      [m.occ.cur!=null? fmFmt(m.occ.cur)+' units':'—', m.occ.cur!=null&&m.occ.prev!=null? 'Occupancy (up from '+fmFmt(m.occ.prev)+' in '+m.prevMonthName+', '+(m.occ.cur>=m.occ.prev?'+':'')+(m.occ.prev? ((m.occ.cur-m.occ.prev)/m.occ.prev*100).toFixed(1):'0')+'%)' : 'Occupancy (enter in manual section)',BLUE],
+      [m.sr.total? fmFmt(m.sr.total):'—','Service requests received'+(m.sr.total? ', '+Math.round(m.sr.status.resolved/m.sr.total*100)+'% resolved':''),GREEN],
+      [fmPct(m.compliance.cur),'Compliance with cleaning plans',GOLD],
+      [String(pc.recv),'Complaints in '+m.monthName+' ('+pc.rect+' rectified)',RED],
+      [m.vendorRange,'Monthly vendor scores',BLUE]];
+    cards.forEach((c,i)=>{ const x=[.5,3.55,6.6][i%3], y=i<3?1.3:2.85; R(s,x,y,2.85,1.35,CREAM); R(s,x,y,.07,1.35,c[2]);
+      T(s,c[0],{x:x+.2,y:y+.1,w:2.55,h:.68,fontSize:26,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); T(s,c[1],{x:x+.2,y:y+.78,w:2.55,h:.47,fontSize:11,color:GREY,valign:'top'}); }); }
+  // ---- 3 housekeeping & facade
+  { const s=base('Housekeeping & Façade Cleaning',m.hkTake); const hk=m.hk;
+    bar(s,.5,.95,4.4,3.5,'Housekeeping – YTD',['Handover','Soft Cleaning','Deep Cleaning','After Modifications','DLP Visits','TOTAL Units YTD'],[hk.handover,hk.soft,hk.deep,hk.mods,hk.dlp,hk.total],[GOLD,GOLD,GOLD,GOLD,GOLD,NAVY]);
+    if(m.facade.length) bar(s,5.1,.95,4.4,3.5,'Façade Cleaning – YTD',m.facade.map(f=>f.name),m.facade.map(f=>f.pct),[BLUE],'0%'); else T(s,'No façade lists in the system yet.',{x:5.1,y:2.3,w:4.4,h:.5,fontSize:11,color:GREY,align:'center'}); }
+  // ---- 4 pest & waste
+  { const s=base('Pest Control & Waste Management',m.pwTake);
+    bar(s,.5,.95,4.4,3.5,'Pest Control – '+m.label,['Resolved','Pending','Canceled'],[m.pest.resolved,m.pest.pending,m.pest.canceled],[GREEN]);
+    bar(s,5.1,.95,4.4,3.5,'Waste Management – '+m.label,m.waste.map(w=>w.name).concat(['TOTAL VISITS']),m.waste.map(w=>w.visits).concat([m.wasteTotal]),[GOLD,GOLD,NAVY]); }
+  // ---- 5 complaints & compliance
+  { const s=base('Complaints & Compliance',m.ccTake); const c=m.complaints;
+    T(s,'Total complaints received',{x:.5,y:.95,w:4.4,h:.3,fontSize:11,bold:true,color:NAVY});
+    s.addChart(pres.charts.BAR,[{name:'Received',labels:[m.prevMon,m.mon],values:[c.prev.recv,c.cur.recv]},{name:'Rectification',labels:[m.prevMon,m.mon],values:[c.prev.rect,c.cur.rect]}],{x:.5,y:1.25,w:4.4,h:3.2,barDir:'col',barGrouping:'clustered',chartColors:[NAVY,GOLD],showValue:true,dataLabelFontSize:9,catAxisLabelFontSize:9,valAxisLabelFontSize:8,valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:9,valAxisMinVal:0,barGapWidthPct:60});
+    bar(s,5.1,.95,4.4,3.5,'Compliance Rate with cleaning plans',[m.prevMon,m.mon],[m.compliance.prev||0,m.compliance.cur||0],[GREEN],'0%'); }
+  // ---- 6 occupancy & response time
+  { const s=base('Occupancy & Response Time',m.orTake);
+    bar(s,.5,.95,4.4,3.5,'Occupancy Status – units',[m.prevMon,m.mon],[m.occ.prev||0,m.occ.cur||0],[BLUE]);
+    T(s,'Avg. response time to rectify complaints',{x:5.1,y:.95,w:4.4,h:.3,fontSize:11,bold:true,color:NAVY});
+    R(s,5.1,1.5,4.4,2.6,CREAM); R(s,5.1,1.5,.07,2.6,GOLD);
+    T(s,fmFmt(m.respHours)+' hours',{x:5.4,y:1.8,w:3.9,h:.9,fontSize:40,bold:true,color:NAVY,valign:'middle'});
+    T(s,'Fixed service level: '+(m.respHours/24)+' days from complaint to rectification.',{x:5.4,y:2.85,w:3.9,h:.8,fontSize:12,color:GREY}); }
+  // ---- 7 service requests
+  { const s=base('Service Requests – '+m.monthName,m.srTake); const st=m.sr.status, so=m.sr.source;
+    bar(s,.5,.95,4.4,3.5,m.mon+' Soft Service SRs – by status',['Resolved','Pending action','Pending customer','Canceled','Open','Wrong assignment','TOTAL'],[st.resolved,st.pendingAction,st.pendingCustomer,st.canceled,st.open,st.wrong,m.sr.total],[GREEN,GREEN,GREEN,GREEN,GREEN,GREEN,NAVY]);
+    bar(s,5.1,.95,4.4,3.5,'Number of Requests – by source',['Quality','Call Center','CM','DLP','Integrated'],[so.quality,so.callCenter,so.cm,so.dlp,so.integrated],[NAVY]); }
+  // ---- 8 revenue
+  { const s=base(m.mon+' Total Revenue',m.revTake); const r=m.rev;
+    T(s,fmFmt(r.total,2)+' EGP',{x:.5,y:1.0,w:5,h:.7,fontSize:30,bold:true,color:NAVY,valign:'middle'}); T(s,m.monthName+' Total Revenue',{x:.5,y:1.7,w:5,h:.3,fontSize:11,color:GREY});
+    [[fmFmt(r.handover)+' EGP','Handover units',GOLD,.5,2.15],[fmFmt(r.paid)+' EGP','Paid services',BLUE,3.0,2.15],[fmFmt(r.soft)+' EGP','Soft Cleaning',GOLD,.5,3.35],[fmFmt(r.deep)+' EGP','Deep Cleaning',BLUE,3.0,3.35]].forEach(c=>{ R(s,c[3],c[4],2.35,1.05,CREAM); R(s,c[3],c[4],.07,1.05,c[2]); T(s,c[0],{x:c[3]+.2,y:c[4]+.1,w:2.05,h:.5,fontSize:18,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); T(s,c[1],{x:c[3]+.2,y:c[4]+.62,w:2.05,h:.3,fontSize:10,color:GREY}); });
+    T(s,'Paid services breakdown',{x:5.7,y:.95,w:3.8,h:.3,fontSize:11,bold:true,color:NAVY});
+    if(r.paid>0) s.addChart(pres.charts.DOUGHNUT,[{name:'Paid',labels:['Soft Cleaning','Deep Cleaning'],values:[r.soft,r.deep]}],{x:5.7,y:1.25,w:3.8,h:3.2,holeSize:58,chartColors:[GOLD,NAVY],showPercent:true,showLegend:true,legendPos:'b',legendFontSize:9,dataLabelColor:WHITE,dataLabelFontSize:10}); else T(s,'No completed paid orders this month.',{x:5.7,y:2.4,w:3.8,h:.5,fontSize:11,color:GREY,align:'center'}); }
+  // ---- 9 cost management
+  { const s=base('Cost Management',m.costTake); m.vendors.slice(0,6).forEach((v,i)=>{ const x=[.5,3.55,6.6][i%3], y=i<3?.95:2.75;
+      T(s,v.name+'  ('+v.cat+')',{x,y,w:2.9,h:.3,fontSize:10,bold:true,color:NAVY,fit:'shrink'});
+      s.addChart(pres.charts.BAR,[{name:'EGP',labels:['Requested Payment','Approved Payment'],values:[v.req,v.appr]}],{x,y:y+.28,w:2.9,h:1.45,barDir:'col',chartColors:[GOLD,GOLD],showValue:true,dataLabelFontSize:8,dataLabelFormatCode:'#,##0',catAxisLabelFontSize:7,valAxisHidden:true,valGridLine:{style:'none'},catGridLine:{style:'none'},showLegend:false,barGapWidthPct:70,valAxisMinVal:0}); }); }
+  // ---- 10 vendor scores
+  { const s=base('Monthly Score – Vendors',m.scoreTake); const V=m.vendors.filter(v=>v.cur!=null||v.prev!=null);
+    T(s,'Monthly Score – '+m.prevMon+' vs '+m.mon,{x:.5,y:.95,w:5.6,h:.3,fontSize:11,bold:true,color:NAVY});
+    if(V.length) s.addChart(pres.charts.BAR,[{name:m.prevMon,labels:V.map(v=>v.name),values:V.map(v=>(v.prev||0)/100)},{name:m.mon,labels:V.map(v=>v.name),values:V.map(v=>(v.cur||0)/100)}],{x:.5,y:1.25,w:5.6,h:3.2,barDir:'col',barGrouping:'clustered',chartColors:[NAVY,GOLD],showValue:true,dataLabelFontSize:7,dataLabelFormatCode:'0%',catAxisLabelFontSize:8,valAxisLabelFontSize:8,valAxisLabelFormatCode:'0%',valAxisMinVal:.8,valAxisMaxVal:1,valGridLine:{color:'E3E3E3',size:.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:9,barGapWidthPct:45});
+    const hd={bold:true,color:WHITE,fill:{color:NAVY},fontFace:FONT,fontSize:10}; const cell=(t,o)=>({text:String(t),options:Object.assign({fontFace:FONT,fontSize:10,color:NAVY},o||{})});
+    s.addTable([[{text:'Vendor',options:hd},{text:m.prevMon,options:hd},{text:m.mon,options:hd}]].concat(V.map(v=>[cell(v.name,{bold:true}),cell(v.prev!=null?Math.round(v.prev)+'%':'—',{align:'center'}),cell(v.cur!=null?Math.round(v.cur)+'%':'—',{align:'center'})])),{x:6.3,y:1.3,w:3.2,colW:[1.5,.85,.85],rowH:.32,border:{type:'solid',color:'D9D4C7',pt:.5}}); }
+  // ---- 11 attention
+  { const s=base('Points for Management Attention',null); const cols={gold:GOLD,blue:BLUE,red:RED,green:GREEN,navy:NAVY};
+    m.attention.slice(0,6).forEach((a,i)=>{ const x=i%2? 5.1:.5, y=1.0+Math.floor(i/2)*1.25; R(s,x,y,4.4,1.1,CREAM); R(s,x,y,.07,1.1,cols[a.c]||GOLD);
+      T(s,a.t,{x:x+.22,y:y+.1,w:4.05,h:.45,fontSize:13,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); if(a.d) T(s,a.d,{x:x+.22,y:y+.58,w:4.05,h:.45,fontSize:10.5,color:GREY,valign:'top'}); }); }
+  return pres;
+}
+
+/* ============================= FM Monthly Report (inside Reports) ============================= */
+const FM_UNIT_RATE=1500, FM_RESP_HOURS=48;
+const FM_MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const FM_MONTH_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const FM_CAT_LABEL={ housekeeping:'Housekeeping', facade_cleaning:'Facade Operations', pest_control:'Pest Control', waste_mgt:'Waste MGT', scent_diffusers:'Scent Diffusers', yd_operator:'Serviced Apt Operator' };
+const FM_CAT_ORDER=['housekeeping','facade_cleaning','pest_control','waste_mgt','scent_diffusers','yd_operator'];
+Object.assign(S,{ fm:{ open:false, month:'', busy:false, err:'', model:null, draft:{}, rows:[] } });
+function fmShift(m,d){ let [y,mo]=m.split('-').map(Number); mo+=d; while(mo>12){ mo-=12; y++; } while(mo<1){ mo+=12; y--; } return y+'-'+String(mo).padStart(2,'0'); }
+function fmAllRows(build){ return (async()=>{ let out=[]; for(let i=0;;i+=1000){ const {data,error}=await build().range(i,i+999); if(error) throw error; out=out.concat(data||[]); if(!data||data.length<1000) break; } return out; })(); }
+async function fmSafe(p){ try{ return await p; }catch(e){ console.warn('fm',e&&e.message); return []; } }
+async function fmCollect(month){
+  const y=month.slice(0,4), ys=y+'-01-01', from=month+'-01', to=fmShift(month,1)+'-01', pfrom=fmShift(month,-1)+'-01', prev=fmShift(month,-1);
+  const [dv,ord,ss,cmp,runs,lists,items,logs,sups,invs,kpis,inps]=await Promise.all([
+    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',ys).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',ys).lt('scheduled_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',ys).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('complaints').select('date,status').gte('date',pfrom).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('task_runs').select('date,status').gte('date',pfrom).lt('date',to))),
+    fmSafe(fmAllRows(()=>sb.from('svc_lists').select('id,service,name,position').in('service',['facade','waste']))),
+    fmSafe(fmAllRows(()=>sb.from('svc_items').select('id,list_id,service').in('service',['facade','waste']))),
+    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',ys).lt('log_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('suppliers').select('id,name,category'))),
+    fmSafe(fmAllRows(()=>sb.from('supplier_invoices').select('supplier_id,amount,discount,invoice_date').gte('invoice_date',from).lt('invoice_date',to))),
+    fmSafe(fmAllRows(()=>sb.from('supplier_kpi').select('supplier_id,month,overall_score,score').in('month',[month,prev]))),
+    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').gte('month',y+'-01').lte('month',month)))
+  ]);
+  return { month, prev, from, to, pfrom, dv, ord, ss, cmp, runs, lists, items, logs, sups, invs, kpis, inps };
+}
+function fmBuildModel(r,draft){
+  const mi=+r.month.slice(5)-1, pi=+r.prev.slice(5)-1;
+  const ov=k=>{ const v=draft['ov_'+k]; return (v===undefined||v===null||v==='')? null : +v; };
+  const num=k=>{ const v=draft[k]; return (v===undefined||v===null||v==='')? null : +v; };
+  const n0=k=>num(k)||0;
+  const inMonth=d=>d>=r.from && d<r.to;
+  const norm=c=>String(c||'').trim().toUpperCase();
+  // revenue
+  const uMonth=new Set(r.dv.filter(x=>inMonth(x.date)).map(x=>norm(x.unit_code)).filter(Boolean));
+  const uYtd=new Set(r.dv.map(x=>norm(x.unit_code)).filter(Boolean));
+  const okOrd=r.ord.filter(o=>orderApproved(o));
+  const sumType=(t,f)=>okOrd.filter(o=>o.order_type===t && f(o.scheduled_date)).reduce((s,o)=>s+(+o.price||0),0);
+  const cntType=t=>okOrd.filter(o=>o.order_type===t).length;
+  const hoUnits=ov('handoverUnits')!=null?ov('handoverUnits'):uMonth.size;
+  const soft=ov('soft')!=null?ov('soft'):sumType('soft_cleaning',inMonth), deep=ov('deep')!=null?ov('deep'):sumType('deep_cleaning',inMonth);
+  const rev={ handoverUnits:hoUnits, handover:hoUnits*FM_UNIT_RATE, soft, deep, paid:soft+deep, total:hoUnits*FM_UNIT_RATE+soft+deep };
+  // housekeeping YTD
+  const dlpYtd=r.inps.filter(x=>x.month!==r.month).reduce((s,x)=>s+(+((x.data||{}).dlp)||0),0)+n0('dlp');
+  const hk={ handover:ov('hkHandover')!=null?ov('hkHandover'):uYtd.size, soft:ov('hkSoft')!=null?ov('hkSoft'):cntType('soft_cleaning'), deep:ov('hkDeep')!=null?ov('hkDeep'):cntType('deep_cleaning'),
+    mods:ov('hkMods')!=null?ov('hkMods'):r.ss.filter(x=>x.service_type==='modifications'&&x.status==='completed').length, dlp:dlpYtd };
+  hk.total=hk.handover+hk.soft+hk.deep+hk.mods+hk.dlp;
+  // facade (every façade list = one zone)
+  const facade=r.lists.filter(l=>l.service==='facade').sort((a,b)=>(a.position||0)-(b.position||0)||String(a.name).localeCompare(String(b.name),'en',{numeric:true})).map(l=>{
+    const total=r.items.filter(i=>i.list_id===l.id).length; const done=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id).map(x=>x.item_id)).size;
+    return { name:l.name, pct: total? Math.min(1,done/total):0 }; });
+  // waste visits per phase (list name contains E1 / E2)
+  const wl=r.lists.filter(l=>l.service==='waste'); const phaseOf=name=>/e\s*-?1/i.test(name)?'Phase E1':/e\s*-?2/i.test(name)?'Phase E2':'Other';
+  const wmap={'Phase E1':new Set(),'Phase E2':new Set(),'Other':new Set()};
+  r.logs.filter(x=>x.service==='waste'&&inMonth(x.log_date)).forEach(x=>{ const nm=(wl.find(l=>l.id===x.list_id)||{}).name||x.list_name||''; wmap[phaseOf(nm)].add(x.log_date); });
+  const waste=[{name:'Phase E1',visits:wmap['Phase E1'].size},{name:'Phase E2',visits:wmap['Phase E2'].size}]; if(wmap['Other'].size) waste.push({name:'Other',visits:wmap['Other'].size});
+  const wasteTotal=waste.reduce((s,w)=>s+w.visits,0);
+  // complaints / compliance
+  const cmpOf=(a,b)=>{ const l=r.cmp.filter(c=>c.date>=a&&c.date<b); return { recv:l.length, rect:l.filter(c=>c.status==='resolved').length }; };
+  const complaints={ prev:cmpOf(r.pfrom,r.from), cur:cmpOf(r.from,r.to) };
+  if(ov('cRecv')!=null) complaints.cur.recv=ov('cRecv'); if(ov('cRect')!=null) complaints.cur.rect=ov('cRect');
+  const compOf=(a,b)=>{ const l=r.runs.filter(x=>x.date>=a&&x.date<b); return l.length? l.filter(x=>x.status==='completed').length/l.length : null; };
+  const compliance={ prev:compOf(r.pfrom,r.from), cur: ov('compliance')!=null? ov('compliance')/100 : compOf(r.from,r.to) };
+  // occupancy (current from the form, previous from last month's saved entry)
+  const prevIn=(r.inps.find(x=>x.month===r.prev)||{}).data||{};
+  const occ={ cur:num('occ'), prev: prevIn.occ!==undefined&&prevIn.occ!==''&&prevIn.occ!==null? +prevIn.occ : null };
+  // service requests
+  const status={ resolved:n0('sr_resolved'), pendingAction:n0('sr_pendingAction'), pendingCustomer:n0('sr_pendingCustomer'), canceled:n0('sr_canceled'), open:n0('sr_open'), wrong:n0('sr_wrong') };
+  const integAuto=r.ss.filter(x=>x.service_type==='integrated'&&inMonth(x.date)).length;
+  const source={ quality:n0('so_quality'), callCenter:n0('so_callCenter'), cm:n0('so_cm'), dlp:n0('so_dlp'), integrated: ov('integrated')!=null? ov('integrated'):integAuto };
+  const sr={ status, source, total:Object.values(status).reduce((a,b)=>a+b,0) };
+  const pest={ resolved:n0('pest_resolved'), pending:n0('pest_pending'), canceled:n0('pest_canceled') }; pest.total=pest.resolved+pest.pending+pest.canceled;
+  // vendors
+  const vendors=r.sups.filter(s=>FM_CAT_LABEL[s.category]).map(s=>{
+    const inv=r.invs.filter(i=>i.supplier_id===s.id); const req=inv.reduce((t,i)=>t+(+i.amount||0),0), appr=inv.reduce((t,i)=>t+(+i.amount||0)-(+i.discount||0),0);
+    const sc=mm=>{ const l=r.kpis.filter(k=>k.supplier_id===s.id&&k.month===mm).map(k=>+(k.overall_score!=null&&k.overall_score!==''?k.overall_score:k.score)).filter(v=>!isNaN(v)); return l.length? l.reduce((a,b)=>a+b,0)/l.length : null; };
+    const norm01=v=>v==null?null:(v<=1?v*100:v);
+    return { name:s.name, cat:FM_CAT_LABEL[s.category], catKey:s.category, req, appr, prev:norm01(sc(r.prev)), cur:norm01(sc(r.month)), has:inv.length>0 };
+  }).filter(v=>v.has||v.cur!=null||v.prev!=null).sort((a,b)=>FM_CAT_ORDER.indexOf(a.catKey)-FM_CAT_ORDER.indexOf(b.catKey));
+  const curScores=vendors.map(v=>v.cur).filter(v=>v!=null).map(Math.round);
+  const vendorRange=curScores.length? (Math.min(...curScores)===Math.max(...curScores)? Math.min(...curScores)+'%' : Math.min(...curScores)+'–'+Math.max(...curScores)+'%') : '—';
+  // texts
+  const monthName=FM_MONTH_EN[mi], prevMonthName=FM_MONTH_EN[pi], label=monthName+' '+r.month.slice(0,4), td=new Date();
+  const notRect=Math.max(0,complaints.cur.recv-complaints.cur.rect), pct=(a,b)=>b?Math.round(a/b*100):0;
+  const follow=[]; if(status.pendingCustomer) follow.push(status.pendingCustomer+' requests pending customer'); if(notRect) follow.push(notRect+' open complaint'+(notRect>1?'s':''));
+  const execTake='Revenue '+fmFmt(rev.total)+' EGP, compliance '+fmPct(compliance.cur)+', vendor scores '+vendorRange+(follow.length? '; follow-up needed on '+follow.join(' and ')+'.' : '; no open follow-ups.');
+  const fp=facade.map(f=>f.pct);
+  const hkTake=hk.total+' units serviced YTD ('+hk.handover+' handover, '+hk.soft+' soft cleaning, '+hk.deep+' deep cleaning).'+(fp.length? ' Façade completion '+Math.round(Math.min(...fp)*100)+'–'+Math.round(Math.max(...fp)*100)+'%.':'');
+  const pwTake=(pest.total? pest.resolved+' of '+pest.total+' pest-control requests resolved ('+pct(pest.resolved,pest.total)+'%); ' : 'Pest-control requests not entered; ')+wasteTotal+' waste-collection visits across Phases E1 and E2.';
+  const ccTake='Compliance with cleaning plans '+fmPct(compliance.cur)+' in '+monthName+'; '+complaints.cur.rect+' of '+complaints.cur.recv+' '+monthName+' complaints rectified.';
+  const orTake=occ.cur!=null&&occ.prev!=null? 'Occupancy '+(occ.cur>=occ.prev?'grew':'fell')+' from '+occ.prev+' to '+occ.cur+' units ('+(occ.cur-occ.prev>=0?'+':'')+(occ.cur-occ.prev)+', '+(occ.prev?((occ.cur-occ.prev)/occ.prev*100).toFixed(1):'0')+'%).' : 'Occupancy: enter this month\'s units in the manual section.';
+  const srTake=sr.total? sr.total+' requests received, '+status.resolved+' resolved ('+pct(status.resolved,sr.total)+'%); '+source.callCenter+' via Call Center, '+source.cm+' via CM, '+source.integrated+' Integrated.' : 'Service requests not entered yet (manual section).';
+  const revTake='Handover units '+pct(rev.handover,rev.total)+'% of revenue; paid services '+pct(rev.paid,rev.total)+'%'+(rev.paid? ', of which deep cleaning is '+pct(rev.deep,rev.paid)+'%.' : '.');
+  const sumReq=vendors.reduce((t,v)=>t+v.req,0), sumAppr=vendors.reduce((t,v)=>t+v.appr,0);
+  const costTake='Total requested: '+fmFmt(sumReq)+' · approved: '+fmFmt(sumAppr)+(sumReq===sumAppr? ' — every payment approved in full.' : ' — difference '+fmFmt(sumReq-sumAppr)+' (discounts).');
+  const scoreTake=curScores.length? 'All '+curScores.length+' vendors at '+vendorRange+'.' : 'No vendor scores recorded for '+monthName+'.';
+  // attention points
+  const att=[];
+  if(status.pendingCustomer) att.push({ t:status.pendingCustomer+' SRs pending customer', d:pct(status.pendingCustomer,sr.total)+'% of '+monthName+' requests await customer response.', c:'gold' });
+  if(status.wrong) att.push({ t:status.wrong+' wrong-assignment SRs', d:'Routing errors to correct between teams.', c:'blue' });
+  if(notRect) att.push({ t:notRect+' complaint'+(notRect>1?'s':'')+' not rectified', d:complaints.cur.recv+' received in '+monthName+', '+complaints.cur.rect+' rectified.', c:'red' });
+  const lowF=facade.filter(f=>f.pct<1).sort((a,b)=>a.pct-b.pct); if(lowF.length) att.push({ t:'Façade: '+lowF.slice(0,3).map(f=>f.name+' '+Math.round(f.pct*100)+'%').join(', '), d:'Remaining zones need completion.', c:'blue' });
+  const zero=[['After Modifications',hk.mods],['DLP Visits',hk.dlp],['Soft Cleaning',hk.soft],['Deep Cleaning',hk.deep]].filter(x=>!x[1]).map(x=>x[0]); if(zero.length) att.push({ t:'Housekeeping: '+zero.length+' categor'+(zero.length>1?'ies':'y')+' at 0', d:zero.join(', ')+': none YTD.', c:'gold' });
+  if(pest.pending) att.push({ t:'Pest control: '+pest.pending+' pending request'+(pest.pending>1?'s':''), d:pest.resolved+' of '+pest.total+' resolved ('+pct(pest.resolved,pest.total)+'%).', c:'green' });
+  String(draft.notes||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>att.push({ t:x, d:'', c:'navy' }));
+  if(!att.length) att.push({ t:'No open points', d:'All indicators are on target for '+monthName+'.', c:'green' });
+  return { month:r.month, label, monthName, prevMonthName, mon:FM_MON[mi], prevMon:FM_MON[pi], reportDate:td.getDate()+' '+FM_MONTH_EN[td.getMonth()]+' '+td.getFullYear(),
+    rev, hk, facade, pest, waste, wasteTotal, complaints, compliance, occ, respHours:FM_RESP_HOURS, sr, vendors, vendorRange, attention:att,
+    execTake, hkTake, pwTake, ccTake, orTake, srTake, revTake, costTake, scoreTake, integAuto,
+    missing:[ occ.cur==null?'Occupancy':null, sr.total?null:'Service requests (statuses)', pest.total?null:'Pest control requests' ].filter(Boolean) };
+}
+async function fmLoad(){
+  const f=S.fm; if(!f.month) f.month=fmShift((S.today||todayStr()).slice(0,7),-1);
+  f.busy=true; f.err=''; render();
+  try{
+    const raw=await fmCollect(f.month); f.raw=raw;
+    const saved=(raw.inps.find(x=>x.month===f.month)||{}).data||{};
+    f.draft=Object.assign({},saved); f.model=fmBuildModel(raw,f.draft);
+  }catch(e){ f.err='تعذّر تحميل البيانات: '+(e&&e.message||e); }
+  f.busy=false; render();
+}
+function fmRecalc(){ const f=S.fm; if(f.raw) f.model=fmBuildModel(f.raw,f.draft); }
+async function fmSave(){
+  const f=S.fm; const {error}=await sb.from('fm_monthly_inputs').upsert({ month:f.month, data:f.draft, updated_by:S.session.user.id, updated_at:new Date().toISOString() },{ onConflict:'month' });
+  if(error){ toast('تعذّر الحفظ: '+error.message,false); return false; }
+  toast('تم حفظ الإدخال اليدوي',true); await fmLoad(); return true;
+}
+function fmLoadPptx(){
+  if(window.PptxGenJS) return Promise.resolve();
+  const srcs=['https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js','https://unpkg.com/pptxgenjs@4.0.1/dist/pptxgen.bundle.js','https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'];
+  return (async()=>{ for(const s of srcs){ try{ await fvLoadScript(s); if(window.PptxGenJS) return; }catch(e){} } throw new Error('pptx lib'); })();
+}
+async function fmExport(){
+  const f=S.fm; if(!f.raw){ toast('استنى لحد ما البيانات تتحمل',false); return; }
+  fmRecalc();
+  if(f.model.missing.length && !confirm('لسه ناقص إدخال يدوي: '+f.model.missing.join('، ')+'\nتكمل التصدير بالأرقام الحالية؟')) return;
+  toast('جاري تجهيز ملف PowerPoint...',true);
+  try{ await fmLoadPptx(); const pres=fmBuildPptx(window.PptxGenJS,f.model); await pres.writeFile({ fileName:'FM_Monthly_Report_'+f.model.label.replace(/ /g,'_')+'.pptx' }); }
+  catch(e){ console.error(e); toast('تعذّر تجهيز الملف — تأكد من الإنترنت وجرّب تاني',false); }
+}
+const FM_FIELDS={
+  occ:'Occupancy — عدد الوحدات المشغولة (هذا الشهر)',
+  sr_resolved:'Resolved', sr_pendingAction:'Pending action', sr_pendingCustomer:'Pending customer', sr_canceled:'Canceled', sr_open:'Open', sr_wrong:'Wrong assignment',
+  so_quality:'Quality', so_callCenter:'Call Center', so_cm:'CM', so_dlp:'DLP',
+  pest_resolved:'Resolved', pest_pending:'Pending', pest_canceled:'Canceled', dlp:'DLP Visits (هذا الشهر)' };
+const FM_OV={ handoverUnits:'وحدات Handover (الشهر)', soft:'إيراد Soft (EGP)', deep:'إيراد Deep (EGP)', hkHandover:'Handover YTD', hkSoft:'Soft YTD', hkDeep:'Deep YTD', hkMods:'After Modifications YTD', compliance:'الالتزام % (0-100)', cRecv:'شكاوى مستلمة', cRect:'شكاوى معالجة', integrated:'Integrated SRs' };
+function fmInput(k,label){ const v=S.fm.draft[k]; return `<div class="form-row" style="margin:0;min-width:120px;flex:1;"><label style="font-size:11px;">${label}</label><input type="number" min="0" data-fm-in="${k}" value="${v==null?'':esc(v)}"></div>`; }
+function fmCardRow(lbl,val,manual){ return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--text-dim);">${lbl}${manual?' <span style="font-size:10px;background:#fff3cd;color:#8a6d00;border-radius:999px;padding:1px 7px;">يدوي</span>':''}</span><b>${val}</b></div>`; }
+function fmReportCard(){
+  const role=S.profile&&S.profile.role; if(role!=='admin'&&role!=='opm') return '';
+  const f=S.fm;
+  if(!f.open) return `<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><h3 style="margin:0;">📑 FM Monthly Report</h3><div style="font-size:12px;color:var(--text-dim);margin-top:3px;">ريبورت الإدارة الشهري (Soft Services) — بيتجمّع من النظام + إدخال يدوي للناقص، ويتصدّر PowerPoint.</div></div><button class="primary-btn" id="fm-open">فتح</button></div>`;
+  const m=f.model;
+  let body='';
+  if(f.busy) body='<div style="padding:20px;text-align:center;color:var(--text-dim);">جاري تجميع بيانات الشهر...</div>';
+  else if(f.err) body=`<div style="padding:16px;color:var(--coral);">${esc(f.err)}</div>`;
+  else if(m){
+    const sec=(t,rows)=>`<div class="card" style="margin:0;padding:12px 14px;"><b style="font-size:13px;">${t}</b>${rows}</div>`;
+    body=`${m.missing.length?`<div style="background:#fff3cd;color:#6b5300;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;">⚠️ ناقص إدخال يدوي: ${m.missing.join('، ')}</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px;">
+      ${sec('الإيراد',fmCardRow('Handover ('+m.rev.handoverUnits+' وحدة × '+FM_UNIT_RATE+')',fmFmt(m.rev.handover)+' ج.م')+fmCardRow('Soft Cleaning',fmFmt(m.rev.soft))+fmCardRow('Deep Cleaning',fmFmt(m.rev.deep))+fmCardRow('الإجمالي',fmFmt(m.rev.total)+' ج.م'))}
+      ${sec('Housekeeping YTD',fmCardRow('Handover',m.hk.handover)+fmCardRow('Soft / Deep',m.hk.soft+' / '+m.hk.deep)+fmCardRow('After Modifications',m.hk.mods)+fmCardRow('DLP Visits',m.hk.dlp,true)+fmCardRow('الإجمالي',m.hk.total))}
+      ${sec('الواجهات (YTD)',m.facade.length? m.facade.map(x=>fmCardRow(esc(x.name),Math.round(x.pct*100)+'%')).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش قوائم واجهات</div>')}
+      ${sec('Pest & Waste',fmCardRow('Pest: تم / معلق / ملغي',m.pest.resolved+' / '+m.pest.pending+' / '+m.pest.canceled,true)+m.waste.map(w=>fmCardRow('Waste '+w.name,w.visits+' زيارة')).join(''))}
+      ${sec('الشكاوى والالتزام',fmCardRow(m.mon+' شكاوى (مستلمة / معالجة)',m.complaints.cur.recv+' / '+m.complaints.cur.rect)+fmCardRow(m.prevMon+' شكاوى',m.complaints.prev.recv+' / '+m.complaints.prev.rect)+fmCardRow('الالتزام بخطط النظافة',fmPct(m.compliance.cur))+fmCardRow('زمن الاستجابة','48 ساعة (ثابت)'))}
+      ${sec('Occupancy & SRs',fmCardRow('Occupancy',m.occ.cur!=null?m.occ.cur:'—',true)+fmCardRow('الشهر السابق',m.occ.prev!=null?m.occ.prev:'—')+fmCardRow('إجمالي SRs',m.sr.total||'—',true)+fmCardRow('Integrated (تلقائي من خدمات جانبية)',m.sr.source.integrated))}
+      ${sec('الموردين',m.vendors.length? m.vendors.map(v=>fmCardRow(esc(v.name),'طلب '+fmFmt(v.req)+' · موافق '+fmFmt(v.appr)+' · تقييم '+(v.cur!=null?Math.round(v.cur)+'%':'—'))).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش فواتير أو تقييمات للشهر</div>')}
+    </div>
+    <div class="card" style="margin:0 0 12px;padding:12px 14px;"><b>✍️ الإدخال اليدوي — ${esc(m.label)}</b>
+      <div style="font-size:12px;color:var(--text-dim);margin:4px 0 8px;">الحاجات اللي مش موجودة في النظام. الأرقام بتتحفظ للشهر ده، وOccupancy الشهر اللي فات بيتسحب لوحده.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">${fmInput('occ',FM_FIELDS.occ)}${fmInput('dlp',FM_FIELDS.dlp)}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">Service Requests (من Salesforce) — الحالات</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['sr_resolved','sr_pendingAction','sr_pendingCustomer','sr_canceled','sr_open','sr_wrong'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">المصادر (Integrated تلقائي)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['so_quality','so_callCenter','so_cm','so_dlp'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div style="font-size:12px;font-weight:800;margin:8px 0 4px;">Pest Control</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${['pest_resolved','pest_pending','pest_canceled'].map(k=>fmInput(k,FM_FIELDS[k])).join('')}</div>
+      <div class="form-row" style="margin:10px 0 0;"><label>نقاط إضافية للإدارة (سطر لكل نقطة)</label><textarea data-fm-in="notes" rows="3">${esc(f.draft.notes||'')}</textarea></div>
+      <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;">تعديل يدوي لأرقام تلقائية (اتركها فاضية للحساب التلقائي)</summary>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${Object.keys(FM_OV).map(k=>fmInput('ov_'+k,FM_OV[k])).join('')}</div></details>
+    </div>`;
+  }
+  return `<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><h3 style="margin:0;">📑 FM Monthly Report</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;"><div class="fgroup"><label>الشهر</label><input type="month" id="fm-month" value="${esc(f.month)}"></div>
+    <button class="ghost-btn" id="fm-save" ${f.busy||!m?'disabled':''}>💾 حفظ الإدخال اليدوي</button><button class="primary-btn" id="fm-export" ${f.busy||!m?'disabled':''}>⬇️ تصدير PowerPoint</button><button class="ghost-btn" id="fm-close">إغلاق</button></div></div>${body}</div>`;
+}
+function bindFmReport(){
+  const b=id=>document.getElementById(id);
+  if(b('fm-open')) b('fm-open').onclick=()=>{ S.fm.open=true; fmLoad(); };
+  if(b('fm-close')) b('fm-close').onclick=()=>{ S.fm.open=false; render(); };
+  if(b('fm-month')) b('fm-month').onchange=e=>{ if(e.target.value){ S.fm.month=e.target.value; fmLoad(); } };
+  if(b('fm-save')) b('fm-save').onclick=fmSave;
+  if(b('fm-export')) b('fm-export').onclick=fmExport;
+  document.querySelectorAll('[data-fm-in]').forEach(el=>el.oninput=()=>{ S.fm.draft[el.dataset.fmIn]=el.value; });
+}
+
 /* ============================= GLASS MOTION: staggered entrance + number count-up ============================= */
 S._numPrev={}; S._gIntro=false;
 function glassCount(el, fromTxt){
@@ -1793,7 +2071,7 @@ function renderOrgChart(){
   el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;min-width:280px;"><div style="display:flex;flex-wrap:wrap;justify-content:center;">${mgr}</div>${vline}<div style="width:100%;">${blocks}</div><div style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">آخر تحديث ${new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
 }
 function statusBadge(s){
-  const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', incomplete:'pending', pending_review:'pending', cancelled:'postponed' };
+  const map={ scheduled:'pending', in_progress:'progress', completed:'done', postponed:'postponed', cancelled:'postponed', incomplete:'pending' };
   return `<span class="badge ${map[s]||'pending'}"><span class="dot"></span>${STATUS_LABEL[s]||s}</span>`;
 }
 
@@ -1831,6 +2109,11 @@ function renderDeliveries(){
   </tbody></table></div>`;
 }
 async function handleStatusSelectChange(table, id, value, reload){
+  if(table==='paid_service_orders' && value==='cancelled'){
+    const role=S.profile&&S.profile.role;
+    if(!['admin','opm','fm_dispatcher','supervisor'].includes(role)){ toast('مش مسموح لك تلغي الأوردر',false); await reload(); render(); return; }
+    S.modal={type:'cancelOrderReason', table, id}; render(); return;
+  }
   if(value==='postponed'){
     S.modal={type:'postponeReason', table, id};
     render();
@@ -2062,12 +2345,12 @@ Object.assign(S,{ sideSvc:[], ssDate:todayStr(), ssType:'all' });
 async function sideSvcFetch(){ try{ const {data,error}=await sb.from('side_service_units').select('*'); if(error){ console.warn('side_service_units',error.message); return null; } return data||[]; }catch(e){ return null; } }
 async function loadSideSvc(){ const d=await sideSvcFetch(); if(d) S.sideSvc=d; }
 function ssTypeTag(t){ return `<span class="tag-shift ${t==='integrated'?'morning':'evening'}">${SS_TYPES[t]||esc(t)}</span>`; }
-function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option>${(fvAdm()||x.status==='pending_review'||x.status==='cancelled')?`<option value="pending_review" ${x.status==='pending_review'?'selected':''}>طلب جديد — مراجعة</option><option value="cancelled" ${x.status==='cancelled'?'selected':''}>تم الإلغاء</option>`:''}</select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
+function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option></select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
 function renderSideServices(){
   const canWrite=S.profile.role==='admin'||S.profile.role==='opm';
   const day=(S.sideSvc||[]).filter(x=>x.date===S.ssDate);
   const list=day.filter(x=>S.ssType==='all'||x.service_type===S.ssType);
-  const cnt=t=>day.filter(x=>x.service_type===t && x.status!=='cancelled').length;
+  const cnt=t=>day.filter(x=>x.service_type===t).length;
   return `${renderModReqs()}<div class="toolbar">
     <div class="fgroup"><label>التاريخ</label><input type="date" id="ss-date" value="${S.ssDate}"></div>
     <div class="fgroup"><label>النوع</label><select id="ss-type"><option value="all" ${S.ssType==='all'?'selected':''}>الكل</option><option value="integrated" ${S.ssType==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${S.ssType==='modifications'?'selected':''}>Modifications</option></select></div>
@@ -2122,7 +2405,7 @@ function bindSsForm(){
 }
 function renderSideSvcForSupervisor(){
   const last=addDaysStr(S.today,2);
-  const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last && x.status!=='cancelled' && x.status!=='pending_review').sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
+  const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
   return `<div class="section-title"><h2>خدمات جانبية — Integrated / Modifications (اليوم + يومين)</h2></div>
   ${arr.length? arr.map(x=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div><b>${esc(x.unit_code)}</b> ${ssTypeTag(x.service_type)}${x.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${x.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(x.date)}</span>`:''}${x.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(x.notes)}</div>`:''}</div>
@@ -2165,6 +2448,7 @@ function renderOrders(){
       <div class="stat blue"><div class="num">${cnt('in_progress')}</div><div class="lbl">جاري العمل</div></div>
       <div class="stat amber"><div class="num">${cnt('scheduled')}</div><div class="lbl">مجدولة</div></div>
       <div class="stat coral"><div class="num">${cnt('postponed')}</div><div class="lbl">تم التأجيل</div></div>
+      <div class="stat coral"><div class="num">${cnt('cancelled')}</div><div class="lbl">تم الإلغاء</div></div>
     </div>
     <div class="stat-row" style="margin-bottom:14px;">
       <div class="stat blue"><div class="num" style="font-size:19px;">${fmtM(sum(done))}</div><div class="lbl">إجمالي المبالغ (المنتهي فقط)</div></div>
@@ -2184,6 +2468,7 @@ function renderOrders(){
   <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>النوع</th>${hideMoney?'':'<th>السعر</th><th>الدفع</th>'}<th>التاريخ والميعاد</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.slice(0,S.ordLimit||30).map(o=>{
     const canChangeStatus = (isApprover||role==='supervisor') && orderApproved(o);
+    const canCancelOrder = ['admin','opm','supervisor','fm_dispatcher'].includes(role) && orderApproved(o);
     const extraTag = o.extra_reason ? ' <span class="tag-shift evening">إضافية</span>' : '';
     const statusCell = o.approval_status==='pending' ? '<span class="badge pending"><span class="dot"></span>بانتظار الموافقة</span>'
       : o.approval_status==='rejected' ? '<span class="badge postponed"><span class="dot"></span>مرفوض</span>'
@@ -2192,7 +2477,8 @@ function renderOrders(){
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}` : statusBadge(o.status));
+        ${canCancelOrder?`<option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>`:''}
+      </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}` : (canCancelOrder?`${statusBadge(o.status)}${o.status!=='cancelled'?`<button class="ghost-btn danger" style="padding:3px 8px;font-size:11px;margin-top:4px;" data-ord-cancel="${o.id}">إلغاء الأوردر</button>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}`:statusBadge(o.status)));
     return `<tr style="${o.approval_status==='rejected'?'opacity:.6;':''}">
       <td>${esc(o.unit_code||'-')}${extraTag}</td>
       <td>${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</td>
@@ -2214,7 +2500,7 @@ function renderOrders(){
       kv('رقم الوحدة',esc(o.unit_code||'-'))+kv('النوع',ORDER_TYPE_LABEL[o.order_type]||o.order_type)+kv('رقم Sales Force',esc(o.client_info||'-'))
       +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.payment_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
       +kv('التاريخ',o.scheduled_date)+kv('الميعاد',fmt12(o.scheduled_time,'-'))+kv('الحالة',statusBadge(o.status))
-      +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')
+      +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')+(o.cancel_reason?kv('سبب الإلغاء',esc(o.cancel_reason)):'')
       +kv('ملاحظات',esc(o.opm_notes||'-'))
       +(fvAdm()?`<div style="margin-top:14px;">${audHistBtn('paid_service_orders',o.id,o.unit_code||'')} <span style="font-size:12px;color:var(--text-dim);">سجل التغييرات (مين عدّل وإمتى)</span></div>`:'')
       +((canManage||role==='fm_dispatcher')?`<div style="display:flex;gap:8px;margin-top:14px;"><button class="primary-btn" data-ord-edit="${o.id}">تعديل</button>${canManage?`<button class="ghost-btn danger" data-ord-del="${o.id}">${ICON.trash(12)} حذف</button>`:''}</div>`:'')); })()}`;
@@ -2228,6 +2514,7 @@ function bindOrders(){
   const add=document.getElementById('ord-add'); if(add) add.onclick=()=>{ S.modal={type:'addOrder'}; render(); };
   const ex=document.getElementById('ord-extra'); if(ex) ex.onclick=()=>{ S.modal={type:'addOrder', extra:true}; render(); };
   document.querySelectorAll('[data-ord-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.ordStatus, sel.value, loadOrders));
+  document.querySelectorAll('[data-ord-cancel]').forEach(b=>b.onclick=()=>{ S.modal={type:'cancelOrderReason',table:'paid_service_orders',id:b.dataset.ordCancel}; render(); });
   document.querySelectorAll('[data-ord-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editOrder', id:b.dataset.ordEdit}; render(); });
   document.querySelectorAll('[data-ord-del]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; await dbDelete('paid_service_orders', b.dataset.ordDel); await loadOrders(); render(); toast('تم الحذف',true); });
   document.querySelectorAll('[data-ord-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('paid_service_orders', sel.dataset.ordPayment, {payment_status:sel.value}); await loadOrders(); render(); toast('تم تحديث حالة الدفع',true); });
@@ -2309,7 +2596,7 @@ function priceDisplayHtml(price, isSpecialized){
   return `<span style="color:var(--mint);font-weight:700;">السعر: ${price.toLocaleString('en-US')} ج.م</span>`;
 }
 const MAX_ORDERS_PER_DAY = 2;
-function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && o.status!=='postponed' && orderApproved(o) && !o.extra_reason).length; }
+function ordersCountForDate(date){ return S.orders.filter(o=>o.scheduled_date===date && !['postponed','cancelled'].includes(o.status) && orderApproved(o) && !o.extra_reason).length; }
 function findNextAvailableOrderDate(fromDate){
   let d = new Date(fromDate+'T00:00:00');
   for(let i=0;i<60;i++){
@@ -3785,7 +4072,7 @@ function renderReports(){
     </div>
     ${rows||'<div style="font-size:12.5px;color:var(--text-dim);">مفيش تقارير محفوظة لسه.</div>'}
   </div>`;
-  return card + renderReportsMain();
+  return fmReportCard() + card + renderReportsMain();
 }
 async function generateDailyReport(openAfter){
   toast('جارٍ توليد التقرير...',true);
@@ -3823,6 +4110,7 @@ function bindDailyReportModal(){
   const pr=document.getElementById('dr-modal-print'); if(pr) pr.onclick=()=>printReportHtml(m);
 }
 function bindReports(){
+  bindFmReport();
   bindReportsMain();
   const g=document.getElementById('dr-gen'); if(g) g.onclick=()=>generateDailyReport();
   const ml=document.getElementById('dr-mail'); if(ml) ml.onclick=()=>generateDailyReport();
@@ -3839,7 +4127,7 @@ function bindReports(){
 Object.assign(S,{ logs:{ date:'', rows:[], logins:[], loaded:false, busy:false, err:'', user:'', sect:'', q:'' }, audHist:{ loading:false, rows:[], err:'' } });
 const AUD_T={ delivery_units:'وحدة التسليم', unit_notes:'ملاحظة على وحدة', paid_service_orders:'أوردر خدمة مدفوعة', side_service_units:'وحدة خدمات جانبية', pest_control_requests:'طلب مكافحة', task_lists:'قائمة مهام', task_items:'بند مهمة', task_runs:'تنفيذ قائمة مهام', task_run_items:'بند مهمة', svc_lists:'قائمة', svc_items:'بند', pest_schedule_rows:'بند جدول المكافحة', pest_schedule_done:'بند مكافحة', attendance_records:'سجل حضور', attendance_edit_requests:'طلب تعديل حضور', daily_presence:'حضور اليوم', hk_zone_assignments:'توزيع زون', hk_supervisor_assignments:'توزيع مشرف', hk_worker_counts:'عدد عمال', hk_labor_distribution:'توزيع عمالة', urgent_tasks:'تاسك مستعجل', emergency_alerts:'بلاغ طوارئ', complaints:'شكوى', client_violations:'مخالفة عميل', suppliers:'مورد', supplier_kpi:'تقييم مورد', supplier_invoices:'فاتورة مورد', card_handover:'استلام كرت', profiles:'مستخدم', user_qr_tokens:'كود QR', verify_sessions:'جلسة تحقق', verify_checks:'رد تحقق', verify_settings:'نطاق التحقق', manpower_settings:'إعدادات العمالة', login:'تسجيل دخول' };
 const AUD_SECT={ 'وحدات التسليم':['delivery_units','unit_notes'], 'الخدمة المدفوعة':['paid_service_orders'], 'خدمات جانبية':['side_service_units'], 'المهام المجدولة':['task_lists','task_items','task_runs','task_run_items'], 'مكافحة الحشرات':['pest_control_requests','pest_schedule_rows','pest_schedule_done'], 'الواجهات والمخلفات':['svc_lists','svc_items'], 'الحضور والتوزيع':['attendance_records','attendance_edit_requests','daily_presence','hk_zone_assignments','hk_supervisor_assignments','hk_worker_counts','hk_labor_distribution'], 'التحقق من الهوية':['verify_sessions','verify_checks','verify_settings'], 'المخالفات والشكاوى والطوارئ':['client_violations','complaints','urgent_tasks','emergency_alerts'], 'الموردين':['suppliers','supplier_kpi','supplier_invoices'], 'المستخدمين والدخول':['profiles','user_qr_tokens','card_handover','login'], 'إعدادات':['manpower_settings'] };
-const AUD_F={ status:'الحالة', notes:'الملاحظات', note:'الملاحظة', unit_code:'كود الوحدة', date:'التاريخ', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', postpone_reason:'سبب التأجيل', assigned_supervisor_id:'المشرف المسؤول', assigned_to:'المسؤول', price:'السعر', payment_status:'حالة الدفع', payment_photo:'صورة الدفع', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', opm_notes:'ملاحظات OPM', client_info:'بيانات العميل', scheduled_date:'تاريخ التنفيذ', scheduled_time:'ميعاد التنفيذ', order_type:'نوع الخدمة', service_type:'نوع الخدمة', photo:'الصورة', done:'تم التنفيذ', done_by_name:'نفّذه', name:'الاسم', label:'البند', active:'نشط', role:'الدور', full_name:'الاسم', shift:'الوردية', phase:'المرحلة', title:'العنوان', details:'التفاصيل', description:'الوصف', open_time:'وقت الفتح', close_time:'وقت الإغلاق', frequency:'التكرار', supervisor_marked_done:'علّم المشرف إنه خلّص', review_status:'مراجعة المشرف الأول', review_note:'ملاحظة المراجعة', rework_count:'عدد مرات الإعادة', completed_at:'وقت الإنجاز', verified_by:'اعتمده', reviewed_by:'راجعه', holder_name:'اسم المستلم', amount:'المبلغ', discount:'الخصم', score:'التقييم', month:'الشهر', budget:'الميزانية', workers:'عدد العمال', place:'المكان', present:'حاضر', actual_name:'الاسم الفعلي', moved_to_evening:'اتنقل للمسائية', workers_count:'عدد العمال', supervisors_count:'عدد المشرفين', building:'العمارة', floor_no:'الدور', apartment:'الشقة', type:'النوع', location:'المكان', message:'الرسالة', reason:'السبب', request_reason:'السبب', changes:'التعديلات', token:'التوكن', email:'الإيميل', value:'القيمة', radius_m:'نصف القطر (م)', lat:'خط العرض', lng:'خط الطول', task:'البند', weekday:'اليوم', start_time:'من', end_time:'إلى', position:'الترتيب', paid_at:'تاريخ السداد', invoice_date:'تاريخ الفاتورة', supervisor_name:'المشرف', worker_count:'عدد العمال', summary:'الملخص' };
+const AUD_F={ status:'الحالة', notes:'الملاحظات', note:'الملاحظة', unit_code:'كود الوحدة', date:'التاريخ', client_arrival_time:'ميعاد وصول العميل', special_instructions:'تعليمات خاصة', postpone_reason:'سبب التأجيل', cancel_reason:'سبب الإلغاء', assigned_supervisor_id:'المشرف المسؤول', assigned_to:'المسؤول', price:'السعر', payment_status:'حالة الدفع', payment_photo:'صورة الدفع', approval_status:'حالة الاعتماد', extra_reason:'سبب الطلب الإضافي', opm_notes:'ملاحظات OPM', client_info:'بيانات العميل', scheduled_date:'تاريخ التنفيذ', scheduled_time:'ميعاد التنفيذ', order_type:'نوع الخدمة', service_type:'نوع الخدمة', photo:'الصورة', done:'تم التنفيذ', done_by_name:'نفّذه', name:'الاسم', label:'البند', active:'نشط', role:'الدور', full_name:'الاسم', shift:'الوردية', phase:'المرحلة', title:'العنوان', details:'التفاصيل', description:'الوصف', open_time:'وقت الفتح', close_time:'وقت الإغلاق', frequency:'التكرار', supervisor_marked_done:'علّم المشرف إنه خلّص', review_status:'مراجعة المشرف الأول', review_note:'ملاحظة المراجعة', rework_count:'عدد مرات الإعادة', completed_at:'وقت الإنجاز', verified_by:'اعتمده', reviewed_by:'راجعه', holder_name:'اسم المستلم', amount:'المبلغ', discount:'الخصم', score:'التقييم', month:'الشهر', budget:'الميزانية', workers:'عدد العمال', place:'المكان', present:'حاضر', actual_name:'الاسم الفعلي', moved_to_evening:'اتنقل للمسائية', workers_count:'عدد العمال', supervisors_count:'عدد المشرفين', building:'العمارة', floor_no:'الدور', apartment:'الشقة', type:'النوع', location:'المكان', message:'الرسالة', reason:'السبب', request_reason:'السبب', changes:'التعديلات', token:'التوكن', email:'الإيميل', value:'القيمة', radius_m:'نصف القطر (م)', lat:'خط العرض', lng:'خط الطول', task:'البند', weekday:'اليوم', start_time:'من', end_time:'إلى', position:'الترتيب', paid_at:'تاريخ السداد', invoice_date:'تاريخ الفاتورة', supervisor_name:'المشرف', worker_count:'عدد العمال', summary:'الملخص' };
 const AUD_HIDE=new Set(['id','created_by','delivery_unit_id','list_id','run_id','item_id','session_id','row_id','user_id','supervisor_id','record_id','requested_by','decided_by','updated_by','approved_by','assigned_by','completed_by','marked_by','done_by','status_by','key','photo_count','has_photo','sort_order','zone_id','unit_label','last_reset_at','service','kind']);
 const AUD_VAL={ payment_status:{ paid:'مدفوع', unpaid:'غير مدفوع' }, approval_status:{ approved:'معتمد', pending:'بانتظار الاعتماد', rejected:'مرفوض' }, shift:{ morning:'صباحية', evening:'مسائية', both:'الاتنين', emergency:'طوارئ' }, order_type:{ soft_cleaning:'نظافة عادية', deep_cleaning:'نظافة عميقة' }, service_type:{ integrated:'خدمة متكاملة', modifications:'تعديلات', full_service:'خدمة كاملة', inspection:'معاينة', flying_spray:'رش طائر', crawling_spray:'رش زاحف', specialized_spray:'رش متخصص', rodent_control:'مكافحة قوارض' }, review_status:{ ok:'مطابق', not_ok:'غير مطابق' }, frequency:{ daily:'يومي', weekly:'أسبوعي', monthly:'شهري' } };
 const AUD_STATUS_EXTRA={ pending:'معلّق', approved:'معتمد', rejected:'مرفوض', enrolling:'تسجيل وجوه', enrolled:'جاهز', calling:'شغّال', closed:'مقفول', matched:'مطابق', mismatch:'غير مطابق', no_response:'لم يستجب', acknowledged:'استلم النداء', selfie_ok:'السيلفي تمام', submitted:'اتبعت', resolved:'تم الحل', submitted_:'', not_done:'ما اتنفّذش', paid:'مدفوع' };
@@ -3993,9 +4281,9 @@ function renderAuditHist(){
 }
 
 /* ============================= طلبات الأوردرات الخارجية (لينك request.html) ============================= */
-Object.assign(S,{ modReqs:[], modReqsLoaded:false, modReqsErr:'', mrRej:null, mrEd:null });
+Object.assign(S,{ modReqs:[], modReqsLoaded:false, modReqsErr:'', mrRej:null });
 const MR_WORKS={ modification:'تعديل', painting:'دهان', plumbing:'سباكة', installations:'تركيبات', electrical:'كهرباء', carpentry:'نجارة', other:'أخرى' };
-const MR_ST={ pending:['طلب جديد — قيد المراجعة','#d98a14'], waitlist:['اليوم محجوز — قائمة انتظار','#c2410c'], approved:['اتقبل','#1f9d57'], rejected:['اترفض','#d64545'], cancelled:['تم الإلغاء','#6b7280'] };
+const MR_ST={ pending:['معلّق','#d98a14'], waitlist:['اليوم محجوز — قائمة انتظار','#c2410c'], approved:['اتقبل','#1f9d57'], rejected:['اترفض','#d64545'] };
 function mrLink(){ try{ return new URL('request.html', location.href).href.split('#')[0]; }catch(e){ return 'request.html'; } }
 function mrDateAr(d){ try{ return new Date(d+'T12:00:00Z').toLocaleDateString('ar-EG',{ weekday:'long', day:'numeric', month:'long', timeZone:'UTC' }); }catch(e){ return d; } }
 function mrAddDays(s,n){ const d=new Date(s+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
@@ -4003,77 +4291,45 @@ function mrAddDays(s,n){ const d=new Date(s+'T12:00:00Z'); d.setUTCDate(d.getUTC
 function mrNearestFree(reqDate){
   const taken=new Set();
   (S.modReqs||[]).forEach(r=>{ if(r.status==='pending'||r.status==='approved') taken.add(r.req_date); });
-  (S.sideSvc||[]).forEach(x=>{ if(x.service_type==='modifications' && x.status!=='postponed' && x.status!=='cancelled') taken.add(x.date); });
+  (S.sideSvc||[]).forEach(x=>{ if(x.service_type==='modifications' && x.status!=='postponed') taken.add(x.date); });
   for(let k=1;k<=60;k++){ for(const c of [mrAddDays(reqDate,k), mrAddDays(reqDate,-k)]){ if(c>S.today && !taken.has(c)) return c; } }
   return mrAddDays(S.today,1);
 }
 async function loadModReqs(){
   if(!fvAdm()) return;
-  const {data,error}=await sb.from('modification_requests').select('*').order('created_at',{ascending:false}).limit(200);
+  const {data,error}=await sb.from('modification_requests').select('*').order('created_at',{ascending:false}).limit(150);
   S.modReqsErr=error? error.message : ''; if(!error) S.modReqs=data||[]; S.modReqsLoaded=true;
 }
 function mrWa(r,kind){
-  const sig='\nشكرًا — قسم Soft Services', hi=`أهلًا ${r.requester_name}،\n`;
   let msg;
-  if(kind==='ok') msg=hi+`تم قبول طلبك رقم #${r.ref_no} لوحدة ${r.unit_code} يوم ${mrDateAr(r.req_date)}.\nبرجاء تحضير المفتاح مع الشخص طالب الخدمة (ضروري)، والتأكد من عدم وجود مخلفات بناء.`+sig;
-  else if(kind==='edit') msg=hi+`تم قبول تعديل طلبك رقم #${r.ref_no}. الموعد الحالي: يوم ${mrDateAr(r.req_date)} لوحدة ${r.unit_code}.`+sig;
-  else if(kind==='editno') msg=hi+`بخصوص طلب تعديل طلبك رقم #${r.ref_no}: نعتذر، تعذّر تنفيذ التعديل، والطلب الأصلي كما هو (يوم ${mrDateAr(r.req_date)}).`+sig;
-  else if(kind==='cancel') msg=hi+`تم إلغاء طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}${r.cancel_reason?' ('+r.cancel_reason+')':''}.\nتقدر تعمل طلب جديد من اللينك في أي وقت.`+sig;
-  else msg=hi+`بخصوص طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}: نعتذر، يوم ${mrDateAr(r.req_date)} غير متاح${r.reject_reason?' ('+r.reject_reason+')':''}.\n`+(r.suggested_date? `أقرب ميعاد متاح: ${mrDateAr(r.suggested_date)}.\nلو مناسب لك برجاء الرد بالتأكيد.` : 'برجاء اختيار يوم آخر من اللينك.')+sig;
+  if(kind==='ok') msg=`أهلًا ${r.requester_name}،\nتم قبول طلبك رقم #${r.ref_no} لوحدة ${r.unit_code} يوم ${mrDateAr(r.req_date)}.\nبرجاء تحضير المفتاح مع الشخص طالب الخدمة (ضروري)، والتأكد من عدم وجود مخلفات بناء.\nشكرًا — قسم Soft Services`;
+  else msg=`أهلًا ${r.requester_name}،\nبخصوص طلبك رقم #${r.ref_no} لوحدة ${r.unit_code}: نعتذر، يوم ${mrDateAr(r.req_date)} غير متاح${r.reject_reason?' ('+r.reject_reason+')':''}.\n`+(r.suggested_date? `أقرب ميعاد متاح: ${mrDateAr(r.suggested_date)}.\nلو مناسب لك برجاء الرد بالتأكيد.` : 'برجاء اختيار يوم آخر من اللينك.')+`\nشكرًا — قسم Soft Services`;
   return 'https://wa.me/'+String(r.phone||'').replace(/\D/g,'')+'?text='+encodeURIComponent(msg);
-}
-function mrEditDiff(r){
-  const e=r.edit_data; if(!e) return '';
-  const rows=[['التاريخ',r.req_date,e.date],['الوحدة',r.unit_code,e.unit],['الاسم',r.requester_name,e.name],['الخدمة المطلوبة',r.want_text,e.want],
-    ['المفتاح',r.key_bring===true?'هيجيبه':r.key_bring===false?'مش هيجيبه':'—',e.key_bring===true?'هيجيبه':e.key_bring===false?'مش هيجيبه':'—'],['الميعاد',r.preferred_time,e.time],['ملاحظات',r.extra_notes,e.note]]
-    .filter(x=>String(x[1]||'')!==String(x[2]||''));
-  return `<div style="margin-top:8px;background:#fff6e5;border:1px solid #f1dfae;border-radius:10px;padding:10px;">
-    <div style="font-weight:800;margin-bottom:4px;">✏️ طلب تعديل جديد على الطلب #${r.ref_no}${e.date_taken?' <span style="color:var(--coral);">· ⚠ اليوم الجديد محجوز</span>':''}</div>
-    ${rows.length? rows.map(x=>`<div style="font-size:13px;"><b>${x[0]}:</b> <span style="color:var(--text-dim);text-decoration:line-through;">${esc(x[1]||'—')}</span> ← <b>${esc(x[2]||'—')}</b></div>`).join('') : '<div style="font-size:13px;color:var(--text-dim);">مفيش اختلافات ظاهرة.</div>'}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
-      <input type="date" data-mr-edate="${esc(r.id)}" value="${esc(e.date||r.req_date)}" min="${esc(S.today)}" style="width:auto;">
-      <button class="primary-btn" data-mr-ea="${esc(r.id)}">✅ قبول التعديل (يحل مكان القديم)</button>
-      <button class="ghost-btn danger" data-mr-er="${esc(r.id)}">رفض التعديل</button>
-    </div></div>`;
-}
-function mrEditForm(r){
-  const inp=(id,label,val,extra)=>`<div class="form-row" style="margin:0;flex:1;min-width:150px;"><label>${label}</label><input id="${id}" value="${esc(val==null?'':val)}" ${extra||''}></div>`;
-  return `<div style="margin-top:8px;background:var(--sand,#f4f6fa);border-radius:10px;padding:10px;">
-    <div style="font-weight:800;margin-bottom:6px;">✏️ تعديل الطلب #${r.ref_no}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      ${inp('mre-date','التاريخ',r.req_date,'type="date"')}${inp('mre-unit','الوحدة',r.unit_code)}${inp('mre-name','الاسم',r.requester_name)}${inp('mre-phone','رقم الواتس',r.phone,'dir="ltr"')}
-      ${inp('mre-want','الخدمة المطلوبة',r.want_text)}${inp('mre-time','الميعاد',r.preferred_time)}${inp('mre-note','ملاحظات',r.extra_notes)}
-      <div class="form-row" style="margin:0;flex:1;min-width:150px;"><label>المفتاح</label><select id="mre-key"><option value="1" ${r.key_bring===true?'selected':''}>هيجيبه</option><option value="0" ${r.key_bring===false?'selected':''}>مش هيجيبه</option><option value="" ${r.key_bring==null?'selected':''}>—</option></select></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:8px;"><button class="primary-btn" data-mr-save="${esc(r.id)}">حفظ التعديل</button><button class="ghost-btn" data-mr-edit-cancel="1">إلغاء</button></div></div>`;
 }
 function mrCard(r){
   const st=MR_ST[r.status]||[r.status,'#666'];
   const stLabel= r.status==='rejected' && r.suggested_date? 'اتأجل لـ '+r.suggested_date : st[0];
   const works=r.has_works? ((r.works||[]).map(w=>MR_WORKS[w]||w).join('، ')||'—') : '';
-  const waiting=r.status==='pending'||r.status==='waitlist';
-  const live=waiting||r.status==='approved';
-  const rej=S.mrRej===r.id, ed=S.mrEd===r.id;
+  const open=r.status==='pending'||r.status==='waitlist';
+  const rej=S.mrRej===r.id;
   const sug=mrNearestFree(r.req_date);
-  return `<div style="border-inline-start:4px solid ${st[1]};background:var(--glass-bg-strong,#fff);border-radius:12px;padding:10px 12px;margin-bottom:8px;${r.status==='cancelled'||r.status==='rejected'?'opacity:.85;':''}">
+  return `<div style="border-inline-start:4px solid ${st[1]};background:var(--glass-bg-strong,#fff);border-radius:12px;padding:10px 12px;margin-bottom:8px;">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>#${r.ref_no} · ${esc(r.unit_code)}</b><span style="font-size:12px;font-weight:800;color:${st[1]};">${esc(stLabel)}</span></div>
     <div style="font-size:13px;line-height:1.9;margin-top:4px;">
       ${r.want_text?`<div>📌 <b>${esc(r.want_text)}</b></div>`:''}
       <div>📅 التاريخ المطلوب: <b>${esc(r.req_date)}</b>${r.preferred_time?` · ⏰ ${esc(r.preferred_time)}`:''}</div>
       <div>👤 ${esc(r.requester_name)} · <a href="https://wa.me/${esc(String(r.phone||'').replace(/\D/g,''))}" target="_blank" rel="noopener" dir="ltr">${esc(r.phone)}</a></div>
       ${r.key_bring===true?'<div>🔑 المفتاح: هيجيبه للفريق</div>':r.key_bring===false?'<div style="color:var(--coral);">🔑 المفتاح: مش هيجيبه ⚠</div>':''}
-      ${works?`<div>🛠 أعمال متبقية: ${esc(works)}</div>`:''}
+      ${works?`<div>🛠 أعمال متبقية: ${esc(works)}</div>`:(r.has_works===false?'<div style="color:var(--text-dim);">🛠 لا يوجد أعمال متبقية</div>':'')}
       ${r.extra_notes?`<div>📝 ${esc(r.extra_notes)}</div>`:(r.works_note?`<div>📝 ${esc(r.works_note)}</div>`:'')}
-      ${r.reject_reason?`<div style="color:var(--coral);">سبب الرفض: ${esc(r.reject_reason)}</div>`:''}
-      ${r.cancel_reason?`<div style="color:var(--text-dim);">سبب الإلغاء: ${esc(r.cancel_reason)}</div>`:''}
+      ${r.reject_reason?`<div style="color:var(--coral);">السبب: ${esc(r.reject_reason)}</div>`:''}
     </div>
-    ${r.edit_data?mrEditDiff(r):''}
-    ${waiting&&!rej&&!ed?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+    ${open&&!rej?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
       ${r.status==='waitlist'?`<input type="date" data-mr-date="${esc(r.id)}" value="${esc(r.req_date)}" min="${esc(S.today)}" style="width:auto;">`:''}
       <button class="primary-btn" data-mr-ok="${esc(r.id)}">✅ موافقة وتأكيد على الواتس</button>
       <button class="ghost-btn danger" data-mr-no="${esc(r.id)}">↩ رفض وتأجيل لأقرب ميعاد</button>
     </div>`:''}
-    ${waiting&&rej?`<div style="margin-top:8px;background:var(--sand,#f4f6fa);border-radius:10px;padding:10px;">
+    ${open&&rej?`<div style="margin-top:8px;background:var(--sand,#f4f6fa);border-radius:10px;padding:10px;">
       <div style="font-size:12.5px;margin-bottom:6px;"><b>الميعاد المقترح</b> (اقتراح تلقائي لأقرب يوم فاضي — عدّله واكتب الميعاد بنفسك):</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
         <input type="date" id="mr-sd" value="${esc(sug)}" min="${esc(S.today)}" style="width:auto;">
@@ -4083,22 +4339,16 @@ function mrCard(r){
         <button class="primary-btn" data-mr-no-go="${esc(r.id)}">رفض وإرسال الميعاد على الواتس</button>
         <button class="ghost-btn" data-mr-no-only="${esc(r.id)}">رفض بدون ميعاد</button>
         <button class="ghost-btn" data-mr-no-cancel="1">إلغاء</button>
-      </div></div>`:''}
-    ${ed?mrEditForm(r):''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
-      ${live&&!ed?`<button class="ghost-btn" data-mr-edit="${esc(r.id)}">✏️ تعديل</button><button class="ghost-btn" data-mr-cancel="${esc(r.id)}">🚫 تم الإلغاء</button>`:''}
-      ${!live?`<a class="ghost-btn" style="text-decoration:none;" href="${esc(mrWa(r,r.status==='cancelled'?'cancel':'no'))}" target="_blank" rel="noopener">رد على الواتس</a>`:''}
-      ${r.status==='approved'?`<a class="ghost-btn" style="text-decoration:none;" href="${esc(mrWa(r,'ok'))}" target="_blank" rel="noopener">رد على الواتس</a>`:''}
-      <button class="ghost-btn danger" data-mr-del="${esc(r.id)}">${ICON.trash(12)} حذف</button>
-    </div>
+      </div>
+    </div>`:''}
+    ${!open?`<div style="margin-top:6px;"><a class="ghost-btn" style="text-decoration:none;" href="${esc(mrWa(r,r.status==='approved'?'ok':'no'))}" target="_blank" rel="noopener">رد على الواتس</a></div>`:''}
   </div>`;
 }
 function renderModReqs(){
   if(!fvAdm()) return '';
   if(!S.modReqsLoaded && !S._mrLoading){ S._mrLoading=true; loadModReqs().then(()=>{ S._mrLoading=false; if(S.tab==='sideservices' && !S.modal && !hasUnsavedInput()) render(); }); }
-  const all=S.modReqs||[];
-  const open=all.filter(r=>r.status==='pending'||r.status==='waitlist'||r.edit_data).sort((a,b)=>(b.edit_data?1:0)-(a.edit_data?1:0));
-  const done=all.filter(r=>!open.includes(r)).slice(0,10);
+  const open=(S.modReqs||[]).filter(r=>r.status==='pending'||r.status==='waitlist');
+  const done=(S.modReqs||[]).filter(r=>r.status==='approved'||r.status==='rejected').slice(0,8);
   const link=mrLink();
   return `<div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -4106,85 +4356,40 @@ function renderModReqs(){
       <button class="ghost-btn" id="mr-copy">📋 نسخ لينك الطلبات</button>
     </div>
     <div style="font-size:12px;color:var(--text-dim);margin:6px 0 10px;word-break:break-all;" dir="ltr">${esc(link)}</div>
-    ${S.modReqsErr?`<p style="color:var(--coral);font-size:13px;">تعذّر تحميل الطلبات: ${esc(S.modReqsErr)} — لو أول مرة شغّل <b>update_v23</b> ثم <b>update_v25_mod_requests.sql</b>.</p>`:''}
+    ${S.modReqsErr?`<p style="color:var(--coral);font-size:13px;">تعذّر تحميل الطلبات: ${esc(S.modReqsErr)} — لو أول مرة شغّل <b>update_v23_mod_requests.sql</b> ثم <b>update_v23b_mod_requests.sql</b>.</p>`:''}
     ${open.length? open.map(mrCard).join('') : (S.modReqsLoaded&&!S.modReqsErr?'<div style="font-size:13px;color:var(--text-dim);">مفيش طلبات معلّقة.</div>':'')}
-    ${done.length?`<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;">باقي الطلبات (${done.length})</summary><div style="margin-top:8px;">${done.map(mrCard).join('')}</div></details>`:''}
+    ${done.length?`<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;">آخر الطلبات المقررة (${done.length})</summary><div style="margin-top:8px;">${done.map(mrCard).join('')}</div></details>`:''}
   </div>`;
 }
 function bindModReqs(){
   const g=id=>document.getElementById(id);
-  const refresh=async()=>{ await Promise.all([loadModReqs(), loadSideSvc()]); render(); };
-  const byId=id=>(S.modReqs||[]).find(x=>x.id===id);
-  const wa=(r,kind,w)=>{ if(!r) return; if(w) w.location.href=mrWa(r,kind); else toast('اضغط "رد على الواتس" على الطلب',true); };
   if(g('mr-copy')) g('mr-copy').onclick=async ()=>{ const l=mrLink(); try{ await navigator.clipboard.writeText(l); toast('اتنسخ اللينك',true); }catch(e){ prompt('انسخ اللينك:',l); } };
-  // موافقة
   document.querySelectorAll('[data-mr-ok]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrOk, r=byId(id); if(!r) return;
+    const id=b.dataset.mrOk, r=(S.modReqs||[]).find(x=>x.id===id); if(!r) return;
     const dEl=document.querySelector('[data-mr-date="'+id+'"]'); const date=dEl? dEl.value : r.req_date;
-    if(!confirm('تقبل الطلب #'+r.ref_no+' لوحدة '+r.unit_code+' يوم '+date+'؟ هيتأكد في الأوردرات (Modifications) وتفتح الواتس للتأكيد.')) return;
-    const w=window.open('','_blank');
+    if(!confirm('تقبل الطلب #'+r.ref_no+' لوحدة '+r.unit_code+' يوم '+date+'؟ هينزل تلقائي في الأوردرات (Modifications) وتفتح الواتس للتأكيد.')) return;
+    const w=window.open('','_blank');                       // بنفتح التاب قبل الانتظار عشان المتصفح ما يمنعوش
     const {error}=await sb.rpc('mod_req_approve',{ p_id:id, p_date:date });
     if(error){ if(w) w.close(); toast(error.message,false); return; }
-    toast('اتقبل ونزل في الأوردرات',true); await refresh(); wa(byId(id),'ok',w);
+    toast('اتقبل ونزل في الأوردرات',true);
+    await Promise.all([loadModReqs(), loadSideSvc()]); render();
+    const nr=(S.modReqs||[]).find(x=>x.id===id); if(nr){ if(w) w.location.href=mrWa(nr,'ok'); else toast('اضغط "رد على الواتس" على الطلب',true); }
   });
-  // رفض وتأجيل
   document.querySelectorAll('[data-mr-no]').forEach(b=>b.onclick=()=>{ S.mrRej=b.dataset.mrNo; render(); });
   document.querySelectorAll('[data-mr-no-cancel]').forEach(b=>b.onclick=()=>{ S.mrRej=null; render(); });
   const doReject=async (id,withDate)=>{
-    const r=byId(id); if(!r) return;
+    const r=(S.modReqs||[]).find(x=>x.id===id); if(!r) return;
     const sd=withDate? (g('mr-sd')&&g('mr-sd').value) : null; const why=(g('mr-why')&&g('mr-why').value||'').trim();
     if(withDate && !sd){ toast('اكتب الميعاد المقترح',false); return; }
     if(withDate && sd<=S.today){ toast('الميعاد المقترح لازم يكون من بكرة',false); return; }
     const w= withDate? window.open('','_blank') : null;
     const {error}=await sb.rpc('mod_req_reject',{ p_id:id, p_reason:why, p_suggested:sd||null });
     if(error){ if(w) w.close(); toast(error.message,false); return; }
-    S.mrRej=null; toast(withDate?'اتأجل — الميعاد المقترح '+sd+' (واليوم رجع متاح)':'اترفض (واليوم رجع متاح)',true); await refresh(); if(withDate) wa(byId(id),'no',w);
+    S.mrRej=null; toast(withDate?'اتأجل — الميعاد المقترح '+sd:'اترفض',true); await loadModReqs(); render();
+    const nr=(S.modReqs||[]).find(x=>x.id===id); if(withDate && nr){ if(w) w.location.href=mrWa(nr,'no'); else toast('اضغط "رد على الواتس" على الطلب',true); }
   };
   document.querySelectorAll('[data-mr-no-go]').forEach(b=>b.onclick=()=>doReject(b.dataset.mrNoGo,true));
   document.querySelectorAll('[data-mr-no-only]').forEach(b=>b.onclick=()=>doReject(b.dataset.mrNoOnly,false));
-  // قبول / رفض طلب تعديل من صاحب الطلب
-  document.querySelectorAll('[data-mr-ea]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrEa, r=byId(id); if(!r) return;
-    const dEl=document.querySelector('[data-mr-edate="'+id+'"]'); const date=dEl? dEl.value : (r.edit_data&&r.edit_data.date);
-    if(!confirm('تقبل تعديل الطلب #'+r.ref_no+'؟ هيحل مكان القديم بنفس رقم الطلب (التاريخ: '+date+').')) return;
-    const w=window.open('','_blank');
-    const {error}=await sb.rpc('mod_req_edit_accept',{ p_id:id, p_date:date });
-    if(error){ if(w) w.close(); toast(error.message,false); return; }
-    toast('اتقبل التعديل ونزل مكان القديم',true); await refresh(); wa(byId(id),'edit',w);
-  });
-  document.querySelectorAll('[data-mr-er]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrEr, r=byId(id); if(!r) return; if(!confirm('ترفض طلب التعديل على #'+r.ref_no+'؟ الطلب الأصلي هيفضل زي ما هو.')) return;
-    const w=window.open('','_blank');
-    const {error}=await sb.rpc('mod_req_edit_reject',{ p_id:id });
-    if(error){ if(w) w.close(); toast(error.message,false); return; }
-    toast('اترفض طلب التعديل',true); await refresh(); wa(byId(id),'editno',w);
-  });
-  // تعديل مباشر
-  document.querySelectorAll('[data-mr-edit]').forEach(b=>b.onclick=()=>{ S.mrEd=b.dataset.mrEdit; S.mrRej=null; render(); });
-  document.querySelectorAll('[data-mr-edit-cancel]').forEach(b=>b.onclick=()=>{ S.mrEd=null; render(); });
-  document.querySelectorAll('[data-mr-save]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrSave, v=x=>(g(x)&&g(x).value||'').trim();
-    const k=v('mre-key');
-    const {error}=await sb.rpc('mod_req_update',{ p_id:id, p_date:v('mre-date'), p_unit:v('mre-unit'), p_name:v('mre-name'), p_phone:v('mre-phone'), p_want:v('mre-want'), p_key_bring:k===''?null:k==='1', p_note:v('mre-note'), p_time:v('mre-time') });
-    if(error){ toast(error.message,false); return; }
-    S.mrEd=null; toast('اتحفظ التعديل (واتحدّث الأوردر)',true); await refresh();
-  });
-  // إلغاء (تم الإلغاء) — بيرجّع اليوم متاح
-  document.querySelectorAll('[data-mr-cancel]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrCancel, r=byId(id); if(!r) return;
-    const why=prompt('سبب الإلغاء (اختياري):',''); if(why===null) return;
-    const {error}=await sb.rpc('mod_req_cancel',{ p_id:id, p_reason:why });
-    if(error){ toast(error.message,false); return; }
-    toast('تم الإلغاء — اليوم رجع متاح',true); await refresh();
-  });
-  // حذف
-  document.querySelectorAll('[data-mr-del]').forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.mrDel, r=byId(id); if(!r) return;
-    if(!confirm('تحذف الطلب #'+r.ref_no+' نهائيًا؟ لو نزل أوردر في Modifications هيتحذف معاه.')) return;
-    const {error}=await sb.rpc('mod_req_delete',{ p_id:id });
-    if(error){ toast(error.message,false); return; }
-    toast('اتحذف',true); await refresh();
-  });
 }
 
 /* ============================= WASTE DAILY REPORT ============================= */
@@ -5068,7 +5273,7 @@ function renderReportsMain(){
 
   const tables = {
     deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
-    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
+    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']] },
     pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
@@ -5136,7 +5341,7 @@ function exportReportExcel(){
   const shiftFmt = v => SHIFT_LABEL[v]||v;
   const payFmt = v => PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
   if(want('deliveries')) addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['client_arrival_time','ميعاد وصول العميل',v=>fmt12(v,'')],['special_instructions','تعليمات خاصة'],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['notes','ملاحظات']]);
-  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل']]);
+  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']]);
   if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',(v,r)=>v==='completed'?'تم اعتمادها':(r.supervisor_marked_done?'بانتظار اعتماد المشرف الأول':((r.date<S.today || taskMissed((S.taskLists||[]).find(l=>l.id===r.list_id),r))?'أُغلقت قبل الإنجاز':'قيد التنفيذ'))],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
   if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
@@ -5226,7 +5431,8 @@ function renderSupervisorTodayBase(){
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>
+        <option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>
+      </select>${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:11px;color:var(--coral);margin-top:4px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}
     </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة</p>`}`;
     return html;
   }
@@ -5540,6 +5746,10 @@ function renderModal(){
   if(m.type==='postponeReason') return modalWrap('سبب التأجيل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-postpone-generic-reason" placeholder="اكتب سبب التأجيل"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد التأجيل</button>`);
+  if(m.type==='cancelOrderReason') return modalWrap('تأكيد إلغاء الأوردر', `
+    <p style="font-size:13px;line-height:1.8;color:var(--text-dim);">بعد تأكيد الإلغاء، الأوردر هيخرج من حجوزات اليوم، وهيبقى فيه مكان متاح لحجز أوردر بديل. الأوردر القديم هيفضل محفوظ في السجل.</p>
+    <div class="form-row"><label>سبب الإلغاء (إلزامي)</label><textarea id="m-cancel-order-reason" placeholder="اكتب سبب الإلغاء"></textarea></div>
+    <button class="primary-btn" style="width:100%;justify-content:center;background:var(--coral);" id="m-save">تأكيد الإلغاء</button>`);
   if(m.type==='markWaste') return modalWrap('لم يتم العمل', `
     <div class="form-row"><label>السبب (إلزامي)</label><textarea id="m-wr-reason"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد</button>`);
@@ -6042,6 +6252,15 @@ async function handleModalSave(){
     if(!description){ toast('اكتب وصف العمل',false); return; }
     const row={ id:uid('wr'), description, date:document.getElementById('m-wr-date').value, assigned_supervisor_id:document.getElementById('m-wr-sup').value, status:'scheduled', created_by:S.session.user.id };
     if(await dbInsert('waste_removal_jobs',[row])){ await loadWaste(); S.modal=null; render(); toast('تمت الإضافة',true); }
+  }
+  else if(m.type==='cancelOrderReason'){
+    const role=S.profile&&S.profile.role;
+    if(!['admin','opm','fm_dispatcher','supervisor'].includes(role)){ toast('مش مسموح لك تلغي الأوردر',false); S.modal=null; render(); return; }
+    const reason=document.getElementById('m-cancel-order-reason').value.trim();
+    if(!reason){ toast('لازم تكتب سبب الإلغاء',false); return; }
+    if(await dbUpdate('paid_service_orders', m.id, {status:'cancelled', cancel_reason:reason, updated_at:new Date().toISOString()})){
+      await loadOrders(); S.modal=null; S.drawer=null; render(); toast('تم إلغاء الأوردر وإتاحة مكانه للحجز',true);
+    }
   }
   else if(m.type==='postponeReason'){
     const reason=document.getElementById('m-postpone-generic-reason').value.trim();
