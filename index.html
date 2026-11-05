@@ -2353,29 +2353,30 @@ function drawerHtml(title, body){ return `<div class="sp-bg" data-drawer-close><
 function bindDrawer(){ document.querySelectorAll('[data-drawer-close]').forEach(e=>e.onclick=()=>{ S.drawer=null; render(); }); }
 /* ============================= خدمات (Integrated / Modifications) — بدون أسعار ============================= */
 const SS_TYPES={ integrated:'Integrated', modifications:'Modifications' };
-Object.assign(S,{ sideSvc:[], ssDate:todayStr(), ssType:'all' });
+Object.assign(S,{ sideSvc:[], ssDate:'', ssType:'all' });
 async function sideSvcFetch(){ try{ const {data,error}=await sb.from('side_service_units').select('*'); if(error){ console.warn('side_service_units',error.message); return null; } return data||[]; }catch(e){ return null; } }
 async function loadSideSvc(){ const d=await sideSvcFetch(); if(d) S.sideSvc=d; }
 function ssTypeTag(t){ return `<span class="tag-shift ${t==='integrated'?'morning':'evening'}">${SS_TYPES[t]||esc(t)}</span>`; }
 function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option>${x.status==='cancelled'?'<option value="cancelled" selected>تم الإلغاء</option>':''}${x.status==='pending_review'?'<option value="pending_review" selected>قيد المراجعة</option>':''}</select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
 function renderSideServices(){
   const canWrite=S.profile.role==='admin'||S.profile.role==='opm';
-  const day=(S.sideSvc||[]).filter(x=>x.date===S.ssDate);
+  const day=(S.ssDate? (S.sideSvc||[]).filter(x=>x.date===S.ssDate) : (S.sideSvc||[]).filter(x=>x.date>=S.today)).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
   const list=day.filter(x=>S.ssType==='all'||x.service_type===S.ssType);
   const cnt=t=>day.filter(x=>x.service_type===t).length;
   return `${renderModReqs()}<div class="toolbar">
-    <div class="fgroup"><label>التاريخ</label><input type="date" id="ss-date" value="${S.ssDate}"></div>
+    <div class="fgroup"><label>التاريخ</label><input type="date" id="ss-date" value="${S.ssDate}">${S.ssDate?`<button class="ghost-btn" id="ss-upcoming" style="margin-top:4px;">كل القادم</button>`:'<div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">بيعرض كل القادم (من النهارده)</div>'}</div>
     <div class="fgroup"><label>النوع</label><select id="ss-type"><option value="all" ${S.ssType==='all'?'selected':''}>الكل</option><option value="integrated" ${S.ssType==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${S.ssType==='modifications'?'selected':''}>Modifications</option></select></div>
     ${canWrite?`<button class="primary-btn" id="ss-add">${ICON.plus()} إضافة وحدات / أوردرات</button>`:''}
   </div>
   <div class="stat-row" style="margin-bottom:14px;"><div class="stat mint"><div class="num">${cnt('integrated')}</div><div class="lbl">Integrated</div></div><div class="stat blue"><div class="num">${cnt('modifications')}</div><div class="lbl">Modifications</div></div><div class="stat ink"><div class="num">${day.filter(x=>x.status==='completed').length}/${day.length}</div><div class="lbl">منتهية</div></div></div>
-  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>النوع</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
-  ${list.length? list.map(x=>`<tr><td>${esc(x.unit_code)}</td><td>${ssTypeTag(x.service_type)}</td><td>${(canWrite||S.profile.role==='supervisor')? ssStatusSelect('data-ss-status',x) : statusBadge(x.status)}</td><td style="white-space:normal;min-width:140px;">${esc(x.notes||'-')}</td><td>${audHistBtn('side_service_units',x.id,x.unit_code)} ${canWrite?`<button class="ghost-btn" data-ss-edit="${x.id}">تعديل</button> <button class="ghost-btn danger" data-ss-del="${x.id}">${ICON.trash()}</button>`:''}</td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات في هذا اليوم</td></tr>`}
+  <div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>كود الوحدة</th><th>النوع</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead><tbody>
+  ${list.length? list.map(x=>`<tr><td style="white-space:nowrap;">${esc(x.date)}${x.date===S.today?' <span style="font-size:11px;color:var(--blue);font-weight:800;">النهارده</span>':''}</td><td>${esc(x.unit_code)}</td><td>${ssTypeTag(x.service_type)}</td><td>${(canWrite||S.profile.role==='supervisor')? ssStatusSelect('data-ss-status',x) : statusBadge(x.status)}</td><td style="white-space:normal;min-width:140px;">${esc(x.notes||'-')}</td><td>${audHistBtn('side_service_units',x.id,x.unit_code)} ${canWrite?`<button class="ghost-btn" data-ss-edit="${x.id}">تعديل</button> <button class="ghost-btn danger" data-ss-del="${x.id}">${ICON.trash()}</button>`:''}</td></tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-dim);">${S.ssDate?'لا توجد وحدات في هذا اليوم':'لا توجد وحدات قادمة'}</td></tr>`}
   </tbody></table></div>`;
 }
 function bindSideServices(){
   bindModReqs();
   const d=document.getElementById('ss-date'); if(d) d.onchange=()=>{ S.ssDate=d.value; render(); };
+  const up=document.getElementById('ss-upcoming'); if(up) up.onclick=()=>{ S.ssDate=''; render(); };
   const t=document.getElementById('ss-type'); if(t) t.onchange=()=>{ S.ssType=t.value; render(); };
   const a=document.getElementById('ss-add'); if(a) a.onclick=()=>{ S.modal={type:'ssForm'}; render(); };
   document.querySelectorAll('[data-ss-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'ssForm', id:b.dataset.ssEdit}; render(); });
@@ -2386,7 +2387,7 @@ function renderSsForm(){
   const m=S.modal; const ex=m.id? (S.sideSvc||[]).find(x=>x.id===m.id):null;
   return modalWrap(ex?'تعديل':'إضافة وحدات / أوردرات (خدمات جانبية)', `
     <div class="form-row"><label>النوع</label><select id="ss-f-type"><option value="integrated" ${ex&&ex.service_type==='integrated'?'selected':''}>Integrated</option><option value="modifications" ${ex&&ex.service_type==='modifications'?'selected':''}>Modifications</option></select></div>
-    <div class="form-row"><label>التاريخ</label><input type="date" id="ss-f-date" value="${ex?ex.date:S.ssDate}"></div>
+    <div class="form-row"><label>التاريخ</label><input type="date" id="ss-f-date" value="${ex?ex.date:(S.ssDate||S.today)}"></div>
     ${ex? `<div class="form-row"><label>كود الوحدة</label><input id="ss-f-code" value="${esc(ex.unit_code)}"></div>`
         : `<div class="form-row"><label>أكواد الوحدات (واحد في كل سطر أو بينهم فاصلة)</label><textarea id="ss-f-codes" rows="5" placeholder="E1-J1-3-2&#10;Y-A2-4-2"></textarea></div>`}
     <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="ss-f-notes" rows="2">${esc(ex?ex.notes||'':'')}</textarea></div>
@@ -2412,12 +2413,12 @@ function bindSsForm(){
       if(!(await dbInsert('side_service_units', rows))){ b.disabled=false; return; }
       if(fresh.length<codes.length) toast('اتضافت '+fresh.length+' وحدة (التكرار اتجاهل)',true);
     }
-    await loadSideSvc(); S.ssDate=date; S.modal=null; render(); toast('تم الحفظ',true);
+    await loadSideSvc(); S.ssDate=''; S.modal=null; render(); toast('تم الحفظ',true);
   };
 }
 function renderSideSvcForSupervisor(){
   const last=addDaysStr(S.today,2);
-  const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
+  const arr=(S.sideSvc||[]).filter(x=>x.date>=S.today && x.date<=last && x.status!=='cancelled').sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
   return `<div class="section-title"><h2>خدمات جانبية — Integrated / Modifications (اليوم + يومين)</h2></div>
   ${arr.length? arr.map(x=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div><b>${esc(x.unit_code)}</b> ${ssTypeTag(x.service_type)}${x.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${x.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(x.date)}</span>`:''}${x.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(x.notes)}</div>`:''}</div>
@@ -5477,7 +5478,8 @@ function renderSupervisorTodayBase(){
     const lastDay = addDaysStr(S.today,2);
     const myDelivAll = S.deliveries.filter(d=>d.date>=S.today && d.date<=lastDay).sort((a,b)=>String(a.date).localeCompare(String(b.date)) || cmpArrival(a,b));
     const myDeliv = myDelivAll.filter(d=>d.date===S.today);
-    const myOrders = S.orders.filter(o=>o.scheduled_date===S.today && orderApproved(o));
+    const myOrdersAll = S.orders.filter(o=>o.scheduled_date>=S.today && o.scheduled_date<=lastDay && orderApproved(o)).sort((a,b)=>String(a.scheduled_date).localeCompare(String(b.scheduled_date))||String(a.scheduled_time||'').localeCompare(String(b.scheduled_time||'')));
+    const myOrders = myOrdersAll.filter(o=>o.scheduled_date===S.today);
     const doneOf = arr => arr.filter(x=>x.status==='completed').length;
     let html = head('أنت النهاردة مشرف وحدات — كل وحدات اليوم واليومين الجايين نازلة لك أوتوماتيك، وتقدر تغيّر حالتها لو خلصتها بدري.') + supExtras();
     html += `<div class="stat-row">
@@ -5504,9 +5506,9 @@ function renderSupervisorTodayBase(){
       </div>`;
     }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة ولا في اليومين الجايين</p>`}`;
     html += renderSideSvcForSupervisor();
-    html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة</h2></div>
-    ${myOrders.length? myOrders.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b> — ${fmt12(o.scheduled_time,'')}
+    html += `<div class="section-title"><h2>أوردرات الخدمة المدفوعة (اليوم + يومين)</h2></div>
+    ${myOrdersAll.length? myOrdersAll.map(o=>`<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div><b>${o.unit_code?esc(o.unit_code)+' — ':''}${ORDER_TYPE_LABEL[o.order_type]||o.order_type}</b>${o.scheduled_date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${o.scheduled_date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(o.scheduled_date)}</span>`:''} — ${fmt12(o.scheduled_time,'')}
         ${o.opm_notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(o.opm_notes)}</div>`:''}
       </div>
       <select data-my-ord="${o.id}">
@@ -5516,7 +5518,7 @@ function renderSupervisorTodayBase(){
         <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
         <option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>
       </select>${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:11px;color:var(--coral);margin-top:4px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}
-    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة</p>`}`;
+    </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة ولا في اليومين الجايين</p>`}`;
     return html;
   }
 
@@ -6512,7 +6514,7 @@ document.addEventListener('visibilitychange', async ()=>{
   if(urgentRoles().includes(r)) await loadUrgent();
   if(r==='admin'||r==='opm'){ await loadOrders(); await loadAttEditReqs(); checkPendingExtras(true); }
   if(['admin','opm','hk_manager','hk_senior_supervisor','supervisor'].includes(r)){ await loadTaskData(); await ensureTodayTaskRuns(); }
-  if(r==='supervisor'){ await loadDeliveries(); await loadOrders(); }
+  if(r==='supervisor'){ await loadDeliveries(); await loadOrders(); await loadSideSvc(); }
   if(!S.modal && !hasUnsavedInput()) render();
 });
 let pendingPhoto=null;
@@ -6881,7 +6883,7 @@ function startDistPoll(){
     if(hasUnsavedInput()) return;
     await refreshAssignments();
     if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
-    if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
+    if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); await loadOrders(); await loadSideSvc(); }catch(e){} }
     if(!S.modal && !hasUnsavedInput()) render();
   },90000);
 }
