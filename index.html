@@ -641,8 +641,16 @@ function uid(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ============================= DB HELPERS ============================= */
+const DB_COLS={
+  paid_service_orders:'id,order_type,scheduled_date,scheduled_time,client_info,status,assigned_supervisor_id,opm_notes,created_by,assigned_by,created_at,updated_at,unit_code,postpone_reason,price,payment_status,approval_status,extra_reason,approved_by,approved_at,cancel_reason,has_pay_photo',
+  pest_control_requests:'id,unit_code,service_type,scheduled_date,scheduled_time,status,assigned_supervisor_id,notes,created_by,created_at,updated_at,price,payment_status,has_pay_photo',
+  supplier_invoices:'id,supplier_id,amount,discount,invoice_date,status,created_by,created_at,paid_at,phase,has_photo',
+  suppliers:'id,name,category,service_description,budget,created_by,created_at,has_contract',
+  unit_notes:'id,delivery_unit_id,note,created_by,created_at,has_photo',
+  facade_works:'id,date,location_id,description,status,completed_by,completed_at,created_by,created_at,has_photo'
+};
 async function dbSelect(table, filters){
-  let q = sb.from(table).select('*');
+  let q = sb.from(table).select(DB_COLS[table]||'*');
   if(filters) Object.keys(filters).forEach(k=>{ q = q.eq(k, filters[k]); });
   const {data,error} = await q;
   if(error){ console.error(table, error); toast('تعذّر تحديث بيانات "'+table+'" — '+error.message, false); return null; }
@@ -966,7 +974,7 @@ async function fvRepLoad(){
 }
 async function fvRepDetail(date){
   const r=S.verify.rep, ses=(r.rows||[]).find(x=>x.date===date); if(!ses) return;
-  const {data,error}=await sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_thumb,selfie_at,submitted_at,worker_count,result').eq('date',date);
+  const {data,error}=await sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_at,submitted_at,worker_count,result').eq('date',date);
   if(error){ toast('تعذّر تحميل التفاصيل: '+error.message,false); return; }
   if(!(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(e){} }
   r.detail={ date, ses, checks:data||[] }; render();
@@ -998,13 +1006,19 @@ function fvStaff(){ const r=S.profile&&S.profile.role; return r==='admin'||r==='
 function fvMyCheck(){ const v=S.verify; if(!S.session||!v.session) return null; return (v.checks||[]).find(c=>c.supervisor_id===S.session.user.id)||null; }
 function fvLeftMs(){ const d=S.verify.session&&S.verify.session.call_deadline; return d? new Date(d).getTime()-Date.now() : 0; }
 function fvFmtLeft(ms){ ms=Math.max(0,ms); return String(Math.floor(ms/60000)).padStart(2,'0')+':'+String(Math.floor(ms%60000/1000)).padStart(2,'0'); }
-async function loadVerify(){
+async function loadVerify(isTick){
   const q=async f=>{ try{ const r=await f(); return r.error?null:r.data; }catch(e){ return null; } };
-  const [zone,session]=await Promise.all([ q(()=>sb.from('verify_settings').select('*').eq('id','zone').maybeSingle()), q(()=>sb.from('verify_sessions').select('*').eq('id',S.today).maybeSingle()) ]);
-  const checks=await q(()=>sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_thumb,selfie_at,submitted_at,worker_count,result').eq('date',S.today));
+  const v=S.verify;
+  const needZone=!isTick || !v.zone || S.tab==='verify';
+  const [zone,session]=await Promise.all([ needZone? q(()=>sb.from('verify_settings').select('*').eq('id','zone').maybeSingle()) : Promise.resolve(v.zone), q(()=>sb.from('verify_sessions').select('*').eq('id',S.today).maybeSingle()) ]);
+  const checks= session? await q(()=>sb.from('verify_checks').select('id,session_id,supervisor_id,supervisor_name,status,ack_at,selfie_at,submitted_at,worker_count,result').eq('date',S.today)) : [];
   if(fvStaff() && !(S.cardHolders&&S.cardHolders.length)){ try{ await loadCardHolders(); }catch(e){} }
-  const faces=fvStaff()? (await q(()=>sb.from('verify_faces').select('id,kind,label_user_id,thumb,created_at').eq('date',S.today).order('created_at'))||[]) : [];
-  const v=S.verify; v.zone=zone; v.session=session; v.checks=checks||[]; v.faces=faces; v.loaded=true;
+  let faces=v.faces||[];
+  if(session && fvStaff() && S.tab==='verify' && (!isTick || Date.now()-(v.facesAt||0)>90000)){
+    const f=await q(()=>sb.from('verify_faces').select('id,kind,label_user_id,thumb,created_at').eq('date',S.today).order('created_at'));
+    if(f){ faces=f; v.facesAt=Date.now(); }
+  } else if(!session){ faces=[]; }
+  v.zone=zone; v.session=session; v.checks=checks||[]; v.faces=faces; v.loaded=true;
   const sig=JSON.stringify([session&&[session.status,session.call_deadline,session.workers_count,session.supervisors_count],v.checks.map(c=>[c.id,c.status,c.worker_count]),faces.length,zone&&[zone.lat,zone.lng,zone.radius_m]]);
   const changed=sig!==v.sig; v.sig=sig; return changed;
 }
@@ -1013,7 +1027,7 @@ async function verifyTick(force){
   if(fvTickBusy||!S.session||!S.profile||document.visibilityState!=='visible') return;
   if(!['admin','opm','hk_manager','supervisor'].includes(S.profile.role)) return;
   fvTickBusy=true;
-  try{ const ch=await loadVerify(); fvAlarmCheck(); if((ch||force) && (S.tab==='verify'||S.tab==='today') && !document.getElementById('fv-scan') && !document.getElementById('fv-zone-ov') && !S.modal) render(); }
+  try{ const ch=await loadVerify(true); fvAlarmCheck(); if((ch||force) && (S.tab==='verify'||S.tab==='today') && !document.getElementById('fv-scan') && !document.getElementById('fv-zone-ov') && !S.modal) render(); }
   finally{ fvTickBusy=false; }
 }
 function fvSecondTick(){
@@ -1021,7 +1035,7 @@ function fvSecondTick(){
   const ses=S.verify.session; fvSecs++;
   if(ses&&ses.status==='calling'&&fvLeftMs()<=0&&fvSecs%5===0) verifyTick(true);
 }
-setInterval(()=>verifyTick(),12000); setInterval(fvSecondTick,1000); setTimeout(()=>verifyTick(true),4000);
+(function fvSched(){ const st=S.verify&&S.verify.session&&S.verify.session.status; const ms= st==='calling'?12000 : S.tab==='verify'?30000 : 60000; setTimeout(async()=>{ try{ await verifyTick(); }catch(e){} fvSched(); },ms); })(); setInterval(fvSecondTick,1000); setTimeout(()=>verifyTick(true),4000);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') verifyTick(); });
 
 /* ---- alarm (supervisor): loud + vibrating until tapped ---- */
@@ -1788,25 +1802,23 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; S.tab=b.dataset.tab; if(S.tab==='sideservices') S.modReqsLoaded=false; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
-  const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=e=>{ S.tab=e.target.value; render(); };
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; S.tab=b.dataset.tab; if(S.tab==='sideservices') S.modReqsLoaded=false; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='verify') await loadVerify(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
+  const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=async e=>{ S.tab=e.target.value; if(S.tab==='verify'){ try{ await loadVerify(); }catch(x){} } render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();
-    const [k,id]=b.dataset.viewPhoto.split('|'); let src=null;
-    if(k==='ord'){ const o=S.orders.find(x=>x.id===id); src=o&&o.payment_photo; }
-    else if(k==='pest'){ const p=S.pest.find(x=>x.id===id); src=p&&p.payment_photo; }
-    else if(k==='inv'){ const i=S.supplierInvoices.find(x=>x.id===id); src=i&&i.photo; }
-    else if(k==='urg'){
-      sb.from('urgent_tasks').select('status_photo').eq('id',id).maybeSingle().then(({data,error})=>{
-        if(error||!data||!data.status_photo){ toast('مفيش صورة',false); return; }
-        S.modal={ type:'viewPhoto', src:data.status_photo, title:'صورة التنفيذ', back:null }; render();
-      });
-      return;
-    }
-    if(!src) return;
-    S.modal={ type:'viewPhoto', src, title: k==='inv'?'صورة الفاتورة':'إثبات الدفع', back:(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null };
-    render();
+    const [k,id]=b.dataset.viewPhoto.split('|');
+    const LZ={ ord:['paid_service_orders','payment_photo','إثبات الدفع'], pest:['pest_control_requests','payment_photo','إثبات الدفع'], inv:['supplier_invoices','photo','صورة الفاتورة'], fac:['facade_works','photo','صورة الإنجاز'], note:['unit_notes','photo','صورة الملاحظة'], sup:['suppliers','contract_photo','صورة العقد'], urg:['urgent_tasks','status_photo','صورة التنفيذ'] };
+    const z=LZ[k]; if(!z) return;
+    const back=(S.modal&&S.modal.type!=='viewPhoto')?S.modal:null; const ck=k+'|'+id; S._phc=S._phc||{};
+    if(S._phc[ck]){ S.modal={ type:'viewPhoto', src:S._phc[ck], title:z[2], back }; render(); return; }
+    b.disabled=true;
+    sb.from(z[0]).select(z[1]).eq('id',id).maybeSingle().then(({data,error})=>{
+      b.disabled=false; const src=data&&data[z[1]];
+      if(error||!src){ toast('مفيش صورة',false); return; }
+      const ks=Object.keys(S._phc); if(ks.length>8) delete S._phc[ks[0]]; S._phc[ck]=src;
+      S.modal={ type:'viewPhoto', src, title:z[2], back }; render();
+    });
   });
   const toggleGlass=()=>{ glassOn=!glassOn; try{ localStorage.setItem('zw_glass',glassOn?'1':'0'); }catch(e){} document.body.classList.toggle('glass',glassOn); const dg=document.getElementById('drawer-glass'); if(dg) dg.textContent='✨ المظهر الزجاجي: '+(glassOn?'شغّال':'مقفول'); if(glassOn){ S._gIntro=false; render(); } };
   const gb=document.getElementById('glass-btn'); if(gb) gb.onclick=toggleGlass;
@@ -2498,7 +2510,7 @@ function renderOrders(){
     const kv=(k,v)=>`<div class="sp-kv"><span>${k}</span><span style="text-align:left;">${v}</span></div>`;
     return drawerHtml('أوردر '+esc(o.unit_code||''),
       kv('رقم الوحدة',esc(o.unit_code||'-'))+kv('النوع',ORDER_TYPE_LABEL[o.order_type]||o.order_type)+kv('رقم Sales Force',esc(o.client_info||'-'))
-      +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.payment_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
+      +(hideMoney?'':kv('السعر',o.price!=null?(+o.price).toLocaleString('en-US')+' ج.م':'-')+kv('الدفع',PAYMENT_STATUS_LABEL[o.payment_status]||'غير مدفوع')+(o.has_pay_photo?`<div style="margin:8px 0;"><button class="ghost-btn" data-view-photo="ord|${o.id}">🧾 إثبات الدفع</button></div>`:''))
       +kv('التاريخ',o.scheduled_date)+kv('الميعاد',fmt12(o.scheduled_time,'-'))+kv('الحالة',statusBadge(o.status))
       +(o.extra_reason?kv('سبب الإضافة',esc(o.extra_reason)):'')+(o.postpone_reason?kv('سبب التأجيل',esc(o.postpone_reason)):'')+(o.cancel_reason?kv('سبب الإلغاء',esc(o.cancel_reason)):'')
       +kv('ملاحظات',esc(o.opm_notes||'-'))
@@ -2639,7 +2651,7 @@ function renderPestOld(){
       <td>${canManage? `<select data-pest-payment="${p.id}">
         <option value="unpaid" ${p.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
         <option value="paid" ${p.payment_status==='paid'?'selected':''}>مدفوع</option>
-      </select>${p.payment_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="pest|${p.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
+      </select>${p.has_pay_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="pest|${p.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
       <td>${p.scheduled_date}</td><td>${fmt12(p.scheduled_time,'-')}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${canChangeStatus? `<select data-pest-status="${p.id}">
@@ -2894,7 +2906,7 @@ function renderFacadeOld(){
   ${list.length? list.map(f=>{
     return `<tr>
       <td>${esc(f.description||'-')}</td><td>${statusBadge(f.status)}</td>
-      <td>${f.status==='scheduled'?`<button class="ghost-btn" data-fc-complete="${f.id}">تم الانتهاء</button>`:(f.photo?`<img src="${f.photo}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;">`:'')}</td>
+      <td>${f.status==='scheduled'?`<button class="ghost-btn" data-fc-complete="${f.id}">تم الانتهاء</button>`:(f.has_photo?`<button class="ghost-btn" data-view-photo="fac|${f.id}">📷 الصورة</button>`:'')}</td>
     </tr>`;
   }).join(''): `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد أعمال في هذا اليوم</td></tr>`}
   </tbody></table></div>`;
@@ -3001,7 +3013,7 @@ async function loadTaskData(){
   const d=new Date(); d.setDate(d.getDate()-45); const from=dateStr(d);
   const [lists, items, runsRes] = await Promise.all([
     dbSelect('task_lists'), dbSelect('task_items'),
-    sb.from('task_runs').select('*').gte('date', from)
+    sb.from('task_runs').select('id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count').gte('date', from)
   ]);
   if(lists) S.taskLists=lists;
   if(items) S.taskItems=items;
@@ -5094,7 +5106,7 @@ function startUrgentPoll(){
     });
     const sig=urgentSignature();
     if((fresh || sig!==S.urgentSig) && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()){ S.urgentSig=sig; render(); }
-  },20000);
+  },60000);
 }
 
 /* ============================= LOCATIONS (admin) ============================= */
@@ -5632,8 +5644,8 @@ function renderModal(){
       <option value="unpaid" ${o.payment_status!=='paid'?'selected':''}>غير مدفوع</option>
       <option value="paid" ${o.payment_status==='paid'?'selected':''}>مدفوع</option>
     </select></div>
-    ${o.payment_photo?`<img src="${o.payment_photo}" class="photo-preview" style="max-height:140px;margin-bottom:6px;">`:''}
-    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} ${o.payment_photo?'تغيير':'رفع'} إثبات الدفع<input type="file" accept="image/*" id="cf-photo"></label>
+    ${o.has_pay_photo?`<button type="button" class="ghost-btn" style="margin-bottom:6px;" data-view-photo="ord|${o.id}">🧾 عرض الإثبات الحالي</button>`:''}
+    <label class="ghost-btn file-btn" style="display:block;text-align:center;margin-bottom:6px;">${ICON.camera(13)} ${o.has_pay_photo?'تغيير':'رفع'} إثبات الدفع<input type="file" accept="image/*" id="cf-photo"></label>
     <img id="cf-photo-preview" class="photo-preview" style="display:none;max-height:100px;margin-bottom:6px;">
     <div class="form-row"><label>ملاحظات (اختياري)</label><textarea id="m-ord-notes">${esc(o.opm_notes||'')}</textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`);
@@ -5871,8 +5883,8 @@ function renderModal(){
     <div class="form-row"><label>شرح الخدمة</label><textarea id="m-sup-desc">${esc(es.service_description||'')}</textarea></div>
     <div class="form-row"><label>البدجت السنوي/الإجمالي</label><input type="number" id="m-sup-budget" value="${Number(es.budget||0)}"></div>
     <div class="form-row"><label>صورة العقد (اختياري — سيبها لو مش هتغيرها)</label>
-      ${es.contract_photo?`<img src="${es.contract_photo}" class="photo-preview" style="max-height:90px;margin-bottom:6px;">`:''}
-      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} ${es.contract_photo?'تغيير':'رفع'} صورة العقد<input type="file" accept="image/*" id="cf-photo"></label>
+      ${es.has_contract?`<button type="button" class="ghost-btn" style="margin-bottom:6px;" data-view-photo="sup|${es.id}">📄 عرض العقد الحالي</button>`:''}
+      <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} ${es.has_contract?'تغيير':'رفع'} صورة العقد<input type="file" accept="image/*" id="cf-photo"></label>
       <img id="cf-photo-preview" class="photo-preview" style="display:none;">
     </div>
     <p style="font-size:11.5px;color:var(--text-dim);line-height:1.8;margin:0 0 10px;">لو غيّرت القطاع، نموذج التقييم الشهري الجديد هيتغير حسب القطاع الجديد. الفواتير والتقييمات القديمة بتفضل زي ما هي.</p>
@@ -5900,7 +5912,7 @@ function renderModal(){
       <div style="background:var(--sand);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
         <div>القطاع: <b>${SUPPLIER_CAT_LABEL[s.category]}</b></div>
         <div style="margin-top:4px;">${esc(s.service_description||'')}</div>
-        ${s.contract_photo?`<img src="${s.contract_photo}" class="photo-preview" style="max-height:140px;margin-top:8px;">`:''}
+        ${s.has_contract?`<button type="button" class="ghost-btn" style="margin-top:8px;" data-view-photo="sup|${s.id}">📄 صورة العقد</button>`:''}
         <div style="margin-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;"><span>البدجت: <b>${Number(s.budget||0).toLocaleString()}</b></span><span>المتبقي: <b style="color:${remaining<0?'var(--coral)':'var(--mint)'};">${remaining.toLocaleString()}</b></span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);margin-top:4px;flex-wrap:wrap;gap:6px;"><span>إجمالي الفواتير: ${st.totalInvoiced.toLocaleString()}</span><span>موفّر من الخصومات: ${st.totalSaved.toLocaleString()}</span></div>
         <button class="ghost-btn" id="edit-supplier-btn" style="width:100%;margin-top:10px;">✏️ تعديل بيانات المورد (الاسم / القطاع / البدجت)</button>
@@ -5957,7 +5969,7 @@ function renderModal(){
       <div class="tbl-wrap" style="box-shadow:none;"><table><thead><tr><th>المبلغ</th><th>الخصم</th><th>التاريخ</th><th>الحالة</th><th>الفاتورة</th><th></th></tr></thead><tbody>
         ${list.map(i=>`<tr><td>${Number(i.amount).toLocaleString()}</td><td>${Number(i.discount||0).toLocaleString()}</td><td>${i.invoice_date}</td><td>
           <select data-inv-status="${i.id}">${Object.keys(INVOICE_STATUS_LABEL).map(k=>`<option value="${k}" ${i.status===k?'selected':''}>${INVOICE_STATUS_LABEL[k]}</option>`).join('')}</select>
-        </td><td>${i.photo?`<img src="${i.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" data-view-photo="inv|${i.id}">`:'-'}</td>
+        </td><td>${i.has_photo?`<button class="ghost-btn" style="padding:3px 8px;font-size:11px;" data-view-photo="inv|${i.id}">🧾</button>`:'-'}</td>
         <td><button class="ghost-btn" data-inv-edit="${i.id}">تعديل</button> <button class="ghost-btn danger" data-inv-del="${i.id}">${ICON.trash(12)}</button></td></tr>`).join('')}
       </tbody></table></div>`;
     }).join('') || `<p style="font-size:12px;color:var(--text-dim);">لا توجد فواتير بعد</p>`;
@@ -6018,7 +6030,7 @@ function renderModal(){
     return modalWrap('ملاحظات الوحدة', notes.length? notes.map(n=>`
       <div style="border-bottom:1px dashed var(--line);padding:10px 0;">
         <div style="font-size:13px;">${esc(n.note)}</div>
-        ${n.photo?`<img src="${n.photo}" class="photo-preview" style="max-height:180px;">`:''}
+        ${n.has_photo?`<button type="button" class="ghost-btn" style="margin-top:6px;" data-view-photo="note|${n.id}">📷 عرض الصورة</button>`:''}
         <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtTime(n.created_at)} · ${n.created_at?n.created_at.slice(0,10):''}</div>
       </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد ملاحظات على هذه الوحدة</p>`);
   }
@@ -6418,7 +6430,8 @@ async function handleModalSave(){
     const name=document.getElementById('m-sup-name').value.trim();
     if(!name){ toast('اكتب اسم المورد',false); return; }
     const oldSup=S.suppliers.find(x=>x.id===m.id)||{};
-    const patch={ name, category:document.getElementById('m-sup-cat').value, service_description:document.getElementById('m-sup-desc').value.trim(), budget:+document.getElementById('m-sup-budget').value||0, contract_photo:(pendingPhoto||oldSup.contract_photo||null) };
+    const patch={ name, category:document.getElementById('m-sup-cat').value, service_description:document.getElementById('m-sup-desc').value.trim(), budget:+document.getElementById('m-sup-budget').value||0, };
+    if(pendingPhoto) patch.contract_photo=pendingPhoto;
     if(await dbUpdate('suppliers', m.id, patch)){ await loadSuppliers(); pendingPhoto=null; S.modal={type:'supplierDetail', id:m.id}; render(); toast('تم حفظ تعديل المورد',true); }
   }
   else if(m.type==='violForm'){ await saveViolation(); }
@@ -6493,6 +6506,7 @@ function handleScannedCode(code){
 document.addEventListener('visibilitychange', async ()=>{
   if(document.visibilityState!=='visible' || !S.session || !S.profile || S.modal) return;
   if(hasUnsavedInput()) return;
+  if(Date.now()-(S._visAt||0)<60000) return; S._visAt=Date.now();
   await refreshAssignments();
   const r = S.profile.role;
   if(urgentRoles().includes(r)) await loadUrgent();
@@ -6544,6 +6558,13 @@ async function submitTaskConfirm(){
 }
 
 /* ============================= BOOT ============================= */
+async function loadUnitsCached(){
+  if(S.units && S.units.length && S._unitsAt && Date.now()-S._unitsAt<3600000) return S.units;
+  try{ const c=JSON.parse(localStorage.getItem('zw_units_v1')||'null'); if(c&&c.rows&&c.rows.length&&Date.now()-c.t<86400000){ S._unitsAt=Date.now(); return c.rows; } }catch(e){}
+  const rows=await dbSelect('units_master');
+  if(rows&&rows.length){ S._unitsAt=Date.now(); try{ localStorage.setItem('zw_units_v1',JSON.stringify({t:Date.now(),rows})); }catch(e){} }
+  return rows;
+}
 async function loadRoleData(){
   const role=S.profile.role;
   const isMgmt = role==='admin'||role==='opm';
@@ -6560,7 +6581,7 @@ async function loadRoleData(){
   if(isMgmt || role==='fm_dispatcher'){
     jobs.orders = dbSelect('paid_service_orders');
     jobs.pest = dbSelect('pest_control_requests');
-    jobs.units = dbSelect('units_master');
+    jobs.units = loadUnitsCached();
   }
   if(wantsOpsData){
     jobs.sideSvc = sideSvcFetch();
@@ -6570,13 +6591,13 @@ async function loadRoleData(){
     jobs.waste = dbSelect('waste_removal_jobs');
     jobs.deliveries = dbSelect('delivery_units');
     jobs.unitNotes = dbSelect('unit_notes');
-    jobs.units = dbSelect('units_master');
+    jobs.units = loadUnitsCached();
   }
   if(isHK){
     jobs.orders = dbSelect('paid_service_orders');
     jobs.deliveries = dbSelect('delivery_units');
     jobs.unitNotes = dbSelect('unit_notes');
-    jobs.units = dbSelect('units_master');
+    jobs.units = loadUnitsCached();
   }
   if(role==='facade_sv'){ jobs.facade = dbSelect('facade_works'); jobs.orders = dbSelect('paid_service_orders'); }
   if(role==='pest_sv') jobs.pest = dbSelect('pest_control_requests');
@@ -6741,7 +6762,7 @@ function startSvcPoll(){
     const r=S.profile.role; if(!(r==='admin'||r==='opm'||isSvcSV(r))) return;
     if(hasUnsavedInput()) return;
     await loadSvcData(); if(!S.modal && !hasUnsavedInput()) render();
-  },30000);
+  },90000);
 }
 function startExtraPoll(){
   if(extraPollStarted) return; extraPollStarted = true;
@@ -6757,7 +6778,7 @@ function startExtraPoll(){
     if(sig===S._pendSig) return; S._pendSig=sig;
     await loadOrders(); await loadAttEditReqs();
     if(!S.modal && !hasUnsavedInput()) render();
-  }, 60000);
+  }, 120000);
 }
 /* ============================= v5: notifications (mandatory permission + targeted server notifications + web push) ============================= */
 // المفتاح العام لـ Web Push (VAPID). لو فاضي: الإشعارات بتشتغل والتطبيق مفتوح بس.
@@ -6840,7 +6861,16 @@ async function markNotificationsRead(){
   if(ids.length){ const {error}=await sb.from('notifications').update({ read:true }).in('id',ids); if(error) console.warn('notifications read',error.message); }
 }
 let notifPollStarted=false;
-function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(()=>{ if(S.session&&S.profile) loadNotifications(false); },15000); }
+async function notifProbe(){
+  if(!S.session||!S.profile||document.visibilityState!=='visible') return;
+  try{
+    const {data,count,error}=await sb.from('notifications').select('id',{count:'exact'}).eq('read',false).order('created_at',{ascending:false}).limit(1);
+    if(error) return;
+    const sig=(count||0)+'|'+((data&&data[0]&&data[0].id)||'');
+    if(sig===S._ntfProbe) return; S._ntfProbe=sig; await loadNotifications(false);
+  }catch(e){}
+}
+function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(notifProbe,45000); }
 let distPollStarted=false;
 function startDistPoll(){
   if(distPollStarted) return; distPollStarted=true;
@@ -6853,7 +6883,7 @@ function startDistPoll(){
     if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
     if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); }catch(e){} }
     if(!S.modal && !hasUnsavedInput()) render();
-  },30000);
+  },90000);
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
@@ -6862,7 +6892,7 @@ if('serviceWorker' in navigator){
     else if(d.type==='push'){ loadNotifications(false); }
   });
 }
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && S.session && S.profile) loadNotifications(false); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && S.session && S.profile) notifProbe(); });
 
 /* ============================= v5: mobile app-like navigation + card tables ============================= */
 function menuIcon(sz){ return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`; }
