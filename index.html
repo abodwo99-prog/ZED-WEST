@@ -1844,7 +1844,8 @@ function bindGlobalEvents(){
 }
 
 /* ============================= TAB DISPATCH ============================= */
-function renderTabBody(){
+function renderTabBody(){ return fmUnitBar()+renderTabBodyInner(); }
+function renderTabBodyInner(){
   switch(S.tab){
     case 'home': return renderHome();
     case 'deliveries': return renderDeliveries();
@@ -1900,7 +1901,51 @@ function bindTabEvents(){
     case 'today': bindSupervisorToday(); break;
     case 'myname': bindMyName(); break;
   }
+  bindFmUnitBar();
   bindModalEvents();
+}
+
+/* ============================= FM dispatcher: unit search ============================= */
+Object.assign(S,{ unitQ:'', fmQ:'' });
+function fmUnitMatch(code){ return !!S.unitQ && String(code||'').trim().toLowerCase()===S.unitQ.toLowerCase(); }
+function fmUnitBar(){
+  const _r=S.profile&&S.profile.role; const _staff=(_r==='admin'||_r==='opm');
+  if(!(_r==='fm_dispatcher' || (_staff && ['home','deliveries','sideservices','orders','pest','complaints'].includes(S.tab)))) return '';
+  return `<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--ink),var(--ink-2));color:#fff;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-weight:800;font-size:14px;">🔍 بحث برقم الوحدة</span>
+      <input id="fm-unit-q" autocomplete="off" placeholder="اكتب كود الوحدة..." value="${esc(S.fmQ||'')}" style="flex:1;min-width:180px;border:none;border-radius:9px;padding:11px 14px;font-size:15px;">
+    </div>
+    <div id="fm-unit-res" style="margin-top:8px;font-size:13px;line-height:1.8;"></div>
+  </div>
+  ${(S.unitQ && ['deliveries','orders','pest','complaints','sideservices'].includes(S.tab))?`<div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>🔎 بتعرض الوحدة: <b>${esc(S.unitQ)}</b> (كل التواريخ)</span><button class="ghost-btn" id="fm-unit-clear">إلغاء الفلتر</button></div>`:''}`;
+}
+function fmUnitResults(q){
+  q=(q||'').trim().toLowerCase(); if(q.length<2) return [];
+  const groups=[
+    { tab:'deliveries', label:'تسليم وحدة', data:S.deliveries||[], date:d=>d.date },
+    { tab:'orders', label:'خدمة مدفوعة', data:(S.orders||[]).filter(orderApproved), date:o=>o.scheduled_date },
+    { tab:'pest', label:'مكافحة حشرات', data:S.pest||[], date:x=>x.scheduled_date },
+    { tab:'complaints', label:'شكوى', data:S.complaints||[], date:c=>c.date }
+  ];
+  if(S.profile.role==='admin'||S.profile.role==='opm') groups.push({ tab:'sideservices', label:'خدمة جانبية', data:S.sideSvc||[], date:x=>x.date });
+  const out=[];
+  groups.forEach(g=>g.data.forEach(it=>{ if(String(it.unit_code||'').toLowerCase().includes(q)) out.push({ tab:g.tab, label:g.label, code:it.unit_code, date:g.date(it)||'', status:it.status }); }));
+  out.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return out.slice(0,40);
+}
+function bindFmUnitBar(){
+  const inp=document.getElementById('fm-unit-q'); if(!inp) return;
+  const box=document.getElementById('fm-unit-res');
+  const draw=()=>{
+    S.fmQ=inp.value; const res=fmUnitResults(inp.value);
+    if((inp.value||'').trim().length<2){ box.innerHTML=''; return; }
+    if(!res.length){ box.innerHTML='<span style="opacity:.8;">مفيش نتائج لرقم الوحدة ده</span>'; return; }
+    box.innerHTML=res.map((r,i)=>`<div data-fm-go="${i}" style="cursor:pointer;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.15);"><b>${esc(r.code)}</b> <span style="opacity:.75;font-size:12px;">— ${r.label} — ${esc(r.date)}${r.date===S.today?' (النهارده)':''}${STATUS_LABEL[r.status]?' — '+STATUS_LABEL[r.status]:''}</span></div>`).join('');
+    box.querySelectorAll('[data-fm-go]').forEach(el=>el.onclick=()=>{ const r=res[+el.dataset.fmGo]; S.unitQ=String(r.code||'').trim(); S.tab=r.tab; S.fmQ=''; S.ordersDate=''; render(); });
+  };
+  inp.oninput=draw; if(S.fmQ) draw();
+  const clr=document.getElementById('fm-unit-clear'); if(clr) clr.onclick=()=>{ S.unitQ=''; render(); };
 }
 
 /* ============================= HOME (admin/opm) ============================= */
@@ -1941,13 +1986,6 @@ function renderHome(){
   })() : '';
 
   return `
-  <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,var(--ink),var(--ink-2));color:#fff;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:800;font-size:14px;">🔍 بحث في النظام</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <input id="sys-search" placeholder="ابحث برقم الوحدة، اسم مورد، اسم مستخدم، وصف شكوى..." style="flex:1;min-width:220px;border:none;border-radius:9px;padding:11px 14px;font-size:13.5px;">
-    </div>
-    <div id="sys-search-results" style="margin-top:10px;font-size:13px;line-height:1.8;"></div>
-  </div>
   <div class="stat-row">${extraCard}${attEditCard}${cardsHtml}${attendanceCard}</div>
   ${(role==='admin'||role==='opm'||role==='hk_manager')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
   <div class="card" style="margin-bottom:14px;">
@@ -2093,7 +2131,7 @@ function renderDeliveries(){
   const canWrite = role==='admin'||role==='opm';
   const canChangeStatus = ['admin','opm','supervisor'].includes(role);
   const todayOnly = role==='fm_dispatcher';
-  const list = S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate)).sort(cmpArrival);
+  const list = S.unitQ ? S.deliveries.filter(d=>fmUnitMatch(d.unit_code)).sort((a,b)=>String(b.date).localeCompare(String(a.date))) : S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate)).sort(cmpArrival);
   return `
   <div class="toolbar">
     ${todayOnly? '<span style="font-size:13px;font-weight:800;">وحدات تسليم اليوم — للعلم فقط</span>' : `<div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>`}
@@ -2104,7 +2142,7 @@ function renderDeliveries(){
   ${list.length? list.map(d=>{
     const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
     return `<tr>
-      <td>${esc(d.unit_code)}</td>
+      <td>${esc(d.unit_code)}${S.unitQ?` <div style="font-size:11px;color:var(--text-dim);">${esc(d.date)}</div>`:''}</td>
       <td>${fmt12(d.client_arrival_time,'-')}</td>
       <td style="white-space:normal;min-width:150px;">${esc(d.special_instructions||'-')}</td>
       <td>${canChangeStatus? `<select data-dv-status="${d.id}">
@@ -2360,7 +2398,7 @@ function ssTypeTag(t){ return `<span class="tag-shift ${t==='integrated'?'mornin
 function ssStatusSelect(attr,x){ return `<select ${attr}="${x.id}"><option value="scheduled" ${x.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${x.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${x.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${x.status==='postponed'?'selected':''}>تم التأجيل</option>${x.status==='cancelled'?'<option value="cancelled" selected>تم الإلغاء</option>':''}${x.status==='pending_review'?'<option value="pending_review" selected>قيد المراجعة</option>':''}</select>${x.status==='postponed'&&x.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(x.postpone_reason)}</div>`:''}`; }
 function renderSideServices(){
   const canWrite=S.profile.role==='admin'||S.profile.role==='opm';
-  const day=(S.ssDate? (S.sideSvc||[]).filter(x=>x.date===S.ssDate) : (S.sideSvc||[]).filter(x=>x.date>=S.today)).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
+  const day=S.unitQ ? (S.sideSvc||[]).filter(x=>fmUnitMatch(x.unit_code)).sort((a,b)=>String(b.date).localeCompare(String(a.date))) : (S.ssDate? (S.sideSvc||[]).filter(x=>x.date===S.ssDate) : (S.sideSvc||[]).filter(x=>x.date>=S.today)).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.service_type).localeCompare(String(b.service_type)));
   const list=day.filter(x=>S.ssType==='all'||x.service_type===S.ssType);
   const cnt=t=>day.filter(x=>x.service_type===t).length;
   return `${renderModReqs()}<div class="toolbar">
@@ -2440,6 +2478,8 @@ function renderOrders(){
   let list = S.ordersDate ? S.orders.filter(o=>o.scheduled_date===S.ordersDate) : S.orders;
   if(todayOnly) list = list.filter(o=>o.scheduled_date===S.today);
   if(!canCreate) list = list.filter(orderApproved);
+  if(S.unitQ) list = S.orders.filter(o=>fmUnitMatch(o.unit_code) && (canCreate||orderApproved(o)));
+  list = list.slice().sort((a,b)=>String(b.scheduled_date).localeCompare(String(a.scheduled_date)) || String(b.created_at||'').localeCompare(String(a.created_at||'')));
   const pending = isApprover ? S.orders.filter(o=>o.approval_status==='pending') : [];
   const pendingHtml = pending.length ? `<div class="card" style="margin-bottom:14px;border-color:var(--amber);background:var(--amber-light);">
     <h3 style="margin:0 0 8px;font-size:14px;color:var(--amber);">طلبات وحدات إضافية بانتظار موافقتك (${pending.length})</h3>
@@ -2638,7 +2678,7 @@ function renderPestOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm'||role==='fm_dispatcher';
   const canAssign = role==='admin'||role==='opm';
-  const list = S.pest.slice().sort((a,b)=> a.scheduled_date < b.scheduled_date ? 1 : -1);
+  const list = S.pest.filter(p=>!S.unitQ||fmUnitMatch(p.unit_code)).sort((a,b)=> a.scheduled_date < b.scheduled_date ? 1 : -1);
   return `
   <div class="toolbar">${canCreate?`<button class="primary-btn" id="pest-add">${ICON.plus()} طلب جديد</button>`:''}</div>
   <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
@@ -3272,7 +3312,7 @@ async function loadAttEditReqs(){ S.attEditReqs = (await dbSelect('attendance_ed
 
 /* ============================= COMPLAINTS ============================= */
 function renderComplaints(){
-  const list = S.complaints.slice().sort((a,b)=> a.date<b.date?1:-1);
+  const list = S.complaints.filter(c=>!S.unitQ||fmUnitMatch(c.unit_code)).sort((a,b)=> a.date<b.date?1:-1);
   const pending = list.filter(c=>c.status==='pending');
   return `
   <div class="toolbar"><button class="primary-btn" id="cx-add">${ICON.plus()} تسجيل شكوى جديدة</button></div>
