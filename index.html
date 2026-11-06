@@ -1396,7 +1396,7 @@ function fvDistM(a,b,c,d){ const R=6371000,rad=x=>x*Math.PI/180,dl=rad(c-a),dn=r
 function fvZoneState(p){ const z=S.verify.zone; if(!z) return { ok:true, unknown:true }; const d=fvDistM(p.coords.latitude,p.coords.longitude,z.lat,z.lng); return { ok:d<=z.radius_m, d }; }
 function fvDist(a,b){ let s=0; for(let i=0;i<a.length;i++){ const x=a[i]-b[i]; s+=x*x; } return Math.sqrt(s); }
 function fvLight(video){ try{ const c=document.createElement('canvas'); c.width=24; c.height=24; const x=c.getContext('2d'); x.drawImage(video,0,0,24,24); const d=x.getImageData(0,0,24,24).data; let s=0; for(let i=0;i<d.length;i+=4) s+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; return s/(d.length/4); }catch(e){ return 255; } }
-function fvCrop(video,b){ const m=.28,w=b.width*(1+2*m),h=b.height*(1+2*m),x=Math.max(0,b.x-b.width*m),y=Math.max(0,b.y-b.height*m); const c=document.createElement('canvas'); c.width=112; c.height=112; try{ c.getContext('2d').drawImage(video,x,y,Math.min(w,video.videoWidth-x),Math.min(h,video.videoHeight-y),0,0,112,112); }catch(e){} return c.toDataURL('image/jpeg',.6); }
+function fvCrop(video,b){ const m=.28,w=b.width*(1+2*m),h=b.height*(1+2*m),x=Math.max(0,b.x-b.width*m),y=Math.max(0,b.y-b.height*m); const c=document.createElement('canvas'); c.width=150; c.height=150; try{ c.getContext('2d').drawImage(video,x,y,Math.min(w,video.videoWidth-x),Math.min(h,video.videoHeight-y),0,0,150,150); }catch(e){} return c.toDataURL('image/jpeg',.55); }
 function fvLoadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
 let fvEngineP=null;
 function fvEngine(){
@@ -1412,6 +1412,25 @@ function fvEngine(){
   return fvEngineP;
 }
 
+/* ---- big photo viewer (tap any verification thumbnail) ---- */
+function fvZoom(src){
+  const old=document.getElementById('fv-zoom'); if(old) old.remove();
+  const el=document.createElement('div'); el.id='fv-zoom';
+  el.style.cssText='position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;';
+  el.innerHTML='<img src="'+src+'" style="max-width:96vw;max-height:88vh;width:min(96vw,88vh);height:auto;border-radius:14px;object-fit:contain;image-rendering:auto;background:#111;"><div style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;color:#fff;font:800 15px Cairo,sans-serif;background:rgba(255,255,255,.18);border-radius:999px;padding:6px 14px;">✕ إغلاق</div>';
+  el.onclick=()=>el.remove(); document.body.appendChild(el);
+}
+document.addEventListener('click',e=>{ const im=e.target&&e.target.closest?e.target.closest('img[data-fvz]'):null; if(im){ e.preventDefault(); e.stopPropagation(); fvZoom(im.src); } },true);
+/* download the face engine once (the service worker keeps it) so scanning works with no network */
+function fvPrefetchEngine(){
+  try{
+    if(!navigator.onLine || !S.profile) return;
+    const r=S.profile.role; if(!['admin','opm','hk_manager','supervisor','senior_supervisor','hk_senior','hk_sv'].includes(r) && !String(r).includes('supervisor') && !String(r).includes('hk')) return;
+    if(navigator.connection && navigator.connection.saveData) return;
+    setTimeout(()=>{ fvEngine().then(()=>{ try{ localStorage.setItem('zw_fa_ready','1'); }catch(e){} }).catch(()=>{}); },10000);
+  }catch(e){}
+}
+
 /* ---- camera scanner overlay (not part of render(), so polling can't kill the stream) ---- */
 function fvOpenScanner(opt){
   return new Promise(resolve=>{
@@ -1423,9 +1442,11 @@ function fvOpenScanner(opt){
       <div class="fv-zone" id="fv-zone" style="display:${opt.zoneCheck?'block':'none'}">جاري تحديد موقعك...</div>
       <div class="fv-msg" id="fv-msg">جاري تشغيل الكاميرا...</div>
       <div class="fv-strip" id="fv-strip"></div>
-      <div class="fv-foot"><button class="primary-btn" id="fv-fin" style="width:100%;justify-content:center;" disabled>${esc(opt.finishLabel||'تم')}</button></div>`;
+      <div class="fv-foot"><button class="primary-btn" id="fv-shot" disabled style="width:100%;justify-content:center;margin-bottom:8px;font-size:17px;padding:14px;background:#4a5568;opacity:.7;">📸 تصوير</button><button class="primary-btn" id="fv-fin" style="width:100%;justify-content:center;" disabled>${esc(opt.finishLabel||'تم')}</button></div>`;
     document.body.appendChild(ov);
-    const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin'), wrap=$('.fv-vwrap'), frameEl=$('#fv-frame');
+    const $=s=>ov.querySelector(s), video=$('#fv-video'), msg=$('#fv-msg'), fin=$('#fv-fin'), shot=$('#fv-shot'), wrap=$('.fv-vwrap'), frameEl=$('#fv-frame');
+    let ready=false, busy=false, inLoop=false;
+    const setReady=v=>{ ready=!!v; const on=ready&&!busy; shot.disabled=!on; shot.style.background=on?'#2e9e5b':'#4a5568'; shot.style.opacity=on?'1':'.7'; };
     // الإطار: المربع اللي لازم الوجه يبقى جواه — أي وجه برّاه أو بعيد (صغير) بيتتجاهل
     const frameRect=()=>{ const W=wrap.clientWidth, H=wrap.clientHeight, s=Math.min(W,H)*.72; return { x:(W-s)/2, y:(H-s)/2, s }; };
     const placeFrame=()=>{ const f=frameRect(); frameEl.style.cssText='left:'+f.x+'px;top:'+f.y+'px;width:'+f.s+'px;height:'+f.s+'px;'; };
@@ -1439,7 +1460,7 @@ function fvOpenScanner(opt){
     const close=res=>{ alive=false; window.removeEventListener('resize',placeFrame); try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} if(watchId!=null) try{ navigator.geolocation.clearWatch(watchId); }catch(e){} ov.remove(); resolve(res); };
     const refresh=()=>{
       $('#fv-count').textContent=faces.length;
-      $('#fv-strip').innerHTML=faces.map((f,i)=>`<div class="th"><img src="${f.t}"><button data-i="${i}">✕</button></div>`).join('');
+      $('#fv-strip').innerHTML=faces.map((f,i)=>`<div class="th"><img data-fvz="1" src="${f.t}"><button data-i="${i}">✕</button></div>`).join('');
       $('#fv-strip').querySelectorAll('button').forEach(b=>b.onclick=()=>{ faces.splice(+b.dataset.i,1); stable=0; refresh(); });
       fin.disabled=!(zoneOk && (opt.selfie? faces.length===1 : faces.length>0));
     };
@@ -1458,39 +1479,56 @@ function fvOpenScanner(opt){
       try{ stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:opt.selfie?'user':'environment', width:{ideal:1280}, height:{ideal:720} }, audio:false }); video.srcObject=stream; await video.play(); }
       catch(e){ msg.textContent='تعذّر تشغيل الكاميرا — صرّح للكاميرا من إعدادات المتصفح'; return; }
       msg.textContent='جاري تحميل نموذج التعرف على الوجوه (أول مرة بياخد وقت)...';
-      try{ fa=await fvEngine(); }catch(e){ msg.textContent='فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
+      try{ fa=await fvEngine(); }catch(e){ msg.textContent=(typeof ZW!=='undefined'&&ZW.isOffline())? 'نموذج التعرف على الوجوه لسه ماتحمّلش على الجهاز — افتح التطبيق مرة وانت على إنترنت (ومستنى دقيقة) وبعدها هيشتغل أوفلاين' : 'فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
       msg.textContent=opt.selfie?'حط وجهك جوا الإطار':'حط وجه كل عامل جوا الإطار واحد واحد';
+      const detect=()=>fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
+      const isGood=d=>opt.selfie? (d.detection.score>=.7 && inFrame(d.detection.box,.42)) : (d.detection.score>=.6 && inFrame(d.detection.box,.30));
+      // التصوير يدوي: اللي بيصوّر هو اللي يدوس الزرار لما الإطار يبقى أخضر
       const loop=async()=>{
         if(!alive) return;
+        if(busy){ setTimeout(loop,120); return; }
+        inLoop=true;
         try{
           if(video.readyState>=2){
-            const vw=video.videoWidth;
             const lum=fvLight(video);
-            if(lum<50){ frameEl.classList.remove('ok'); msg.textContent='💡 الإضاءة ضعيفة جدًا — روح مكان أنور أو شغّل إضاءة قبل التصوير'; if(alive) setTimeout(loop,400); return; }
-            const dets=await fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
-            if(opt.selfie){
-              const good=dets.filter(d=>d.detection.score>=.7 && inFrame(d.detection.box,.42));
-              frameEl.classList.toggle('ok',good.length===1||faces.length>0);
-              if(faces.length) msg.textContent='✓ تم التقاط السيلفي — اضغط للإنهاء (أو احذفه وأعد)';
-              else if(good.length===1){ if(++stable>=3){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); refresh(); } else msg.textContent='ثبّت وجهك...'; }
-              else { stable=0; msg.textContent=good.length>1?'لازم وجه واحد بس جوا الإطار':'حط وجهك جوا الإطار وقرّب شوية'; }
-            } else {
-              let added=0;
-              for(const d of dets){
-                if(d.detection.score<.6 || !inFrame(d.detection.box,.30)) continue;
-                const e=Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000);
-                if(faces.some(f=>fvDist(f.e,e)<FV_DEDUP)) continue;
-                faces.push({ e, t:fvCrop(video,d.detection.box) }); added++;
+            if(lum<50){ frameEl.classList.remove('ok'); setReady(false); msg.textContent='💡 الإضاءة ضعيفة جدًا — روح مكان أنور أو شغّل إضاءة قبل التصوير'; }
+            else{
+              const good=(await detect()).filter(isGood);
+              if(opt.selfie){
+                const one=good.length===1;
+                frameEl.classList.toggle('ok',one||faces.length>0); setReady(one&&!faces.length);
+                if(faces.length) msg.textContent='✓ تم التقاط السيلفي — اضغط تأكيد (أو احذفه وأعد)';
+                else if(one) msg.textContent='✅ وشك جوا الإطار — دوس 📸 تصوير';
+                else msg.textContent=good.length>1?'لازم وجه واحد بس جوا الإطار':'حط وجهك جوا الإطار وقرّب شوية';
+              } else {
+                frameEl.classList.toggle('ok',good.length>0); setReady(good.length>0);
+                if(good.length) msg.textContent=`✅ الوجه جوا الإطار — دوس 📸 تصوير (اتسجّل ${faces.length})`;
+                else msg.textContent=lum<85?'💡 الإضاءة مش كفاية — زوّدها لتصوير أدق':'حط وجه العامل جوا الإطار (واحد واحد) وقرّب شوية';
               }
-              if(added){ refresh(); fvBeep(); }
-              const inside=dets.filter(d=>d.detection.score>=.6 && inFrame(d.detection.box,.30)).length;
-              if(lum<85 && !inside){ msg.textContent='💡 الإضاءة مش كفاية — زوّدها لتصوير أدق'; }
-              frameEl.classList.toggle('ok',inside>0);
-              if(inside || lum>=85) msg.textContent=inside? `وجه جوا الإطار — اتسجّل ${faces.length}` : 'حط وجه العامل جوا الإطار (واحد واحد) وقرّب شوية';
             }
           }
         }catch(e){ console.warn('fv loop',e); }
+        inLoop=false;
         if(alive) setTimeout(loop,250);
+      };
+      shot.onclick=async()=>{
+        if(!ready||busy||!fa) return; busy=true; setReady(false);
+        while(inLoop) await new Promise(r=>setTimeout(r,30));
+        try{
+          const good=(await detect()).filter(isGood); let added=0, dup=0;
+          if(opt.selfie){
+            if(good.length===1 && !faces.length){ const d=good[0]; faces.push({ e:Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000), t:fvCrop(video,d.detection.box) }); added++; }
+          } else {
+            for(const d of good){
+              const e=Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000);
+              if(faces.some(f=>fvDist(f.e,e)<FV_DEDUP)){ dup++; continue; }
+              faces.push({ e, t:fvCrop(video,d.detection.box) }); added++;
+            }
+          }
+          if(added){ refresh(); fvBeep(); try{ navigator.vibrate&&navigator.vibrate(60); }catch(e){} frameEl.style.transition='none'; frameEl.style.background='rgba(61,220,132,.35)'; setTimeout(()=>{ frameEl.style.background=''; },180); }
+          else msg.textContent=dup?'⚠️ الوجه ده اتصوّر قبل كده':'الوجه مش واضح — اتأكد إنه جوا الإطار وجرّب تاني';
+        }catch(e){ msg.textContent='حصل خطأ في التصوير — جرّب تاني'; }
+        busy=false;
       };
       loop();
     })();
@@ -1572,7 +1610,7 @@ async function fvEnrolScan(kind){
   const r=await fvOpenScanner({ title:kind==='worker'?'تحقق العمالة — مسح الوجوه':'تحقق المشرفين — مسح الوجوه', selfie:false, zoneCheck:false, finishLabel:'تم الانتهاء من مسح الوجوه الأولي — رفع للإدارة' });
   if(!r) return;
   if(!r.faces.length){ toast('مفيش وجوه اتسجلت',false); return; }
-  if(await fvSaveEnrol(kind,r.faces)){ render(); toast('تم رفع '+r.faces.length+' وجه للإدارة',true); }
+  if(await fvSaveEnrol(kind,r.faces)){ render(); toast(ZW.isOffline()? ('اتحفظ '+r.faces.length+' وجه على الموبايل — هيترفعوا للإدارة أول ما النت يرجع'):('تم رفع '+r.faces.length+' وجه للإدارة'),true); }
 }
 
 /* ---- admin: start the call ---- */
@@ -1625,7 +1663,7 @@ async function fvSupStart(){
 }
 
 /* ---- rendering ---- */
-function fvThumbs(arr,color){ return (arr&&arr.length)? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px;">${arr.map(t=>`<img src="${t}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid ${color};">`).join('')}</div>`:''; }
+function fvThumbs(arr,color){ return (arr&&arr.length)? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px;">${arr.map(t=>`<img data-fvz="1" src="${t}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid ${color};cursor:zoom-in;">`).join('')}</div>`:''; }
 const FV_STATUS={ pending:'لم يفتح النداء', acknowledged:'فتح النداء', selfie_ok:'سيلفي تم', submitted:'معلّق للمقارنة', matched:'مطابق ✅', mismatch:'غير مطابق ⚠️', no_response:'لم يستجب ⛔' };
 function fvResultHtml(c){
   const r=c.result||{};
@@ -1689,7 +1727,7 @@ function renderVerify(){
     h+=`<div class="section-title"><h2>تحقق العمالة</h2></div>${enrolOpen?'':'<div class="card" style="margin-bottom:10px;border-color:var(--amber);"><b>تسجيل الوجوه الصباحي اتقفل (بعد الساعة 9 ص)</b></div>'}<div class="card" style="margin-bottom:14px;">${fvThumbs(wF.map(f=>f.thumb),'#3b8be6')||'<div style="font-size:13px;color:var(--text-dim);">لم يتم مسح عمالة اليوم</div>'}
       <button class="primary-btn" id="fv-enrol-worker" ${locked?'disabled':''}>${ICON.faceScan(16)} ${wF.length?'إعادة مسح وجوه العمالة':'ابدأ مسح وجوه العمالة'}</button></div>
       <div class="section-title"><h2>تحقق المشرفين</h2></div><div class="card" style="margin-bottom:14px;">
-      ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(cardHolderOf(u.id)||u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
+      ${sF.length? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sF.map(f=>`<div style="text-align:center;"><img data-fvz="1" src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #549C42;cursor:zoom-in;"><select data-fv-label="${f.id}" style="display:block;font-size:11px;max-width:96px;margin-top:4px;"><option value="">اسم المشرف</option>${sups.map(u=>`<option value="${u.id}" ${f.label_user_id===u.id?'selected':''}>${esc(cardHolderOf(u.id)||u.full_name)}</option>`).join('')}</select></div>`).join('')}</div>`:'<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">لم يتم مسح المشرفين</div>'}
       <button class="primary-btn" id="fv-enrol-sup" ${locked?'disabled':''}>${ICON.faceScan(16)} ${sF.length?'إعادة مسح وجوه المشرفين':'ابدأ مسح وجوه المشرفين'}</button></div>`;
   }
   h+=fvReportHtml(ses,v.checks||[]);
@@ -3069,9 +3107,13 @@ function myCheckin(svc){
 }
 let svcResetCalled=false;
 const FACADE_RESET_DAYS=60;
+// عمارات E1 / E2 = "مرحلة" (مش برج) ودورة التصفير بتاعتها 180 يوم (العمود cycle_days في svc_lists)؛ الأبراج 60 يوم
+function facadeIsBuilding(l){ return /عمارات|(^|[^a-z0-9])e\s*-?\s*[12](?![0-9])/i.test(String((l&&l.name)||'')); }
+function facadeDays(l){ return (l&&l.cycle_days)||FACADE_RESET_DAYS; }
+function facadeNoun(l){ return facadeIsBuilding(l)?'المرحلة':'البرج'; }
 function facadeCycleInfo(l){
   if(!l || !l.completed_at) return null;
-  const end=new Date(l.completed_at).getTime()+FACADE_RESET_DAYS*86400000;
+  const end=new Date(l.completed_at).getTime()+facadeDays(l)*86400000;
   const left=Math.max(0,Math.ceil((end-Date.now())/86400000));
   return { left, endDate:new Date(end).toLocaleDateString('ar-EG',{ timeZone:'Africa/Cairo', day:'numeric', month:'numeric', year:'numeric' }) };
 }
@@ -3079,8 +3121,8 @@ function facadeFinishHtml(svc,l){
   if(svc!=='facade') return '';
   const role=S.profile.role; const isMgr=role==='admin'||role==='opm'; const canAct=isMgr||role==='facade_sv';
   const info=facadeCycleInfo(l);
-  if(info) return `<div style="font-size:11.5px;margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><span style="color:var(--mint);font-weight:800;">✅ تم الانتهاء من البرج — هيتصفّر بعد ${info.left} يوم (${esc(info.endDate)})</span>${isMgr?`<button class="ghost-btn" style="padding:3px 10px;font-size:11px;" data-svc-unfinish="${l.id}">إلغاء الانتهاء</button>`:''}</div>`;
-  return canAct? `<div style="margin-top:6px;"><button class="ghost-btn" style="padding:5px 12px;font-size:12px;" data-svc-finish="${l.id}">✅ تم الانتهاء من البرج</button></div>` : '';
+  if(info) return `<div style="font-size:11.5px;margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><span style="color:var(--mint);font-weight:800;">✅ تم الانتهاء من ${facadeNoun(l)} — هيتصفّر بعد ${info.left} يوم (${esc(info.endDate)})</span>${isMgr?`<button class="ghost-btn" style="padding:3px 10px;font-size:11px;" data-svc-unfinish="${l.id}">إلغاء الانتهاء</button>`:''}</div>`;
+  return canAct? `<div style="margin-top:6px;"><button class="ghost-btn" style="padding:5px 12px;font-size:12px;" data-svc-finish="${l.id}">✅ تم الانتهاء من ${facadeNoun(l)}</button></div>` : '';
 }
 async function loadSvcData(){
   if(!svcResetCalled){ svcResetCalled=true; try{ await sb.rpc('reset_facade_cycles'); }catch(e){} try{ await sb.rpc('reset_waste_daily'); }catch(e){} }
@@ -3215,11 +3257,11 @@ function bindSvc(svc){
   document.querySelectorAll('[data-fsv-ord]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('paid_service_orders', sel.dataset.fsvOrd, sel.value, loadOrders));
   document.querySelectorAll('[data-svc-finish]').forEach(b=>b.onclick=async ()=>{
     const l=(S.svcLists||[]).find(x=>x.id===b.dataset.svcFinish); if(!l) return;
-    if(!confirm('تأكيد إنك خلّصت "'+l.name+'"؟\nالعداد هيبدأ دلوقتي، وبعد '+FACADE_RESET_DAYS+' يوم نسبة الإنجاز بتاعته هتتصفّر أوتوماتيك.')) return;
+    if(!confirm('تأكيد إنك خلّصت "'+l.name+'"؟\nالعداد هيبدأ دلوقتي، وبعد '+facadeDays(l)+' يوم نسبة الإنجاز بتاعته هتتصفّر أوتوماتيك.')) return;
     b.disabled=true;
     const {error}=await sb.rpc('complete_facade_tower',{ p_list_id:l.id });
     if(error){ toast('حصل خطأ: '+error.message,false); b.disabled=false; return; }
-    await refreshSvc(); toast('تم تسجيل الانتهاء من البرج — العداد بدأ',true);
+    await refreshSvc(); toast('تم تسجيل الانتهاء من '+facadeNoun(l)+' — العداد بدأ',true);
   });
   document.querySelectorAll('[data-svc-unfinish]').forEach(b=>b.onclick=async ()=>{
     const l=(S.svcLists||[]).find(x=>x.id===b.dataset.svcUnfinish); if(!l) return;
@@ -7029,6 +7071,8 @@ async function bootApp(){
   await loadRoleData();
   render();
   try{ ZW.flush(); }catch(e){}
+  try{ fvPrefetchEngine(); }catch(e){}
+  try{ if(fvAdm() && navigator.onLine && localStorage.getItem('zw_vpurge')!==S.today){ sb.rpc('verify_purge_old',{ p_days:14 }).then(r=>{ if(r&&!r.error) localStorage.setItem('zw_vpurge',S.today); }); } }catch(e){}
   setupRealtime();
   startExtraPoll();
   startUrgentPoll();

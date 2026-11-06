@@ -1,9 +1,10 @@
 // Service Worker — Ora Soft Services Operations
 // 1) بيستقبل إشعارات الـ Web Push حتى لو التطبيق مقفول، وبيفتح الشاشة المعنية لما تدوس على الإشعار.
 // 2) v7: بيخزّن التطبيق نفسه (الصفحة + المكتبات) عشان يفتح من غير إنترنت. طلبات Supabase ما بيلمسهاش خالص.
-const SW_VERSION = 'v7';
+const SW_VERSION = 'v8';
 const SHELL_CACHE = 'zw-shell-' + SW_VERSION;
 const FONT_CACHE = 'zw-fonts-v1';
+const FA_CACHE = 'zw-faceapi-v1'; // محرك التعرف على الوجوه + النماذج (حوالي 8 ميجا) — بيتنزّل مرة وبيفضل عشان المسح يشتغل أوفلاين
 const SHELL_FILES = ['index.html', 'manifest.json', 'supabase.js', 'qrcode.min.js', 'jsQR.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'icon-192.png', 'icon-512.png'];
 const scopeUrl = (p) => new URL(p, self.registration.scope).href;
 
@@ -21,7 +22,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   // مسح كاش النسخ القديمة بس (الجديد بيفضل)
   event.waitUntil((async () => {
-    try { const keys = await caches.keys(); await Promise.all(keys.filter((k) => k !== SHELL_CACHE && k !== FONT_CACHE).map((k) => caches.delete(k))); } catch (e) {}
+    try { const keys = await caches.keys(); await Promise.all(keys.filter((k) => k !== SHELL_CACHE && k !== FONT_CACHE && k !== FA_CACHE).map((k) => caches.delete(k))); } catch (e) {}
     await self.clients.claim();
   })());
 });
@@ -43,6 +44,21 @@ self.addEventListener('fetch', (event) => {
       const hit = await cache.match(req);
       const net = fetch(req).then((res) => { if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone()); return res; }).catch(() => null);
       return hit || (await net) || new Response('', { status: 504 });
+    })());
+    return;
+  }
+
+  // محرك التعرف على الوجوه (face-api) من الـ CDN: من الكاش الأول، ولو مش موجود بنجيبه ونخزّنه
+  if ((url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'unpkg.com') && url.pathname.indexOf('face-api') !== -1) {
+    event.respondWith((async () => {
+      const cache = await caches.open(FA_CACHE);
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      try {
+        const res = await fetch(req);
+        if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+        return res;
+      } catch (e) { return new Response('', { status: 504 }); }
     })());
     return;
   }
