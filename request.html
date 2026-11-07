@@ -61,6 +61,25 @@ button.go:disabled{opacity:.55;cursor:default}
 .choice span{font-size:13px;color:var(--dim)}
 .editbar{background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
 .link{color:var(--brand-d);font-weight:700;cursor:pointer;background:none;border:0;font:inherit;text-decoration:underline;margin-top:6px}
+
+.trk{margin-top:16px;border-top:1px solid #e6e1d3;padding-top:14px}
+.trk .tt{font-weight:800;font-size:14px;margin-bottom:10px}
+.trk .stp{display:flex;gap:12px;position:relative;padding-bottom:18px}
+.trk .stp:last-child{padding-bottom:0}
+.trk .stp:not(:last-child)::before{content:"";position:absolute;right:11px;top:24px;bottom:0;width:3px;background:#d9d4c4;border-radius:2px}
+.trk .stp.done:not(:last-child)::before{background:#549C42}
+.trk .dot{flex:0 0 25px;height:25px;border-radius:50%;background:#d9d4c4;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;z-index:1}
+.trk .stp.done .dot{background:#549C42}
+.trk .stp.cur .dot{background:#549C42;box-shadow:0 0 0 5px rgba(84,156,66,.25)}
+.trk .stp.bad .dot{background:#d64545;box-shadow:0 0 0 5px rgba(214,69,69,.2)}
+.trk .stp.warn .dot{background:#d98a00;box-shadow:0 0 0 5px rgba(217,138,0,.22)}
+.trk .lb{font-size:14px;font-weight:700;color:#8a8574}
+.trk .stp.done .lb,.trk .stp.cur .lb{color:#1b2430}
+.trk .stp.bad .lb{color:#b3261e}.trk .stp.warn .lb{color:#9a6200}
+.trk .sb{font-size:12.5px;color:#66758a;margin-top:2px;line-height:1.7}
+.trk .edt{margin-top:14px;text-align:center;font-size:12.5px;color:#66758a}
+.trk .edt button{background:none;border:0;color:#2f6fed;font:700 12.5px inherit;text-decoration:underline;cursor:pointer;padding:4px}
+.trk .ph{margin-top:8px;display:none}
 </style>
 </head>
 <body>
@@ -72,18 +91,17 @@ button.go:disabled{opacity:.55;cursor:default}
 
   <div id="startView">
     <button class="choice" id="chNew" type="button"><b>🆕 طلب جديد</b><span>احجز أوردر جديد لوحدتك</span></button>
-    <button class="choice" id="chEdit" type="button"><b>✏️ مراجعة وتعديل طلب</b><span>عندك رقم طلب؟ راجعه أو اطلب تعديله</span></button>
+    <button class="choice" id="chEdit" type="button"><b>✏️ مراجعة وتعديل طلب</b><span>عندك رقم طلب؟ تابع حالته</span></button>
   </div>
 
   <div id="lookupView" style="display:none">
     <div class="card">
-      <h2>مراجعة وتعديل طلب</h2>
+      <h2>تتبّع طلب</h2>
       <label class="f" for="lkRef">رقم الطلب</label>
       <input type="tel" id="lkRef" inputmode="numeric" placeholder="مثال: 12">
-      <label class="f" for="lkPh">رقم الواتس اللي اتسجّل بيه الطلب</label>
-      <input type="tel" id="lkPh" inputmode="tel" placeholder="01xxxxxxxxx">
       <div class="err" id="lkErr"></div>
-      <button class="go" id="lkGo" type="button" style="margin-top:14px">عرض الطلب</button>
+      <button class="go" id="lkGo" type="button" style="margin-top:14px">تتبّع الطلب</button>
+      <div id="trk" style="display:none"></div>
       <div style="text-align:center"><button class="link" id="lkBack" type="button">رجوع</button></div>
     </div>
   </div>
@@ -201,33 +219,72 @@ button.go:disabled{opacity:.55;cursor:default}
   $('lkBack').onclick=function(){ show('startView'); };
   function lkErr(t){ var e=$('lkErr'); e.textContent=t; e.style.display=t?'block':'none'; }
   var STL={pending:'قيد المراجعة',waitlist:'قيد المراجعة (اليوم محجوز)',approved:'مقبول',rejected:'مرفوض',cancelled:'ملغي'};
+  var trkRef=0;
+  var STEPS=['تم استلام الطلب','قيد المراجعة','مجدول','جاري العمل','تم الانتهاء'];
+  function drawTrack(r){
+    var idx={review:1,scheduled:2,in_progress:3,completed:4,postponed:2,rejected:1,cancelled:1}[r.stage]; if(idx===undefined) idx=1;
+    var sub={}; 
+    sub[0]='تم تسجيل طلبك رقم #'+r.ref;
+    sub[1]= r.waitlist ? 'اليوم محجوز في أوردرات تانية — طلبك في قائمة الانتظار وهنرد عليك على الواتس' : 'الإدارة بتراجع طلبك وهنرد عليك على الواتس';
+    sub[2]= r.date ? ('الأوردر متجدول يوم '+fmt(r.date)) : 'الأوردر اتجدول';
+    sub[3]='الفريق شغال على طلبك دلوقتي';
+    sub[4]='تم الانتهاء من الطلب ✅';
+    var h='<div class="trk"><div class="tt">حالة الطلب #'+r.ref+'</div>';
+    for(var i=0;i<STEPS.length;i++){
+      var cls='', mark=String(i+1), lb=STEPS[i], note='';
+      if(i<idx||(r.stage==='completed'&&i<=idx)){ cls='done'; mark='✓'; }
+      if(i===idx){
+        if(r.stage==='rejected'){ cls='bad'; mark='✕'; lb='مرفوض'; note=(r.reason?('السبب: '+r.reason+'. '):'')+(r.suggested_date?('الميعاد المقترح من الإدارة: '+fmt(r.suggested_date)+'. '):'')+'تقدر تعمل طلب جديد.'; }
+        else if(r.stage==='cancelled'){ cls='bad'; mark='✕'; lb='تم إلغاء الطلب'; note=(r.reason?('السبب: '+r.reason+'. '):'')+'تقدر تعمل طلب جديد.'; }
+        else if(r.stage==='postponed'){ cls='warn'; mark='!'; lb='مجدول — اتأجل'; note=(r.reason?('السبب: '+r.reason+'. '):'')+'هنتواصل معاك على الواتس لتحديد ميعاد جديد.'; }
+        else if(r.stage==='completed'){ cls='done'; mark='✓'; note=sub[4]; }
+        else { cls='cur'; note=sub[i]; }
+      } else if(i<idx && sub[i] && i===0){ note=sub[0]; }
+      h+='<div class="stp '+cls+'"><div class="dot">'+mark+'</div><div><div class="lb">'+lb+'</div>'+(note?'<div class="sb">'+note+'</div>':'')+'</div></div>';
+    }
+    var edt='';
+    if(r.edit_pending) edt='فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.';
+    else if(r.can_edit) edt='<button id="trkEdit" type="button">✏️ لو حابب تعدل</button>'+(r.stage==='scheduled'?'<div style="font-size:11.5px;margin-top:2px">التعديل متاح طول ما الأوردر لسه مجدول</div>':'');
+    else if(r.stage==='rejected'||r.stage==='cancelled') edt='';
+    else edt='مش هتقدر تعدل في المرحلة الحالية';
+    h+='<div class="edt">'+edt+'</div>';
+    h+='<div class="ph" id="trkPhBox"><label class="f" for="lkPh">رقم الواتس اللي اتسجّل بيه الطلب (للتأكد إنك صاحب الطلب)</label><input type="tel" id="lkPh" inputmode="tel" placeholder="01xxxxxxxxx"><div class="err" id="lkErr2"></div><button class="go" id="lkVerify" type="button" style="margin-top:10px">متابعة للتعديل</button></div></div>';
+    $('trk').innerHTML=h; $('trk').style.display='block';
+    var be=$('trkEdit'); if(be) be.onclick=function(){ $('trkPhBox').style.display='block'; be.style.display='none'; var p=$('lkPh'); if(p) p.focus(); };
+    var vb=$('lkVerify'); if(vb) vb.onclick=lkVerify;
+  }
   $('lkGo').onclick=function(){
-    lkErr(''); var ref=parseInt($('lkRef').value.replace(/\D/g,''),10), ph=$('lkPh').value.trim();
-    if(!ref) return lkErr('اكتب رقم الطلب'); if(ph.replace(/\D/g,'').length<10) return lkErr('اكتب رقم الواتس صح');
+    lkErr(''); $('trk').style.display='none'; var ref=parseInt($('lkRef').value.replace(/\D/g,''),10);
+    if(!ref) return lkErr('اكتب رقم الطلب');
     $('lkGo').disabled=true; $('lkGo').textContent='جارٍ البحث...';
-    rpc('public_req_lookup',{p_ref:ref,p_phone:ph}).then(function(r){
-      $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب';
+    rpc('public_req_track',{p_ref:ref}).then(function(r){
+      $('lkGo').disabled=false; $('lkGo').textContent='تتبّع الطلب';
       if(!r||!r.ok) return lkErr((r&&r.msg)||'مفيش طلب بالرقم ده');
-      if(r.status==='rejected'||r.status==='cancelled'){
-        var m='حالة الطلب #'+r.ref+': '+(STL[r.status]||r.status)+'.';
-        if(r.status==='rejected'&&r.suggested_date) m+=' الميعاد المقترح من الإدارة: '+fmt(r.suggested_date)+'.';
-        if(r.reject_reason) m+=' السبب: '+r.reject_reason+'.';
-        m+=' تقدر تعمل طلب جديد من \"طلب جديد\".';
-        return lkErr(m);
-      }
-      if(r.edit_pending) return lkErr('فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.');
+      trkRef=r.ref; drawTrack(r);
+    }).catch(function(){ $('lkGo').disabled=false; $('lkGo').textContent='تتبّع الطلب'; lkErr('تعذّر الاتصال — جرّب تاني'); });
+  };
+  function lkVerify(){
+    var e2=$('lkErr2'); function err2(t){ e2.textContent=t; e2.style.display=t?'block':'none'; }
+    err2(''); var ref=trkRef, ph=$('lkPh').value.trim();
+    if(ph.replace(/\D/g,'').length<10) return err2('اكتب رقم الواتس صح');
+    $('lkVerify').disabled=true; $('lkVerify').textContent='جارٍ التحقق...';
+    rpc('public_req_lookup',{p_ref:ref,p_phone:ph}).then(function(r){
+      $('lkVerify').disabled=false; $('lkVerify').textContent='متابعة للتعديل';
+      if(!r||!r.ok) return err2((r&&r.msg)||'رقم الواتس مش مطابق للطلب ده');
+      if(r.status==='rejected'||r.status==='cancelled') return err2('الطلب ده اتقفل — اعمل طلب جديد.');
+      if(r.edit_pending) return err2('فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.');
       var approved=(r.status==='approved');
       mode='edit'; editRef=r.ref; editPhone=ph;
       $('nm').value=r.name||''; $('ph').value=ph; $('ph').disabled=true; $('want').value=r.want||''; $('unit').value=r.unit||''; $('d').value=(r.date&&r.date>=minD)?r.date:''; $('note').value=r.note||'';
-      $('tm').value=r.time||''; var kr=document.querySelector('input[name=key][value=\"'+(r.key_bring===false?'0':'1')+'\"]'); if(kr) kr.checked=true;
+      $('tm').value=r.time||''; var kr=document.querySelector('input[name=key][value="'+(r.key_bring===false?'0':'1')+'"]'); if(kr) kr.checked=true;
       var bar='✏️ بتعدّل الطلب <b>#'+r.ref+'</b> (الحالة: '+(STL[r.status]||r.status)+'). ';
-      bar+= approved ? 'الطلب مقبول، فالتعديل بيتبعت للإدارة للموافقة والأوردر الحالي يفضل زي ما هو لحد الموافقة.' : 'الطلب لسه تحت المراجعة فالتعديل بيتطبق على طول.';
+      bar+= approved ? 'الطلب مقبول ومجدول، فالتعديل بيتبعت للإدارة للموافقة والأوردر الحالي يفضل زي ما هو لحد الموافقة.' : 'الطلب لسه تحت المراجعة فالتعديل بيتطبق على طول.';
       if(r.edit_result==='rejected') bar+='<br>⚠️ طلب التعديل السابق اترفض'+(r.edit_result_note?(': '+r.edit_result_note):'')+'.';
       if(r.edit_result==='approved') bar+='<br>✅ طلب التعديل السابق اتقبل'+(r.edit_result_note?(': '+r.edit_result_note):'')+'.';
       $('editBar').innerHTML=bar; $('editBar').style.display='block';
       $('hwCard').style.display='none'; $('go').textContent= approved ? 'إرسال طلب التعديل' : 'حفظ التعديل'; updateDay(); show('formView');
-    }).catch(function(){ $('lkGo').disabled=false; $('lkGo').textContent='عرض الطلب'; lkErr('تعذّر الاتصال — جرّب تاني'); });
-  };
+    }).catch(function(){ $('lkVerify').disabled=false; $('lkVerify').textContent='متابعة للتعديل'; err2('تعذّر الاتصال — جرّب تاني'); });
+  }
 
   // لو فيه أعمال صيانة متبقية: نقفل الشاشة ونطلّع الرسالة
   Array.prototype.forEach.call(document.querySelectorAll('input[name=hw]'),function(r){ r.addEventListener('change',function(){

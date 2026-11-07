@@ -1284,8 +1284,8 @@ function tabsForRole(role){
   if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
   if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
   if(role==='supervisor') return [['today','قائمة اليوم'],['verify','التحقق من الهوية'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['cards','استلام الكروت'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
   return [];
 }
@@ -2270,7 +2270,7 @@ function bindTabEvents(){
     case 'waste': bindWaste(); break;
     case 'tasks': if(S.profile.role==='hk_manager') bindTasksManager(); else bindTasksAdmin(); break;
     case 'zones': bindZones(); break;
-    case 'cards': bindCards(); break;
+    case 'cards': if(S.profile&&(S.profile.role==='admin'||S.profile.role==='opm')) bindCards(); break;
     case 'violations': bindViolations(); break;
     case 'urgent': bindUrgent(); break;
     case 'emergency': bindEmergency(); break;
@@ -2561,7 +2561,7 @@ function bindDeliveries(){
   const _dvMf=document.getElementById('dv-mf'); if(_dvMf) _dvMf.onclick=()=>{ if(!S.mfMonth) S.mfMonth=(S.today||todayStr()).slice(0,7); S.mfData=null; S.modal={type:'monthlyFinance'}; render(); loadMonthlyFinance(); };
   const _dvXl=document.getElementById('dv-xl'); if(_dvXl) _dvXl.onclick=()=>{ S.modal={type:'dvExport', kind:'excel'}; render(); };
   const _dvQt=document.getElementById('dv-qt'); if(_dvQt) _dvQt.onclick=()=>{ S.modal={type:'dvExport', kind:'quote'}; render(); };
-  const _dvBulk=document.getElementById('dv-bulk'); if(_dvBulk) _dvBulk.onclick=()=>{ S.modal={type:'bulkDelivery'}; render(); };
+  const _dvBulk=document.getElementById('dv-bulk'); if(_dvBulk) _dvBulk.onclick=()=>{ S._bdT={}; S.modal={type:'bulkDelivery'}; render(); };
   document.querySelectorAll('[data-dv-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editDelivery', id:b.dataset.dvEdit}; render(); });
   document.querySelectorAll('[data-dv-status]').forEach(sel=>sel.onchange=()=>handleStatusSelectChange('delivery_units', sel.dataset.dvStatus, sel.value, loadDeliveries));
   document.querySelectorAll('[data-dv-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('delivery_units', b.dataset.dvDel); await loadDeliveries(); render(); });
@@ -2666,6 +2666,26 @@ function mfFit(){
   const fit=document.getElementById('mf-fit'), sh=document.getElementById('mf-sheet'); if(!fit||!sh) return;
   const w=sh.offsetWidth, k=Math.min(1,fit.clientWidth/w);
   sh.style.transform='scale('+k+')'; fit.style.height=(sh.offsetHeight*k)+'px';
+}
+function bdParse(){
+  const seen=new Set(); const out=[];
+  String((document.getElementById('m-bd-codes')||{}).value||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(line=>{
+    const parts=line.split(/\t|\|/).map(x=>x.trim()); const code=parts[0]; if(!code) return;
+    const k=code.toLowerCase(); if(seen.has(k)) return; seen.add(k); out.push({ code, t:parseLooseTime(parts[1])||'' });
+  });
+  return out;
+}
+function bdDraw(){
+  const box=document.getElementById('m-bd-list'); if(!box) return;
+  S._bdT=S._bdT||{}; const items=bdParse();
+  box.innerHTML=items.length? ('<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">ميعاد وصول العميل لكل وحدة ('+items.length+' وحدة):</div>'+items.map((it,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);"><b dir="ltr" style="min-width:84px;">${esc(it.code)}</b>${time12Input('bd-t-'+i, S._bdT[it.code]!==undefined?S._bdT[it.code]:it.t)}</div>`).join('')) : '';
+  box.querySelectorAll('[data-t12]').forEach((w,i)=>w.querySelectorAll('select').forEach(sel=>sel.addEventListener('change',()=>{ t12Sync(w); if(items[i]) S._bdT[items[i].code]=w.querySelector('input[type=hidden]').value; })));
+  items.forEach(it=>{ if(S._bdT[it.code]===undefined && it.t) S._bdT[it.code]=it.t; });
+}
+function bindBulkDelivery(){
+  const ta=document.getElementById('m-bd-codes'); if(!ta) return;
+  let tm=null; ta.addEventListener('input',()=>{ clearTimeout(tm); tm=setTimeout(bdDraw,250); });
+  bdDraw();
 }
 function bindMonthlyFinance(){
   const m=document.getElementById('mf-month');
@@ -4237,6 +4257,7 @@ function cardHolderOf(userId){ const r=(S.cardHolders||[]).find(x=>x.user_id===u
 const CARD_ROLES=['hk_manager','hk_admin','hk_senior_supervisor','supervisor','fm_dispatcher'];
 const CARD_ROLE_LABEL={ hk_manager:'مدير الموقع', hk_admin:'إداري HK', hk_senior_supervisor:'المشرفون الأوائل', supervisor:'المشرفون', fm_dispatcher:'FM Dispatcher' };
 function renderCards(){
+  if(!S.profile||(S.profile.role!=='admin'&&S.profile.role!=='opm')) return `<div class="card" style="text-align:center;padding:28px;color:var(--text-dim);">🔒 شاشة استلام الكروت متاحة للأدمن وOPM فقط.</div>`;
   const canEdit=['admin','opm','hk_admin'].includes(S.profile.role);
   const users=(S.users||[]).filter(u=>u.active && CARD_ROLES.includes(u.role))
     .sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'ar',{numeric:true}));
@@ -6200,10 +6221,11 @@ function renderModal(){
     <div class="form-row"><label>ملاحظة (اختياري)</label><textarea id="m-urg-note"></textarea></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">تأكيد وتغيير الحالة</button>`); }
   if(m.type==='bulkDelivery') return modalWrap('إضافة وحدات تسليم دفعة واحدة', `
-    <p style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:0;">اكتب (أو الصق من Excel) وحدة في كل سطر. ممكن تكتب بعد الكود ميعاد الوصول وبعده تعليمات، مفصولين بـ <b>|</b> أو Tab — مثال: <span dir="ltr" style="unicode-bidi:embed;">A-101 | 2:30 م | العميل بيوصل بسيارة</span>. الميعاد والتعليمات اللي فوق بتتطبّق على الوحدات اللي من غيرهم.</p>
+    <p style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:0;">اكتب (أو الصق من Excel) وحدة في كل سطر، وهيظهرلك تحتها <b>خانة ميعاد وصول العميل</b> لكل وحدة تظبطها. (برضه ممكن تكتب الميعاد والتعليمات بعد الكود مفصولين بـ <b>|</b> — مثال: <span dir="ltr" style="unicode-bidi:embed;">A-101 | 2:30 م | العميل بيوصل بسيارة</span>). الميعاد العام والتعليمات اللي تحت بتتطبّق على الوحدات اللي من غير ميعاد.</p>
     <div class="form-row"><label>التاريخ</label><input type="date" id="m-bd-date" value="${S.deliveryDate}"></div>
     <div class="form-row"><label>أكواد الوحدات</label><textarea id="m-bd-codes" rows="8" style="font-size:14px;" placeholder="A-101&#10;A-102&#10;B-205 | 3:00 م"></textarea></div>
-    <div class="form-row"><label>ميعاد وصول العميل (لكل الوحدات — اختياري)</label>${time12Input('m-bd-arrival','')}</div>
+    <div id="m-bd-list" style="margin:-2px 0 12px;"></div>
+    <div class="form-row"><label>ميعاد وصول العميل العام (للوحدات اللي من غير ميعاد — اختياري)</label>${time12Input('m-bd-arrival','')}</div>
     <div class="form-row"><label>تعليمات خاصة (لكل الوحدات — اختياري)</label><textarea id="m-bd-instr"></textarea></div>
     <div id="m-bd-info" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">إضافة الوحدات</button>`);
@@ -6494,6 +6516,7 @@ function bindModalEvents(){
   if(S.modal && S.modal.type==='violForm') bindViolModal();
   if(S.modal && S.modal.type==='addUnitNote') bindNoteModal();
   if(S.modal && S.modal.type==='monthlyFinance') bindMonthlyFinance();
+  if(S.modal && S.modal.type==='bulkDelivery') bindBulkDelivery();
   if(S.modal && S.modal.type==='dvExport') bindDvExport();
   if(S.modal && S.modal.type==='ssForm') bindSsForm();
   if(S.modal && S.modal.type==='mrEdit') bindMrEdit();
@@ -6733,7 +6756,7 @@ async function handleModalSave(){
       const parts=line.split(/\t|\|/).map(x=>x.trim());
       const code=parts[0]; if(!code) return;
       const key=code.toLowerCase(); if(seen.has(key)){ dup++; return; } seen.add(key);
-      rows.push({ id:uid('dv'), unit_code:code, date, notes:'', client_arrival_time:(parseLooseTime(parts[1])||defArr), special_instructions:((parts[2]||'').trim()||defInstr), status:'scheduled', created_by:S.session.user.id });
+      rows.push({ id:uid('dv'), unit_code:code, date, notes:'', client_arrival_time:((S._bdT&&S._bdT[code])||parseLooseTime(parts[1])||defArr), special_instructions:((parts[2]||'').trim()||defInstr), status:'scheduled', created_by:S.session.user.id });
     });
     if(!rows.length){ toast(dup?'كل الأكواد دي موجودة قبل كده في اليوم ده':'اكتب كود واحد على الأقل',false); return; }
     const btn=document.getElementById('m-save'); btn.disabled=true;
