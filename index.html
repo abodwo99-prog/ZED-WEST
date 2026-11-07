@@ -1791,8 +1791,8 @@ function fmBuildPptx(Pptx,m){
       T(s,c[0],{x:x+.2,y:y+.1,w:2.55,h:.68,fontSize:26,bold:true,color:NAVY,valign:'middle',fit:'shrink'}); T(s,c[1],{x:x+.2,y:y+.78,w:2.55,h:.47,fontSize:11,color:GREY,valign:'top'}); }); }
   // ---- 3 housekeeping & facade
   { const s=base('Housekeeping & Façade Cleaning',m.hkTake); const hk=m.hk;
-    bar(s,.5,.95,4.4,3.5,'Housekeeping – YTD',['Handover','Soft Cleaning','Deep Cleaning','After Modifications','DLP Visits','TOTAL Units YTD'],[hk.handover,hk.soft,hk.deep,hk.mods,hk.dlp,hk.total],[GOLD,GOLD,GOLD,GOLD,GOLD,NAVY]);
-    if(m.facade.length) bar(s,5.1,.95,4.4,3.5,'Façade Cleaning – YTD',m.facade.map(f=>f.name),m.facade.map(f=>f.pct),[BLUE],'0%'); else T(s,'No façade lists in the system yet.',{x:5.1,y:2.3,w:4.4,h:.5,fontSize:11,color:GREY,align:'center'}); }
+    bar(s,.5,.95,4.4,3.5,'Housekeeping – '+m.monthName,['Handover','Soft Cleaning','Deep Cleaning','After Modifications','DLP Visits','TOTAL Units'],[hk.handover,hk.soft,hk.deep,hk.mods,hk.dlp,hk.total],[GOLD,GOLD,GOLD,GOLD,GOLD,NAVY]);
+    if(m.facade.length) bar(s,5.1,.95,4.4,3.5,'Façade Cleaning – '+m.monthName,m.facade.map(f=>f.name),m.facade.map(f=>f.pct),[BLUE],'0%'); else T(s,'No façade lists in the system yet.',{x:5.1,y:2.3,w:4.4,h:.5,fontSize:11,color:GREY,align:'center'}); }
   // ---- 4 pest & waste
   { const s=base('Pest Control & Waste Management',m.pwTake);
     bar(s,.5,.95,4.4,3.5,'Pest Control – '+m.label,['Resolved','Pending','Canceled'],[m.pest.resolved,m.pest.pending,m.pest.canceled],[GREEN]);
@@ -1849,18 +1849,18 @@ async function fmSafe(p,tag){ try{ return await p; }catch(e){ console.warn('fm',
 async function fmCollect(month){
   const y=month.slice(0,4), ys=y+'-01-01', from=month+'-01', to=fmShift(month,1)+'-01', pfrom=fmShift(month,-1)+'-01', prev=fmShift(month,-1);
   const [dv,ord,ss,cmp,runs,lists,items,logs,sups,invs,kpis,inps,wjobs]=await Promise.all([
-    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',ys).lt('date',to)),'delivery_units'),
-    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',ys).lt('scheduled_date',to)),'paid_service_orders'),
-    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',ys).lt('date',to)),'side_service_units'),
+    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',from).lt('date',to)),'delivery_units'),
+    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',from).lt('scheduled_date',to)),'paid_service_orders'),
+    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',from).lt('date',to)),'side_service_units'),
     fmSafe(fmAllRows(()=>sb.from('complaints').select('date,status').gte('date',pfrom).lt('date',to)),'complaints'),
     fmSafe(fmAllRows(()=>sb.from('task_runs').select('date,status').gte('date',pfrom).lt('date',to)),'task_runs'),
     fmSafe(fmAllRows(()=>sb.from('svc_lists').select('id,service,name,position').in('service',['facade','waste'])),'svc_lists'),
     fmSafe(fmAllRows(()=>sb.from('svc_items').select('id,list_id,service,done,done_at').in('service',['facade','waste'])),'svc_items'),
-    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',ys).lt('log_date',to)),'svc_item_log'),
+    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',from).lt('log_date',to)),'svc_item_log'),
     fmSafe(fmAllRows(()=>sb.from('suppliers').select('id,name,category')),'suppliers'),
     fmSafe(fmAllRows(()=>sb.from('supplier_invoices').select('supplier_id,amount,discount,invoice_date').gte('invoice_date',from).lt('invoice_date',to)),'supplier_invoices'),
     fmSafe(fmAllRows(()=>sb.from('supplier_kpi').select('supplier_id,month,overall_score,score').in('month',[month,prev])),'supplier_kpi'),
-    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').gte('month',y+'-01').lte('month',month)),'fm_monthly_inputs'),
+    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').in('month',[prev,month])),'fm_monthly_inputs'),
     fmSafe(fmAllRows(()=>sb.from('waste_removal_jobs').select('date,description,status').eq('status','completed').gte('date',from).lt('date',to)),'waste_removal_jobs')
   ]);
   return { month, prev, from, to, pfrom, dv, ord, ss, cmp, runs, lists, items, logs, sups, invs, kpis, inps, wjobs };
@@ -1874,21 +1874,20 @@ function fmBuildModel(r,draft){
   const norm=c=>String(c||'').trim().toUpperCase();
   // revenue
   const uMonth=new Set(r.dv.filter(x=>inMonth(x.date)).map(x=>norm(x.unit_code)).filter(Boolean));
-  const uYtd=new Set(r.dv.map(x=>norm(x.unit_code)).filter(Boolean));
   const okOrd=r.ord.filter(o=>orderApproved(o));
   const sumType=(t,f)=>okOrd.filter(o=>o.order_type===t && f(o.scheduled_date)).reduce((s,o)=>s+(+o.price||0),0);
-  const cntType=t=>okOrd.filter(o=>o.order_type===t).length;
+  const cntType=t=>okOrd.filter(o=>o.order_type===t && inMonth(o.scheduled_date)).length;
   const hoUnits=ov('handoverUnits')!=null?ov('handoverUnits'):uMonth.size;
   const soft=ov('soft')!=null?ov('soft'):sumType('soft_cleaning',inMonth), deep=ov('deep')!=null?ov('deep'):sumType('deep_cleaning',inMonth);
   const rev={ handoverUnits:hoUnits, handover:hoUnits*FM_UNIT_RATE, soft, deep, paid:soft+deep, total:hoUnits*FM_UNIT_RATE+soft+deep };
-  // housekeeping YTD
-  const dlpYtd=r.inps.filter(x=>x.month!==r.month).reduce((s,x)=>s+(+((x.data||{}).dlp)||0),0)+n0('dlp');
-  const hk={ handover:ov('hkHandover')!=null?ov('hkHandover'):uYtd.size, soft:ov('hkSoft')!=null?ov('hkSoft'):cntType('soft_cleaning'), deep:ov('hkDeep')!=null?ov('hkDeep'):cntType('deep_cleaning'),
-    mods:ov('hkMods')!=null?ov('hkMods'):r.ss.filter(x=>x.service_type==='modifications'&&x.status==='completed').length, dlp:dlpYtd };
+  // housekeeping (selected month only)
+  const dlpYtd=n0('dlp');
+  const hk={ handover:ov('hkHandover')!=null?ov('hkHandover'):uMonth.size, soft:ov('hkSoft')!=null?ov('hkSoft'):cntType('soft_cleaning'), deep:ov('hkDeep')!=null?ov('hkDeep'):cntType('deep_cleaning'),
+    mods:ov('hkMods')!=null?ov('hkMods'):r.ss.filter(x=>x.service_type==='modifications'&&x.status==='completed'&&inMonth(x.date)).length, dlp:dlpYtd };
   hk.total=hk.handover+hk.soft+hk.deep+hk.mods+hk.dlp;
   // facade (every façade list = one zone)
   const facade=r.lists.filter(l=>l.service==='facade').sort((a,b)=>(a.position||0)-(b.position||0)||String(a.name).localeCompare(String(b.name),'en',{numeric:true})).map(l=>{
-    const its=r.items.filter(i=>i.list_id===l.id); const total=its.length; const dset=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id).map(x=>x.item_id)); its.filter(i=>i.done).forEach(i=>dset.add(i.id)); const done=dset.size;
+    const its=r.items.filter(i=>i.list_id===l.id); const total=its.length; const dset=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id&&inMonth(x.log_date)).map(x=>x.item_id)); its.filter(i=>i.done&&i.done_at&&inMonth(dateStr(new Date(i.done_at)))).forEach(i=>dset.add(i.id)); const done=dset.size;
     return { name:l.name, pct: total? Math.min(1,done/total):0 }; });
   // waste visits per phase (list name contains E1 / E2)
   const wl=r.lists.filter(l=>l.service==='waste'); const phaseOf=name=>/e\s*-?1/i.test(name)?'Phase E1':/e\s*-?2/i.test(name)?'Phase E2':'Other';
@@ -1928,7 +1927,7 @@ function fmBuildModel(r,draft){
   const follow=[]; if(status.pendingCustomer) follow.push(status.pendingCustomer+' requests pending customer'); if(notRect) follow.push(notRect+' open complaint'+(notRect>1?'s':''));
   const execTake='Revenue '+fmFmt(rev.total)+' EGP, compliance '+fmPct(compliance.cur)+', vendor scores '+vendorRange+(follow.length? '; follow-up needed on '+follow.join(' and ')+'.' : '; no open follow-ups.');
   const fp=facade.map(f=>f.pct);
-  const hkTake=hk.total+' units serviced YTD ('+hk.handover+' handover, '+hk.soft+' soft cleaning, '+hk.deep+' deep cleaning).'+(fp.length? ' Façade completion '+Math.round(Math.min(...fp)*100)+'–'+Math.round(Math.max(...fp)*100)+'%.':'');
+  const hkTake=hk.total+' units serviced in '+monthName+' ('+hk.handover+' handover, '+hk.soft+' soft cleaning, '+hk.deep+' deep cleaning).'+(fp.length? ' Façade work done in '+monthName+': '+Math.round(Math.min(...fp)*100)+'–'+Math.round(Math.max(...fp)*100)+'%.':'');
   const pwTake=(pest.total? pest.resolved+' of '+pest.total+' pest-control requests resolved ('+pct(pest.resolved,pest.total)+'%); ' : 'Pest-control requests not entered; ')+wasteTotal+' waste-collection visits across Phases E1 and E2.';
   const ccTake='Compliance with cleaning plans '+fmPct(compliance.cur)+' in '+monthName+'; '+complaints.cur.rect+' of '+complaints.cur.recv+' '+monthName+' complaints rectified.';
   const orTake=occ.cur!=null&&occ.prev!=null? 'Occupancy '+(occ.cur>=occ.prev?'grew':'fell')+' from '+occ.prev+' to '+occ.cur+' units ('+(occ.cur-occ.prev>=0?'+':'')+(occ.cur-occ.prev)+', '+(occ.prev?((occ.cur-occ.prev)/occ.prev*100).toFixed(1):'0')+'%).' : 'Occupancy: enter this month\'s units in the manual section.';
@@ -1943,7 +1942,7 @@ function fmBuildModel(r,draft){
   if(status.wrong) att.push({ t:status.wrong+' wrong-assignment SRs', d:'Routing errors to correct between teams.', c:'blue' });
   if(notRect) att.push({ t:notRect+' complaint'+(notRect>1?'s':'')+' not rectified', d:complaints.cur.recv+' received in '+monthName+', '+complaints.cur.rect+' rectified.', c:'red' });
   const lowF=facade.filter(f=>f.pct<1).sort((a,b)=>a.pct-b.pct); if(lowF.length) att.push({ t:'Façade: '+lowF.slice(0,3).map(f=>f.name+' '+Math.round(f.pct*100)+'%').join(', '), d:'Remaining zones need completion.', c:'blue' });
-  const zero=[['After Modifications',hk.mods],['DLP Visits',hk.dlp],['Soft Cleaning',hk.soft],['Deep Cleaning',hk.deep]].filter(x=>!x[1]).map(x=>x[0]); if(zero.length) att.push({ t:'Housekeeping: '+zero.length+' categor'+(zero.length>1?'ies':'y')+' at 0', d:zero.join(', ')+': none YTD.', c:'gold' });
+  const zero=[['After Modifications',hk.mods],['DLP Visits',hk.dlp],['Soft Cleaning',hk.soft],['Deep Cleaning',hk.deep]].filter(x=>!x[1]).map(x=>x[0]); if(zero.length) att.push({ t:'Housekeeping: '+zero.length+' categor'+(zero.length>1?'ies':'y')+' at 0', d:zero.join(', ')+': none in '+monthName+'.', c:'gold' });
   if(pest.pending) att.push({ t:'Pest control: '+pest.pending+' pending request'+(pest.pending>1?'s':''), d:pest.resolved+' of '+pest.total+' resolved ('+pct(pest.resolved,pest.total)+'%).', c:'green' });
   String(draft.notes||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>att.push({ t:x, d:'', c:'navy' }));
   if(!att.length) att.push({ t:'No open points', d:'All indicators are on target for '+monthName+'.', c:'green' });
@@ -1986,7 +1985,7 @@ const FM_FIELDS={
   sr_resolved:'Resolved', sr_pendingAction:'Pending action', sr_pendingCustomer:'Pending customer', sr_canceled:'Canceled', sr_open:'Open', sr_wrong:'Wrong assignment',
   so_quality:'Quality', so_callCenter:'Call Center', so_cm:'CM', so_dlp:'DLP',
   pest_resolved:'Resolved', pest_pending:'Pending', pest_canceled:'Canceled', dlp:'DLP Visits (هذا الشهر)' };
-const FM_OV={ handoverUnits:'وحدات Handover (الشهر)', soft:'إيراد Soft (EGP)', deep:'إيراد Deep (EGP)', hkHandover:'Handover YTD', hkSoft:'Soft YTD', hkDeep:'Deep YTD', hkMods:'After Modifications YTD', compliance:'الالتزام % (0-100)', cRecv:'شكاوى مستلمة', cRect:'شكاوى معالجة', integrated:'Integrated SRs' };
+const FM_OV={ handoverUnits:'وحدات Handover (الشهر)', soft:'إيراد Soft (EGP)', deep:'إيراد Deep (EGP)', hkHandover:'Handover (الشهر)', hkSoft:'Soft (عدد الشهر)', hkDeep:'Deep (عدد الشهر)', hkMods:'After Modifications (الشهر)', compliance:'الالتزام % (0-100)', cRecv:'شكاوى مستلمة', cRect:'شكاوى معالجة', integrated:'Integrated SRs' };
 function fmInput(k,label){ const v=S.fm.draft[k]; return `<div class="form-row" style="margin:0;min-width:120px;flex:1;"><label style="font-size:11px;">${label}</label><input type="number" min="0" data-fm-in="${k}" value="${v==null?'':esc(v)}"></div>`; }
 function fmCardRow(lbl,val,manual){ return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--text-dim);">${lbl}${manual?' <span style="font-size:10px;background:#fff3cd;color:#8a6d00;border-radius:999px;padding:1px 7px;">يدوي</span>':''}</span><b>${val}</b></div>`; }
 function fmDiagHtml(f){
@@ -2010,8 +2009,8 @@ function fmReportCard(){
     body=`${m.missing.length?`<div style="background:#fff3cd;color:#6b5300;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;">⚠️ ناقص إدخال يدوي: ${m.missing.join('، ')}</div>`:''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px;">
       ${sec('الإيراد',fmCardRow('Handover ('+m.rev.handoverUnits+' وحدة × '+FM_UNIT_RATE+')',fmFmt(m.rev.handover)+' ج.م')+fmCardRow('Soft Cleaning',fmFmt(m.rev.soft))+fmCardRow('Deep Cleaning',fmFmt(m.rev.deep))+fmCardRow('الإجمالي',fmFmt(m.rev.total)+' ج.م'))}
-      ${sec('Housekeeping YTD',fmCardRow('Handover',m.hk.handover)+fmCardRow('Soft / Deep',m.hk.soft+' / '+m.hk.deep)+fmCardRow('After Modifications',m.hk.mods)+fmCardRow('DLP Visits',m.hk.dlp,true)+fmCardRow('الإجمالي',m.hk.total))}
-      ${sec('الواجهات (YTD)',m.facade.length? m.facade.map(x=>fmCardRow(esc(x.name),Math.round(x.pct*100)+'%')).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش قوائم واجهات</div>')}
+      ${sec('Housekeeping (الشهر)',fmCardRow('Handover',m.hk.handover)+fmCardRow('Soft / Deep',m.hk.soft+' / '+m.hk.deep)+fmCardRow('After Modifications',m.hk.mods)+fmCardRow('DLP Visits',m.hk.dlp,true)+fmCardRow('الإجمالي',m.hk.total))}
+      ${sec('الواجهات (الشهر)',m.facade.length? m.facade.map(x=>fmCardRow(esc(x.name),Math.round(x.pct*100)+'%')).join('') : '<div style="font-size:12px;color:var(--text-dim);">مفيش قوائم واجهات</div>')}
       ${sec('Pest & Waste',fmCardRow('Pest: تم / معلق / ملغي',m.pest.resolved+' / '+m.pest.pending+' / '+m.pest.canceled,true)+m.waste.map(w=>fmCardRow('Waste '+w.name,w.visits+' زيارة')).join(''))}
       ${sec('الشكاوى والالتزام',fmCardRow(m.mon+' شكاوى (مستلمة / معالجة)',m.complaints.cur.recv+' / '+m.complaints.cur.rect)+fmCardRow(m.prevMon+' شكاوى',m.complaints.prev.recv+' / '+m.complaints.prev.rect)+fmCardRow('الالتزام بخطط النظافة',fmPct(m.compliance.cur))+fmCardRow('زمن الاستجابة','48 ساعة (ثابت)'))}
       ${sec('Occupancy & SRs',fmCardRow('Occupancy',m.occ.cur!=null?m.occ.cur:'—',true)+fmCardRow('الشهر السابق',m.occ.prev!=null?m.occ.prev:'—')+fmCardRow('إجمالي SRs',m.sr.total||'—',true)+fmCardRow('Integrated (تلقائي من خدمات جانبية)',m.sr.source.integrated))}
@@ -3080,14 +3079,13 @@ const PEST_TYPE_LABEL = { full_service:'خدمة كاملة', inspection:'معا
 function renderPestOld(){
   const role=S.profile.role;
   const canCreate = role==='admin'||role==='opm'||role==='fm_dispatcher';
-  const canAssign = role==='admin'||role==='opm';
+  const canDel = role==='admin'||role==='opm';
   const list = S.pest.filter(p=>!S.unitQ||fmUnitMatch(p.unit_code)).sort((a,b)=> a.scheduled_date < b.scheduled_date ? 1 : -1);
   return `
   <div class="toolbar">${canCreate?`<button class="primary-btn" id="pest-add">${ICON.plus()} طلب جديد</button>`:''}</div>
-  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>المشرف</th><th>الحالة</th><th></th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>كود الوحدة</th><th>نوع الخدمة</th><th>السعر</th><th>الدفع</th><th>التاريخ</th><th>الميعاد</th><th>الحالة</th><th></th></tr></thead><tbody>
   ${list.length? list.map(p=>{
-    const sup=S.users.find(u=>u.id===p.assigned_supervisor_id);
-    const canChangeStatus = role==='admin'||role==='opm'||role==='pest_sv'||p.assigned_supervisor_id===S.session.user.id;
+    const canChangeStatus = role==='admin'||role==='opm'||role==='pest_sv';
     const canManage = role==='admin'||role==='opm';
     return `<tr>
       <td>${esc(p.unit_code)}</td><td>${PEST_TYPE_LABEL[p.service_type]||p.service_type}</td>
@@ -3097,22 +3095,20 @@ function renderPestOld(){
         <option value="paid" ${p.payment_status==='paid'?'selected':''}>مدفوع</option>
       </select>${p.has_pay_photo?`<div><button class="ghost-btn" style="margin-top:4px;padding:3px 8px;font-size:11px;" data-view-photo="pest|${p.id}">🧾 إثبات الدفع</button></div>`:''}` : (PAYMENT_STATUS_LABEL[p.payment_status]||'غير مدفوع')}</td>
       <td>${p.scheduled_date}</td><td>${fmt12(p.scheduled_time,'-')}</td>
-      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${canChangeStatus? `<select data-pest-status="${p.id}">
         <option value="scheduled" ${p.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${p.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${p.status==='completed'?'selected':''}>تم الانتهاء</option>
       </select>`:statusBadge(p.status)}</td>
-      <td>${canAssign?`<button class="ghost-btn" data-pest-assign="${p.id}">تعيين مشرف</button>`:''}${canAssign?` <button class="ghost-btn danger" data-pest-del="${p.id}">${ICON.trash(12)}</button>`:''}</td>
+      <td>${canDel?`<button class="ghost-btn danger" data-pest-del="${p.id}">${ICON.trash(12)}</button>`:''}</td>
     </tr>`;
-  }).join(''): `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
+  }).join(''): `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد طلبات</td></tr>`}
   </tbody></table></div>`;
 }
 function bindPestOld(){
   const add=document.getElementById('pest-add'); if(add) add.onclick=()=>{ S.modal={type:'addPest'}; render(); };
-  document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value, updated_at:new Date().toISOString()}); await loadPest(); render(); toast('تم التحديث',true); });
+  document.querySelectorAll('[data-pest-status]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestStatus, {status:sel.value}); await loadPest(); render(); toast('تم التحديث',true); });
   document.querySelectorAll('[data-pest-payment]').forEach(sel=>sel.onchange=async ()=>{ await dbUpdate('pest_control_requests', sel.dataset.pestPayment, {payment_status:sel.value}); await loadPest(); render(); toast('تم تحديث حالة الدفع',true); });
-  document.querySelectorAll('[data-pest-assign]').forEach(b=>b.onclick=()=>{ S.modal={type:'assignPest', id:b.dataset.pestAssign}; render(); });
   document.querySelectorAll('[data-pest-del]').forEach(b=>b.onclick=async ()=>{ await dbDelete('pest_control_requests', b.dataset.pestDel); await loadPest(); render(); toast('تم الحذف',true); });
 }
 async function loadPest(){ S.pest = (await dbSelect('pest_control_requests')) ?? S.pest; }
