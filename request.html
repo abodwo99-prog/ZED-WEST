@@ -77,6 +77,7 @@ button.go:disabled{opacity:.55;cursor:default}
 .trk .stp.done .lb,.trk .stp.cur .lb{color:#1b2430}
 .trk .stp.bad .lb{color:#b3261e}.trk .stp.warn .lb{color:#9a6200}
 .trk .sb{font-size:12.5px;color:#66758a;margin-top:2px;line-height:1.7}
+.trk .tm{font-size:11.5px;color:#7a8696;margin-top:2px}
 .trk .edt{margin-top:14px;text-align:center;font-size:12.5px;color:#66758a}
 .trk .edt button{background:none;border:0;color:#2f6fed;font:700 12.5px inherit;text-decoration:underline;cursor:pointer;padding:4px}
 .trk .ph{margin-top:8px;display:none}
@@ -221,6 +222,12 @@ button.go:disabled{opacity:.55;cursor:default}
   var STL={pending:'قيد المراجعة',waitlist:'قيد المراجعة (اليوم محجوز)',approved:'مقبول',rejected:'مرفوض',cancelled:'ملغي'};
   var trkRef=0;
   var STEPS=['تم استلام الطلب','قيد المراجعة','مجدول','جاري العمل','تم الانتهاء'];
+  function fdt(iso){
+    if(!iso) return '';
+    try{ var d=new Date(iso); if(isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo',day:'numeric',month:'long',year:'numeric'})+' · '+d.toLocaleTimeString('ar-EG',{timeZone:'Africa/Cairo',hour:'numeric',minute:'2-digit',hour12:true});
+    }catch(e){ return ''; }
+  }
   function drawTrack(r){
     var idx={review:1,scheduled:2,in_progress:3,completed:4,postponed:2,rejected:1,cancelled:1}[r.stage]; if(idx===undefined) idx=1;
     var sub={}; 
@@ -240,7 +247,11 @@ button.go:disabled{opacity:.55;cursor:default}
         else if(r.stage==='completed'){ cls='done'; mark='✓'; note=sub[4]; }
         else { cls='cur'; note=sub[i]; }
       } else if(i<idx && sub[i] && i===0){ note=sub[0]; }
-      h+='<div class="stp '+cls+'"><div class="dot">'+mark+'</div><div><div class="lb">'+lb+'</div>'+(note?'<div class="sb">'+note+'</div>':'')+'</div></div>';
+      var T=r.times||{}, when={0:T.received,1:T.received,2:T.decided,3:T.in_progress,4:T.completed}[i];
+      if(i===idx){ if(r.stage==='rejected') when=T.decided; else if(r.stage==='cancelled') when=T.cancelled||T.decided; else if(r.stage==='postponed') when=T.postponed||T.decided; }
+      if(i>idx) when=null;
+      var tm=fdt(when);
+      h+='<div class="stp '+cls+'"><div class="dot">'+mark+'</div><div><div class="lb">'+lb+'</div>'+(note?'<div class="sb">'+note+'</div>':'')+(tm?'<div class="tm">📅 '+tm+'</div>':'')+'</div></div>';
     }
     var edt='';
     if(r.edit_pending) edt='فيه طلب تعديل على الطلب ده لسه تحت المراجعة — استنى الرد على الواتس.';
