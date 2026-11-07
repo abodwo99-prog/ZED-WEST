@@ -1845,24 +1845,25 @@ const FM_CAT_ORDER=['housekeeping','facade_cleaning','pest_control','waste_mgt',
 Object.assign(S,{ fm:{ open:false, month:'', busy:false, err:'', model:null, draft:{}, rows:[] } });
 function fmShift(m,d){ let [y,mo]=m.split('-').map(Number); mo+=d; while(mo>12){ mo-=12; y++; } while(mo<1){ mo+=12; y--; } return y+'-'+String(mo).padStart(2,'0'); }
 function fmAllRows(build){ return (async()=>{ let out=[]; for(let i=0;;i+=1000){ const {data,error}=await build().range(i,i+999); if(error) throw error; out=out.concat(data||[]); if(!data||data.length<1000) break; } return out; })(); }
-async function fmSafe(p){ try{ return await p; }catch(e){ console.warn('fm',e&&e.message); return []; } }
+async function fmSafe(p,tag){ try{ return await p; }catch(e){ console.warn('fm',tag,e&&e.message); (S.fm._errs=S.fm._errs||{})[tag||'?']=(e&&e.message)||String(e); return []; } }
 async function fmCollect(month){
   const y=month.slice(0,4), ys=y+'-01-01', from=month+'-01', to=fmShift(month,1)+'-01', pfrom=fmShift(month,-1)+'-01', prev=fmShift(month,-1);
-  const [dv,ord,ss,cmp,runs,lists,items,logs,sups,invs,kpis,inps]=await Promise.all([
-    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',ys).lt('date',to))),
-    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',ys).lt('scheduled_date',to))),
-    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',ys).lt('date',to))),
-    fmSafe(fmAllRows(()=>sb.from('complaints').select('date,status').gte('date',pfrom).lt('date',to))),
-    fmSafe(fmAllRows(()=>sb.from('task_runs').select('date,status').gte('date',pfrom).lt('date',to))),
-    fmSafe(fmAllRows(()=>sb.from('svc_lists').select('id,service,name,position').in('service',['facade','waste']))),
-    fmSafe(fmAllRows(()=>sb.from('svc_items').select('id,list_id,service').in('service',['facade','waste']))),
-    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',ys).lt('log_date',to))),
-    fmSafe(fmAllRows(()=>sb.from('suppliers').select('id,name,category'))),
-    fmSafe(fmAllRows(()=>sb.from('supplier_invoices').select('supplier_id,amount,discount,invoice_date').gte('invoice_date',from).lt('invoice_date',to))),
-    fmSafe(fmAllRows(()=>sb.from('supplier_kpi').select('supplier_id,month,overall_score,score').in('month',[month,prev]))),
-    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').gte('month',y+'-01').lte('month',month)))
+  const [dv,ord,ss,cmp,runs,lists,items,logs,sups,invs,kpis,inps,wjobs]=await Promise.all([
+    fmSafe(fmAllRows(()=>sb.from('delivery_units').select('unit_code,date').gte('date',ys).lt('date',to)),'delivery_units'),
+    fmSafe(fmAllRows(()=>sb.from('paid_service_orders').select('order_type,scheduled_date,status,approval_status,price').eq('status','completed').gte('scheduled_date',ys).lt('scheduled_date',to)),'paid_service_orders'),
+    fmSafe(fmAllRows(()=>sb.from('side_service_units').select('service_type,date,status').gte('date',ys).lt('date',to)),'side_service_units'),
+    fmSafe(fmAllRows(()=>sb.from('complaints').select('date,status').gte('date',pfrom).lt('date',to)),'complaints'),
+    fmSafe(fmAllRows(()=>sb.from('task_runs').select('date,status').gte('date',pfrom).lt('date',to)),'task_runs'),
+    fmSafe(fmAllRows(()=>sb.from('svc_lists').select('id,service,name,position').in('service',['facade','waste'])),'svc_lists'),
+    fmSafe(fmAllRows(()=>sb.from('svc_items').select('id,list_id,service,done,done_at').in('service',['facade','waste'])),'svc_items'),
+    fmSafe(fmAllRows(()=>sb.from('svc_item_log').select('service,list_id,list_name,item_id,log_date').in('service',['facade','waste']).gte('log_date',ys).lt('log_date',to)),'svc_item_log'),
+    fmSafe(fmAllRows(()=>sb.from('suppliers').select('id,name,category')),'suppliers'),
+    fmSafe(fmAllRows(()=>sb.from('supplier_invoices').select('supplier_id,amount,discount,invoice_date').gte('invoice_date',from).lt('invoice_date',to)),'supplier_invoices'),
+    fmSafe(fmAllRows(()=>sb.from('supplier_kpi').select('supplier_id,month,overall_score,score').in('month',[month,prev])),'supplier_kpi'),
+    fmSafe(fmAllRows(()=>sb.from('fm_monthly_inputs').select('month,data').gte('month',y+'-01').lte('month',month)),'fm_monthly_inputs'),
+    fmSafe(fmAllRows(()=>sb.from('waste_removal_jobs').select('date,description,status').eq('status','completed').gte('date',from).lt('date',to)),'waste_removal_jobs')
   ]);
-  return { month, prev, from, to, pfrom, dv, ord, ss, cmp, runs, lists, items, logs, sups, invs, kpis, inps };
+  return { month, prev, from, to, pfrom, dv, ord, ss, cmp, runs, lists, items, logs, sups, invs, kpis, inps, wjobs };
 }
 function fmBuildModel(r,draft){
   const mi=+r.month.slice(5)-1, pi=+r.prev.slice(5)-1;
@@ -1887,12 +1888,14 @@ function fmBuildModel(r,draft){
   hk.total=hk.handover+hk.soft+hk.deep+hk.mods+hk.dlp;
   // facade (every façade list = one zone)
   const facade=r.lists.filter(l=>l.service==='facade').sort((a,b)=>(a.position||0)-(b.position||0)||String(a.name).localeCompare(String(b.name),'en',{numeric:true})).map(l=>{
-    const total=r.items.filter(i=>i.list_id===l.id).length; const done=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id).map(x=>x.item_id)).size;
+    const its=r.items.filter(i=>i.list_id===l.id); const total=its.length; const dset=new Set(r.logs.filter(x=>x.service==='facade'&&x.list_id===l.id).map(x=>x.item_id)); its.filter(i=>i.done).forEach(i=>dset.add(i.id)); const done=dset.size;
     return { name:l.name, pct: total? Math.min(1,done/total):0 }; });
   // waste visits per phase (list name contains E1 / E2)
   const wl=r.lists.filter(l=>l.service==='waste'); const phaseOf=name=>/e\s*-?1/i.test(name)?'Phase E1':/e\s*-?2/i.test(name)?'Phase E2':'Other';
   const wmap={'Phase E1':new Set(),'Phase E2':new Set(),'Other':new Set()};
   r.logs.filter(x=>x.service==='waste'&&inMonth(x.log_date)).forEach(x=>{ const nm=(wl.find(l=>l.id===x.list_id)||{}).name||x.list_name||''; wmap[phaseOf(nm)].add(x.log_date); });
+  r.items.filter(i=>i.done&&i.done_at&&wl.some(l=>l.id===i.list_id)).forEach(i=>{ const dd=dateStr(new Date(i.done_at)); if(inMonth(dd)){ const nm=(wl.find(l=>l.id===i.list_id)||{}).name||''; wmap[phaseOf(nm)].add(dd); } });
+  (r.wjobs||[]).forEach(j=>{ if(j.date&&inMonth(j.date)) wmap[phaseOf(j.description||'')].add(j.date); });
   const waste=[{name:'Phase E1',visits:wmap['Phase E1'].size},{name:'Phase E2',visits:wmap['Phase E2'].size}]; if(wmap['Other'].size) waste.push({name:'Other',visits:wmap['Other'].size});
   const wasteTotal=waste.reduce((s,w)=>s+w.visits,0);
   // complaints / compliance
@@ -1916,7 +1919,7 @@ function fmBuildModel(r,draft){
     const sc=mm=>{ const l=r.kpis.filter(k=>k.supplier_id===s.id&&k.month===mm).map(k=>+(k.overall_score!=null&&k.overall_score!==''?k.overall_score:k.score)).filter(v=>!isNaN(v)); return l.length? l.reduce((a,b)=>a+b,0)/l.length : null; };
     const norm01=v=>v==null?null:(v<=1?v*100:v);
     return { name:s.name, cat:FM_CAT_LABEL[s.category], catKey:s.category, req, appr, prev:norm01(sc(r.prev)), cur:norm01(sc(r.month)), has:inv.length>0 };
-  }).filter(v=>v.has||v.cur!=null||v.prev!=null).sort((a,b)=>FM_CAT_ORDER.indexOf(a.catKey)-FM_CAT_ORDER.indexOf(b.catKey));
+  }).sort((a,b)=>FM_CAT_ORDER.indexOf(a.catKey)-FM_CAT_ORDER.indexOf(b.catKey)||String(a.name).localeCompare(String(b.name)));
   const curScores=vendors.map(v=>v.cur).filter(v=>v!=null).map(Math.round);
   const vendorRange=curScores.length? (Math.min(...curScores)===Math.max(...curScores)? Math.min(...curScores)+'%' : Math.min(...curScores)+'–'+Math.max(...curScores)+'%') : '—';
   // texts
@@ -1933,7 +1936,7 @@ function fmBuildModel(r,draft){
   const revTake='Handover units '+pct(rev.handover,rev.total)+'% of revenue; paid services '+pct(rev.paid,rev.total)+'%'+(rev.paid? ', of which deep cleaning is '+pct(rev.deep,rev.paid)+'%.' : '.');
   const sumReq=vendors.reduce((t,v)=>t+v.req,0), sumAppr=vendors.reduce((t,v)=>t+v.appr,0);
   const costTake='Total requested: '+fmFmt(sumReq)+' · approved: '+fmFmt(sumAppr)+(sumReq===sumAppr? ' — every payment approved in full.' : ' — difference '+fmFmt(sumReq-sumAppr)+' (discounts).');
-  const scoreTake=curScores.length? 'All '+curScores.length+' vendors at '+vendorRange+'.' : 'No vendor scores recorded for '+monthName+'.';
+  const scoreTake=curScores.length? (curScores.length===vendors.length?'All ':'')+curScores.length+' vendors scored at '+vendorRange+'.' : 'No vendor scores recorded for '+monthName+'.';
   // attention points
   const att=[];
   if(status.pendingCustomer) att.push({ t:status.pendingCustomer+' SRs pending customer', d:pct(status.pendingCustomer,sr.total)+'% of '+monthName+' requests await customer response.', c:'gold' });
@@ -1951,7 +1954,7 @@ function fmBuildModel(r,draft){
 }
 async function fmLoad(){
   const f=S.fm; if(!f.month) f.month=fmShift((S.today||todayStr()).slice(0,7),-1);
-  f.busy=true; f.err=''; render();
+  f.busy=true; f.err=''; f._errs={}; render();
   try{
     const raw=await fmCollect(f.month); f.raw=raw;
     const saved=(raw.inps.find(x=>x.month===f.month)||{}).data||{};
@@ -1986,6 +1989,14 @@ const FM_FIELDS={
 const FM_OV={ handoverUnits:'وحدات Handover (الشهر)', soft:'إيراد Soft (EGP)', deep:'إيراد Deep (EGP)', hkHandover:'Handover YTD', hkSoft:'Soft YTD', hkDeep:'Deep YTD', hkMods:'After Modifications YTD', compliance:'الالتزام % (0-100)', cRecv:'شكاوى مستلمة', cRect:'شكاوى معالجة', integrated:'Integrated SRs' };
 function fmInput(k,label){ const v=S.fm.draft[k]; return `<div class="form-row" style="margin:0;min-width:120px;flex:1;"><label style="font-size:11px;">${label}</label><input type="number" min="0" data-fm-in="${k}" value="${v==null?'':esc(v)}"></div>`; }
 function fmCardRow(lbl,val,manual){ return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--text-dim);">${lbl}${manual?' <span style="font-size:10px;background:#fff3cd;color:#8a6d00;border-radius:999px;padding:1px 7px;">يدوي</span>':''}</span><b>${val}</b></div>`; }
+function fmDiagHtml(f){
+  const r=f.raw; if(!r) return '';
+  const fl=r.lists.filter(l=>l.service==='facade'), wl=r.lists.filter(l=>l.service==='waste');
+  const fi=r.items.filter(i=>fl.some(l=>l.id===i.list_id)).length, wi=r.items.filter(i=>wl.some(l=>l.id===i.list_id)).length;
+  const fLog=r.logs.filter(x=>x.service==='facade').length, wLog=r.logs.filter(x=>x.service==='waste').length;
+  const errs=Object.keys(f._errs||{}).map(k=>k+': '+f._errs[k]).join(' | ');
+  return `<div style="font-size:11px;color:var(--text-dim);line-height:1.8;margin:-4px 0 10px;direction:ltr;text-align:left;">Sources — facade: ${fl.length} lists / ${fi} items / ${fLog} log rows · waste: ${wl.length} lists / ${wi} items / ${wLog} log rows / ${(r.wjobs||[]).length} jobs · suppliers: ${r.sups.length} · invoices: ${r.invs.length} · KPI rows: ${r.kpis.length}${errs?`<br><span style="color:#c0392b;">errors → ${esc(errs)}</span>`:''}</div>`;
+}
 function fmReportCard(){
   const role=S.profile&&S.profile.role; if(role!=='admin'&&role!=='opm') return '';
   const f=S.fm;
@@ -2022,7 +2033,7 @@ function fmReportCard(){
   }
   return `<div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><h3 style="margin:0;">📑 FM Monthly Report</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;"><div class="fgroup"><label>الشهر</label><input type="month" id="fm-month" value="${esc(f.month)}"></div>
-    <button class="ghost-btn" id="fm-save" ${f.busy||!m?'disabled':''}>💾 حفظ الإدخال اليدوي</button><button class="primary-btn" id="fm-export" ${f.busy||!m?'disabled':''}>⬇️ تصدير PowerPoint</button><button class="ghost-btn" id="fm-close">إغلاق</button></div></div>${body}</div>`;
+    <button class="ghost-btn" id="fm-save" ${f.busy||!m?'disabled':''}>💾 حفظ الإدخال اليدوي</button><button class="primary-btn" id="fm-export" ${f.busy||!m?'disabled':''}>⬇️ تصدير PowerPoint</button><button class="ghost-btn" id="fm-close">إغلاق</button></div></div>${fmDiagHtml(f)}${body}</div>`;
 }
 function bindFmReport(){
   const b=id=>document.getElementById(id);
