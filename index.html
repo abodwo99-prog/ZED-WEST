@@ -2526,16 +2526,16 @@ function renderDeliveries(){
     return `<tr>
       <td>${esc(d.unit_code)}${S.unitQ?` <div style="font-size:11px;color:var(--text-dim);">${esc(d.date)}</div>`:''}</td>
       <td>${fmt12(d.client_arrival_time,'-')}</td>
-      <td style="white-space:normal;min-width:150px;">${esc(d.special_instructions||'-')}</td>
+      <td style="white-space:normal;min-width:130px;max-width:230px;word-break:break-word;line-height:1.6;">${esc(d.special_instructions||'-')}</td>
       <td>${canChangeStatus? `<select data-dv-status="${d.id}">
         <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
         <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
-      </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
-      <td>${esc(d.notes||'-')}</td>
+      </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;white-space:normal;max-width:170px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
+      <td style="white-space:normal;min-width:150px;max-width:260px;word-break:break-word;line-height:1.6;">${esc(d.notes||'-')}</td>
       <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
-      <td>${audHistBtn('delivery_units',d.id,d.unit_code)} ${canWrite?`<button class="ghost-btn" data-dv-edit="${d.id}">تعديل</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
+      <td style="white-space:normal;min-width:96px;">${audHistBtn('delivery_units',d.id,d.unit_code)} ${canWrite?`<button class="ghost-btn" data-dv-edit="${d.id}">تعديل</button> <button class="ghost-btn danger" data-dv-del="${d.id}">${ICON.trash()}</button>`:''}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);">لا توجد وحدات ${todayOnly?'النهاردة':'في هذا اليوم'}</td></tr>`}
   </tbody></table></div>`;
@@ -3321,7 +3321,7 @@ function renderFacadeOrdersForSV(){
   const list=(S.orders||[]).filter(o=>o.order_type==='facade_cleaning' && orderApproved(o)).sort((a,b)=>String(b.scheduled_date).localeCompare(String(a.scheduled_date)));
   return `<div class="section-title"><h2>أوردرات نظافة الواجهات (الخدمة المدفوعة)</h2></div>
   <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>التاريخ</th><th>الميعاد</th><th>ملاحظات</th><th>الحالة</th></tr></thead><tbody>
-  ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${fmt12(o.scheduled_time,'-')}</td><td>${esc(o.opm_notes||'-')}</td>
+  ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${fmt12(o.scheduled_time,'-')}</td><td style="white-space:normal;min-width:150px;max-width:260px;word-break:break-word;line-height:1.6;">${esc(o.opm_notes||'-')}</td>
     <td><select data-fsv-ord="${o.id}"><option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option></select></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text-dim);">لا توجد أوردرات</td></tr>'}
   </tbody></table></div>`;
 }
@@ -3374,7 +3374,7 @@ function renderWasteOld(){
     const sup=S.users.find(u=>u.id===w.assigned_supervisor_id);
     const canAct = (role==='admin'||role==='opm'||role==='waste_sv'||w.assigned_supervisor_id===S.session.user.id) && w.status==='scheduled';
     return `<tr>
-      <td>${esc(w.description)}</td><td>${w.date}</td>
+      <td style="white-space:normal;min-width:150px;max-width:280px;word-break:break-word;line-height:1.6;">${esc(w.description)}</td><td>${w.date}</td>
       <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${w.status==='not_done'?'<span class="badge postponed"><span class="dot"></span>لم يتم العمل</span>':statusBadge(w.status)}</td>
       <td>${esc(w.reason||'-')}</td>
