@@ -1168,11 +1168,20 @@ const ICON = {
 /* ============================= v4: shared helpers (zones / assignments / timers / urgent) ============================= */
 Object.assign(S,{ hkZones:[], zoneTasks:[], zoneAssign:[], supAssign:[], workerCounts:[], laborDist:[], urgent:[], seenUrgent:new Set(), urgentSig:'', openTaskRev:new Set() });
 function userName(id){ const u=(S.users||[]).find(x=>x.id===id); return u? (u.full_name||'') : ''; }
-function shownName(id){ const p=presenceOf(id); return (p && p.actual_name && p.actual_name.trim()) || userName(id); }
+const GENERIC_SV=/^\s*hk[\s_-]*sv[\s_-]*\d+\s*$/i;   // account labels like "HK SV 3" — shown only in the cards handover screen
+function shownNameRaw(id){
+  const p=presenceOf(id); const a=p&&p.actual_name&&String(p.actual_name).trim(); if(a&&!GENERIC_SV.test(a)) return a;
+  const h=cardHolderOf(id); if(h&&!GENERIC_SV.test(h)) return h;
+  const u=userName(id); return GENERIC_SV.test(u)?'':u;
+}
+function shownName(id){ return shownNameRaw(id)||'بدون اسم'; }
+const cleanStored=v=>{ v=String(v==null?'':v); return GENERIC_SV.test(v)?'':v; };
+function plainName(id){ const h=cardHolderOf(id); if(h&&!GENERIC_SV.test(h)) return h; const u=userName(id); return GENERIC_SV.test(u)?'بدون اسم':u; }
+function myName(){ const me=S.session&&S.session.user&&S.session.user.id; const r=me?shownNameRaw(me):''; if(r) return r; const f=(S.profile&&S.profile.full_name)||''; return GENERIC_SV.test(f)?'':f; }
 function renderGreeting(){
   const hr=Math.floor(cairoMinutes()/60);
   const greet = hr<12 ? 'صباح الخير' : 'مساء الخير';
-  const nm = shownName(S.session.user.id) || S.profile.full_name || '';
+  const nm = myName();
   return `<div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span style="font-weight:900;font-size:14.5px;">${greet} يا ${esc(nm)} 👋</span><span style="font-size:12px;color:var(--text-dim);">${esc(fmtDate(S.today))}</span></div>`;
 }
 function zoneById(id){ return (S.hkZones||[]).find(z=>z.id===id)||null; }
@@ -1630,7 +1639,7 @@ async function fvStartCall(){
   if(wasClosed){ const d0=await sb.from('verify_checks').delete().eq('session_id',S.today); if(d0.error){ toast('تعذّر تصفية الجولة السابقة: '+d0.error.message,false); return; } }
   let r=await sb.from('verify_sessions').update({ status:'calling', summary:null, closed_at:null, call_started_by:S.session.user.id, call_started_at:now.toISOString(), call_deadline:dl.toISOString() }).eq('id',S.today);
   if(r.error){ toast('تعذّر بدء النداء: '+r.error.message,false); return; }
-  r=await sb.from('verify_checks').insert(sups.map(u=>({ id:uid('vc'), session_id:S.today, date:S.today, supervisor_id:u.id, supervisor_name:u.full_name||'' })));
+  r=await sb.from('verify_checks').insert(sups.map(u=>({ id:uid('vc'), session_id:S.today, date:S.today, supervisor_id:u.id, supervisor_name:shownNameRaw(u.id)||'بدون اسم' })));
   if(r.error){ await sb.from('verify_sessions').update({ status:'enrolled', call_deadline:null, call_started_at:null }).eq('id',S.today); toast('تعذّر إرسال النداء: '+r.error.message,false); return; }
   await loadVerify(); render(); toast('تم إرسال النداء لـ '+sups.length+' مشرف',true);
 }
@@ -1685,7 +1694,7 @@ function fvReportHtml(ses,checks,title){
     h+=`<div class="section-title"><h2>${title||(ses.status==='calling'?'حالة المشرفين الآن':'تقرير النداء')}</h2></div>`;
     if(ses.status==='closed'&&ses.summary){ const s=ses.summary;
       h+=`<div class="stat-row" style="margin-bottom:12px;"><div class="stat blue"><div class="num">${s.workers_morning}</div><div class="lbl">وجوه الصبح</div></div><div class="stat ink"><div class="num">${s.scanned_total}</div><div class="lbl">وجوه اتصورت بعد النداء</div></div><div class="stat mint"><div class="num">${s.ok}</div><div class="lbl">مشرف مطابق</div></div><div class="stat coral"><div class="num">${s.bad+s.no_response}</div><div class="lbl">غير مطابق / لم يستجب</div></div><div class="stat amber"><div class="num">${s.missing_n}</div><div class="lbl">وجه مفقود</div></div><div class="stat coral"><div class="num">${s.new_n}</div><div class="lbl">وجه جديد</div></div></div>`; }
-    h+=(checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(cardHolderOf(c.supervisor_id)||c.supervisor_name||'-')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وجه`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
+    h+=(checks||[]).map(c=>`<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><b>${esc(shownNameRaw(c.supervisor_id)||cleanStored(c.supervisor_name)||'بدون اسم')}</b>${cardHolderOf(c.supervisor_id)?`<span style="font-size:11.5px;color:var(--text-dim);">(${esc(c.supervisor_name||'')})</span>`:''}<span>${FV_STATUS[c.status]||c.status}${c.worker_count?` · ${c.worker_count} وجه`:''}</span></div>${['matched','mismatch','no_response'].includes(c.status)?`<div style="margin-top:8px;">${fvResultHtml(c)}</div>`:''}</div>`).join('') || '<div class="empty-state">لا توجد بيانات</div>';
     const mis=(checks||[]).find(c=>c.result&&c.result.missing&&c.result.missing.length);
     if(mis) h+=`<div class="card" style="margin-bottom:10px;"><b>ظهروا الصبح ولم يظهروا في أي تحقق (${mis.result.missing_n})</b>${fvThumbs(mis.result.missing.map(m=>m.t),'#6c757d')}</div>`;
   }
@@ -2166,7 +2175,7 @@ function renderTopbar(){
       </button>
       ${S.bellOpen? renderBellDropdown() : ''}
       <span class="role-badge">${esc(ROLE_LABEL[S.profile.role]||S.profile.role)}</span>
-      <span class="tb-name" style="font-size:12px;color:#BCD6F4;">${esc(S.profile.full_name||'')}</span>
+      <span class="tb-name" style="font-size:12px;color:#BCD6F4;">${esc(myName())}</span>
       <button id="logout-btn" style="border:none;background:rgba(255,255,255,.08);color:#C6D9F0;width:32px;height:32px;border-radius:9px;">${ICON.x(13)}</button>
     </div>
   </div>`;
@@ -3256,7 +3265,7 @@ function renderSvcList(svc, l, isMgr, canMark){
       <textarea data-svc-bulk="${l.id}" rows="4" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--sand);"></textarea>
       <button class="ghost-btn" data-svc-bulk-add="${l.id}" style="margin-top:6px;">إضافة البنود</button></details>`
   : (items.length ? `<div class="svc-grid">${items.map(it=>`<button class="svc-chip ${it.done?'done':''}" data-svc-toggle="${it.id}" ${canMark?'':'disabled'}>
-      <b>${esc(it.label)}</b>${it.done?`<small>✓ ${esc(fmtCairo(it.done_at))}</small><small>${esc(it.done_by_name||'')}${it.done_shift?' · '+(it.done_shift==='evening'?'مسائي':'صباحي'):''}</small>`:''}</button>`).join('')}</div>`
+      <b>${esc(it.label)}</b>${it.done?`<small>✓ ${esc(fmtCairo(it.done_at))}</small><small>${esc(cleanStored(it.done_by_name))}${it.done_shift?' · '+(it.done_shift==='evening'?'مسائي':'صباحي'):''}</small>`:''}</button>`).join('')}</div>`
     : '<p style="font-size:12.5px;color:var(--text-dim);">القائمة لسه فاضية.</p>');
   return `<details class="card" data-svc-open="${l.id}" ${S.openSvc.has(l.id)?'open':''} style="margin-bottom:12px;">
     <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14.5px;">${esc(l.name)}</b><span style="font-size:12px;color:var(--text-dim);">${(svc==='facade'&&l.completed_at)?`<span style="color:var(--mint);font-weight:800;">⏳ ${facadeCycleInfo(l).left} يوم</span> · `:''}${p.done}/${p.total} · <b style="color:var(--mint);">${p.pct}%</b></span></summary>
@@ -3434,7 +3443,7 @@ function renderWasteOld(){
     const canAct = (role==='admin'||role==='opm'||role==='waste_sv'||w.assigned_supervisor_id===S.session.user.id) && w.status==='scheduled';
     return `<tr>
       <td style="white-space:normal;min-width:150px;max-width:280px;word-break:break-word;line-height:1.6;">${esc(w.description)}</td><td>${w.date}</td>
-      <td>${sup?esc(sup.full_name):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
+      <td>${sup?esc(shownName(sup.id)):'<span style="color:var(--text-dim);">غير معيّن</span>'}</td>
       <td>${w.status==='not_done'?'<span class="badge postponed"><span class="dot"></span>لم يتم العمل</span>':statusBadge(w.status)}</td>
       <td>${esc(w.reason||'-')}</td>
       <td>${canAct?`<button class="ghost-btn" data-wr-done="${w.id}">تم الانتهاء</button> <button class="ghost-btn danger" data-wr-notdone="${w.id}">لم يتم</button>`:''}${(role==='admin'||role==='opm')?` <button class="ghost-btn danger" data-wr-del="${w.id}">${ICON.trash(12)}</button>`:''}</td>
@@ -4109,7 +4118,7 @@ function renderPresencePart(sh){
     const lock = !!inOther && sh==='morning';
     const dbl = !!inOther && sh==='evening';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;${lock?'opacity:.55;':''}">
-      <span style="font-size:13px;">${esc(u.full_name)}${holder?` <span style="font-size:11px;color:var(--mint);font-weight:700;">🪪 ${esc(holder)}</span>`:''}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}${dbl?` <span style="font-size:11px;color:var(--amber);font-weight:700;">(حضر الصباحية — لو سجّلته حاضر هيتحسب دوبل شيفت ويتبعت إشعار للإدارة)</span>`:''}</span>
+      <span style="font-size:13px;">${esc(shownName(u.id))}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}${dbl?` <span style="font-size:11px;color:var(--amber);font-weight:700;">(حضر الصباحية — لو سجّلته حاضر هيتحسب دوبل شيفت ويتبعت إشعار للإدارة)</span>`:''}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" ${lock?'disabled':dis} style="${selStyle}width:130px;">
         <select data-presence-select="${u.id}" ${lock?'disabled':dis} style="border:1px solid ${selCol};color:${selCol};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
@@ -4649,7 +4658,7 @@ const AUD_VAL={ payment_status:{ paid:'مدفوع', unpaid:'غير مدفوع' }
 const AUD_STATUS_EXTRA={ pending:'معلّق', approved:'معتمد', rejected:'مرفوض', enrolling:'تسجيل وجوه', enrolled:'جاهز', calling:'شغّال', closed:'مقفول', matched:'مطابق', mismatch:'غير مطابق', no_response:'لم يستجب', acknowledged:'استلم النداء', selfie_ok:'السيلفي تمام', submitted:'اتبعت', resolved:'تم الحل', submitted_:'', not_done:'ما اتنفّذش', paid:'مدفوع' };
 function audCairoTime(iso){ try{ return new Date(iso).toLocaleTimeString('ar-EG',{ timeZone:'Africa/Cairo', hour:'numeric', minute:'2-digit' }); }catch(e){ return ''; } }
 function audCairoDate(iso){ try{ return new Date(iso).toLocaleDateString('ar-EG',{ timeZone:'Africa/Cairo', day:'numeric', month:'long', year:'numeric' }); }catch(e){ return ''; } }
-function audUserName(id){ const u=(S.users||[]).find(x=>x.id===id); return u? (cardHolderOf(id)||u.full_name) : ''; }
+function audUserName(id){ const u=(S.users||[]).find(x=>x.id===id); return u? plainName(id) : ''; }
 function audVal(col,v){
   if(v===null||v===undefined||v==='') return '—';
   if(typeof v==='boolean') return v?'نعم':'لا';
@@ -4673,10 +4682,10 @@ function audChanges(r){
 }
 function audWho(r){
   const holder=r.user_id? cardHolderOf(r.user_id) : '';
-  const nm=r.user_name||'—';
+  const nm=(r.user_id?plainName(r.user_id):'')||cleanStored(r.user_name)||'—';
   return holder && holder!==nm ? `${holder} <span style="color:var(--text-dim);font-size:11.5px;">(${esc(nm)})</span>` : esc(nm);
 }
-function audWhoPlain(r){ const holder=r.user_id? cardHolderOf(r.user_id) : ''; const nm=r.user_name||'—'; return holder&&holder!==nm? holder+' ('+nm+')' : nm; }
+function audWhoPlain(r){ return (r.user_id?plainName(r.user_id):'')||cleanStored(r.user_name)||'—'; }
 function audText(r){
   const tl=AUD_T[r.table_name]||r.table_name, lbl=r.row_label? ' «'+r.row_label+'»' : '';
   const ch=r.changes||{};
@@ -4719,7 +4728,7 @@ async function audLoad(){
   L.busy=false;
   if(a.error){ L.err=a.error.message; L.rows=[]; L.logins=[]; L.loaded=true; render(); return; }
   L.rows=a.data||[];
-  L.logins=(b.error? [] : (b.data||[])).map(x=>({ id:'lg'+x.created_at+x.user_id, at:x.created_at, user_id:x.user_id, user_name:(S.users||[]).find(u=>u.id===x.user_id)?.full_name||'—', user_role:(S.users||[]).find(u=>u.id===x.user_id)?.role||'', table_name:'login', action:'insert', changes:{}, method:x.method }));
+  L.logins=(b.error? [] : (b.data||[])).map(x=>({ id:'lg'+x.created_at+x.user_id, at:x.created_at, user_id:x.user_id, user_name:plainName(x.user_id)||'—', user_role:(S.users||[]).find(u=>u.id===x.user_id)?.role||'', table_name:'login', action:'insert', changes:{}, method:x.method }));
   L.loaded=true; render();
 }
 function audFiltered(){
@@ -5013,7 +5022,7 @@ function pestReportModel(){
   const lbl=x=>x.task+' ('+fmt12(x.start_time,'-')+' – '+fmt12(x.end_time,'-')+')';
   return ['E1','E2'].map(ph=>{
     const rows=sched.filter(x=>x.phase===ph && x.weekday===wd).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
-    const done=rows.filter(x=>doneMap.has(x.id)).map(x=>{ const d=doneMap.get(x.id); return { label:lbl(x), done_at:d.done_at, done_by_name:d.done_by_name, done_shift:x.shift }; });
+    const done=rows.filter(x=>doneMap.has(x.id)).map(x=>{ const d=doneMap.get(x.id); return { label:lbl(x), done_at:d.done_at, done_by_name:cleanStored(d.done_by_name), done_shift:x.shift }; });
     return { name:PS_PHASE_LABEL[ph]+' — '+PS_DAYS[wd], total:rows.length, done, notDone:rows.filter(x=>!doneMap.has(x.id)).map(lbl) };
   });
 }
@@ -5293,7 +5302,7 @@ function renderPestSched(){
             return `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line);${dn?'opacity:.85;':''}">
               ${canTick?`<button class="ghost-btn" style="min-width:40px;padding:6px 0;" data-ps-tick="${r.id}">${dn?'✅':'⬜'}</button>`:`<span style="min-width:40px;text-align:center;">${dn?'✅':'⬜'}</span>`}
               <div style="flex:1;"><div style="font-size:13.5px;font-weight:700;line-height:1.7;">${esc(r.task)}</div>
-                <div style="font-size:12px;color:var(--text-dim);">${esc(fmt12(r.start_time,'-'))} – ${esc(fmt12(r.end_time,'-'))}${live?' <b style="color:var(--mint);">· دلوقتي</b>':''}${dn?` · ✅ ${esc(dn.done_by_name||'')} ${esc(wasteTime(dn.done_at))}`:''}</div></div>
+                <div style="font-size:12px;color:var(--text-dim);">${esc(fmt12(r.start_time,'-'))} – ${esc(fmt12(r.end_time,'-'))}${live?' <b style="color:var(--mint);">· دلوقتي</b>':''}${dn?` · ✅ ${esc(cleanStored(dn.done_by_name))} ${esc(wasteTime(dn.done_at))}`:''}</div></div>
               ${S.pestSchedEdit&&isMgr?`<div style="display:flex;gap:4px;"><button class="ghost-btn" data-ps-edit="${r.id}">✏️</button><button class="ghost-btn danger" data-ps-del="${r.id}">${ICON.trash(14)}</button></div>`:''}
             </div>`; }).join('') : '<div style="font-size:12.5px;color:var(--text-dim);margin-top:8px;">مفيش بنود في الشيفت ده.</div>'}
           ${S.pestSchedEdit&&isMgr?`<button class="ghost-btn" style="margin-top:8px;" data-ps-add="${sh}|${wd}">➕ إضافة بند</button>`:''}
@@ -5343,7 +5352,7 @@ async function psToggle(rowId){
   const date=S.pestSchedDate||S.today; const ex=psIsDone(rowId,date);
   let error;
   if(ex){ ({error}=await sb.from('pest_schedule_done').delete().eq('row_id',rowId).eq('date',date)); }
-  else { const nm=(shownName(S.session.user.id)||S.profile.full_name||''); ({error}=await sb.from('pest_schedule_done').insert([{ row_id:rowId, date, done_by:S.session.user.id, done_by_name:nm }])); }
+  else { const nm=myName(); ({error}=await sb.from('pest_schedule_done').insert([{ row_id:rowId, date, done_by:S.session.user.id, done_by_name:nm }])); }
   if(error){ toast('حصل خطأ: '+error.message,false); return; }
   await loadPestSched(); render();
 }
@@ -5559,7 +5568,7 @@ function renderUrgent(){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
       <div><b style="font-size:14px;">${esc(t.title||t.kind)}</b> <span class="tag-shift both">${esc(t.kind||'')}</span> <span class="tag-shift ${t.target_shift||'both'}">${SHIFT_LABEL[t.target_shift]||''}</span>
         ${t.details?`<div style="font-size:13px;margin-top:4px;white-space:pre-wrap;">${esc(t.details)}</div>`:''}
-        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">من: ${esc(t.creator_name||'-')} — ${t.created_at?esc(fmtTime(t.created_at)):''}${t.status_by_name?` · آخر تحديث: ${esc(t.status_by_name)} ${t.status_at?esc(fmtTime(t.status_at)):''}`:''}</div>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">من: ${esc(cleanStored(t.creator_name)||'-')} — ${t.created_at?esc(fmtTime(t.created_at)):''}${cleanStored(t.status_by_name)?` · آخر تحديث: ${esc(cleanStored(t.status_by_name))} ${t.status_at?esc(fmtTime(t.status_at)):''}`:''}</div>
         ${t.status_note?`<div style="font-size:12px;margin-top:3px;">ملاحظة: ${esc(t.status_note)}</div>`:''}
         ${t.has_photo?`<div style="margin-top:6px;"><button class="ghost-btn" style="padding:3px 10px;font-size:11.5px;" data-view-photo="urg|${t.id}">📷 صورة التنفيذ</button></div>`:''}</div>
       <div style="display:flex;gap:6px;align-items:center;">${canEdit? `<select data-urg-status="${t.id}"><option value="pending" ${t.status==='pending'?'selected':''}>جديدة</option><option value="in_progress" ${t.status==='in_progress'?'selected':''}>جاري التنفيذ</option><option value="done" ${t.status==='done'?'selected':''}>تم التنفيذ</option></select>` : urgentBadge(t.status)}${canCreate?` <button class="ghost-btn danger" data-urg-del="${t.id}">${ICON.trash(12)}</button>`:''}</div>
@@ -5573,7 +5582,7 @@ function bindUrgent(){
     const kind=document.getElementById('urg-kind').value; const title=(document.getElementById('urg-title').value||'').trim(); const details=(document.getElementById('urg-details').value||'').trim();
     if(!title){ toast('اكتب المكان أو المطلوب',false); return; }
     const sh=urgentTargetShiftNow(); send.disabled=true;
-    const row={ id:uid('urg'), date:S.today, created_by:S.session.user.id, creator_name:S.profile.full_name||'', kind, title, details:details||null, target_shift:sh, status:'pending' };
+    const row={ id:uid('urg'), date:S.today, created_by:S.session.user.id, creator_name:myName(), kind, title, details:details||null, target_shift:sh, status:'pending' };
     if(await dbInsert('urgent_tasks',[row])){
       await loadUrgent(); S.seenUrgent.add(row.id); S.urgentSig=urgentSignature();
       const recips=(S.presence||[]).filter(p=>p.present===true && (p.shift||'morning')===sh && ['supervisor','hk_senior_supervisor'].includes(((S.users||[]).find(u=>u.id===p.user_id)||{}).role)).length;
@@ -5584,7 +5593,7 @@ function bindUrgent(){
     const id=sel.dataset.urgStatus; const t=(S.urgent||[]).find(x=>x.id===id); const v=sel.value; const r=S.profile.role;
     if(r==='admin'||r==='opm'){
       sel.disabled=true;
-      const patch={ status:v, status_by:S.session.user.id, status_by_name:S.profile.full_name||'', status_at:new Date().toISOString() };
+      const patch={ status:v, status_by:S.session.user.id, status_by_name:myName(), status_at:new Date().toISOString() };
       if(await dbUpdate('urgent_tasks', id, patch)){ await loadUrgent(); S.urgentSig=urgentSignature(); render(); toast('تم تحديث الحالة',true); } else sel.disabled=false;
       return;
     }
@@ -5754,7 +5763,7 @@ function bindUserQrModal(){
 /* ============================= EMERGENCY (طوارئ → جروب واتساب) ============================= */
 const EMERGENCY_TYPES = ['حريق','تسريب مياه','انقطاع كهرباء','عطل أسانسير','حادث / إصابة','مشكلة أمنية','أخرى'];
 function composeEmergencyMessage(type, location, details){
-  const who = (S.profile && S.profile.full_name) || '';
+  const who = myName();
   const role = (S.profile && (ROLE_LABEL[S.profile.role]||S.profile.role)) || '';
   const when = new Date().toLocaleString('ar-EG',{ dateStyle:'medium', timeStyle:'short', timeZone:'Africa/Cairo' });
   return `🚨 *حالة طوارئ* 🚨\nالنوع: ${type}\nالموقع: ${location}\nالمطلوب / التفاصيل: ${details}\nبواسطة: ${who} (${role})\nالوقت: ${when}\n\nبرجاء اتخاذ اللازم.`;
@@ -5860,7 +5869,7 @@ function renderReportsMain(){
 
   const tables = {
     deliveries: { rows:deliv, cols:[['unit_code','كود الوحدة'],['date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل']] },
-    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']] },
+    orders: { rows:orders, cols:[['unit_code','رقم الوحدة'],['client_info','رقم Sales Force'],['order_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة'],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']] },
     pest: { rows:pest, cols:[['unit_code','كود الوحدة'],['service_type','النوع'],['price','السعر'],['payment_status','حالة الدفع'],['scheduled_date','التاريخ'],['status','الحالة']] },
     facade: { rows:facade, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
     waste: { rows:waste, cols:[['description','الوصف'],['date','التاريخ'],['status','الحالة']] },
@@ -5928,7 +5937,7 @@ function exportReportExcel(){
   const shiftFmt = v => SHIFT_LABEL[v]||v;
   const payFmt = v => PAYMENT_STATUS_LABEL[v]||'غير مدفوع';
   if(want('deliveries')) addSheet(data.deliv, 'وحدات التسليم', [['unit_code','كود الوحدة'],['date','التاريخ'],['client_arrival_time','ميعاد وصول العميل',v=>fmt12(v,'')],['special_instructions','تعليمات خاصة'],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['notes','ملاحظات']]);
-  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']]);
+  if(want('orders')) addSheet(data.orders, 'الخدمة المدفوعة', [['unit_code','كود الوحدة'],['client_info','رقم Sales Force'],['order_type','النوع',v=>ORDER_TYPE_LABEL[v]||v],['price','السعر'],['payment_status','حالة الدفع',payFmt],['scheduled_date','التاريخ'],['scheduled_time','الميعاد',v=>fmt12(v,'')],['status','الحالة',statusFmt],['postpone_reason','سبب التأجيل'],['cancel_reason','سبب الإلغاء']]);
   if(want('waste')) addSheet(data.waste, 'رفع المخلفات', [['description','الوصف'],['date','التاريخ'],['status','الحالة',statusFmt],['reason','السبب']]);
   if(want('checklist')) addSheet(data.checklist, 'المهمات المجدولة', [['date','التاريخ'],['list_name','القائمة'],['status','الحالة',(v,r)=>v==='completed'?'تم اعتمادها':(r.supervisor_marked_done?'بانتظار اعتماد المشرف الأول':((r.date<S.today || taskMissed((S.taskLists||[]).find(l=>l.id===r.list_id),r))?'أُغلقت قبل الإنجاز':'قيد التنفيذ'))],['assigned_to','مسندة إلى',v=>shownName(v)||''],['rework_count','مرات إعادة التنفيذ']]);
   if(want('attendance')) addSheet(data.attendance, 'الحضور', [['date','التاريخ'],['shift','الوردية',shiftFmt],['site_manager_count','مدير موقع'],['site_admin_count','إداري موقع'],['senior_supervisor_count','مشرف أول'],['supervisor_count','مشرف'],['worker_count','عامل'],['status','الحالة',statusFmt]]);
@@ -5963,7 +5972,7 @@ function renderSupervisorTodayBase(){
   const myShift = (myPresence && myPresence.shift) || 'morning';
   const hr = new Date().getHours();
   const greet = hr<12 ? 'صباح الخير' : 'مساء الخير';
-  const dispName = (myPresence && myPresence.actual_name && myPresence.actual_name.trim()) || S.profile.full_name || '';
+  const dispName = myName();
   const head = (sub) => `<div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
       <div>
@@ -6561,7 +6570,7 @@ function modalWrap(title, body, wide){
   </div></div>`;
 }
 function supervisorOptions(){
-  return S.users.filter(u=>u.role==='supervisor' && u.active).map(u=>`<option value="${u.id}">${esc(u.full_name)}</option>`).join('');
+  return S.users.filter(u=>u.role==='supervisor' && u.active).map(u=>`<option value="${u.id}">${esc(shownName(u.id))}</option>`).join('');
 }
 
 function bindModalEvents(){
@@ -6773,7 +6782,7 @@ async function handleModalSave(){
       const reason=(document.getElementById('m-at-reason').value||'').trim();
       if(!reason){ toast('اكتب سبب التعديل',false); return; }
       if((S.attEditReqs||[]).some(q=>q.record_id===a.id && q.status==='pending')){ toast('فيه طلب تعديل بانتظار الموافقة على نفس السجل',false); return; }
-      const row={ id:uid('aer'), record_id:a.id, requested_by:S.session.user.id, requester_name:S.profile.full_name||'', changes:ch, reason, status:'pending' };
+      const row={ id:uid('aer'), record_id:a.id, requested_by:S.session.user.id, requester_name:myName(), changes:ch, reason, status:'pending' };
       if(await dbInsert('attendance_edit_requests',[row])){ await loadAttEditReqs(); S.modal=null; render(); toast('تم إرسال طلب التعديل للإدارة / OPM',true); }
     }
   }
@@ -6798,7 +6807,7 @@ async function handleModalSave(){
   else if(m.type==='urgentStatus'){
     if(!pendingPhoto){ toast('لازم ترفع صورة الأول',false); return; }
     const note=((document.getElementById('m-urg-note')||{value:''}).value||'').trim();
-    const patch={ status:m.value, status_by:S.session.user.id, status_by_name:S.profile.full_name||'', status_at:new Date().toISOString(), status_note:note||null, status_photo:pendingPhoto, has_photo:true };
+    const patch={ status:m.value, status_by:S.session.user.id, status_by_name:myName(), status_at:new Date().toISOString(), status_note:note||null, status_photo:pendingPhoto, has_photo:true };
     if(await dbUpdate('urgent_tasks', m.id, patch)){ pendingPhoto=null; S.modal=null; await loadUrgent(); S.urgentSig=urgentSignature(); render(); toast('تم تحديث الحالة',true); }
   }
   else if(m.type==='bulkDelivery'){
@@ -7161,6 +7170,7 @@ async function bootApp(){
   render();
   try{ ZW.flush(); }catch(e){}
   try{ fvPrefetchEngine(); }catch(e){}
+  try{ if(!(S.cardHolders&&S.cardHolders.length)) loadCardHolders().then(()=>{ if(S.cardHolders&&S.cardHolders.length) render(); }).catch(()=>{}); }catch(e){}
   try{ if(fvAdm() && navigator.onLine && localStorage.getItem('zw_vpurge')!==S.today){ sb.rpc('verify_purge_old',{ p_days:14 }).then(r=>{ if(r&&!r.error) localStorage.setItem('zw_vpurge',S.today); }); } }catch(e){}
   setupRealtime();
   startExtraPoll();
@@ -7416,7 +7426,7 @@ function renderBottomNav(tabs){
 function renderDrawer(tabs){
   return `<div class="drawer-bg" id="drawer-bg"></div>
   <aside class="drawer" id="drawer">
-    <div class="drawer-head"><div><div style="font-weight:900;font-size:15px;">${esc(S.profile.full_name||'')}</div><div style="font-size:12px;opacity:.85;margin-top:2px;">${esc(ROLE_LABEL[S.profile.role]||'')}</div></div><button id="drawer-close" class="tb-menu" style="display:inline-flex;">✕</button></div>
+    <div class="drawer-head"><div><div style="font-weight:900;font-size:15px;">${esc(myName())}</div><div style="font-size:12px;opacity:.85;margin-top:2px;">${esc(ROLE_LABEL[S.profile.role]||'')}</div></div><button id="drawer-close" class="tb-menu" style="display:inline-flex;">✕</button></div>
     <div class="drawer-list">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(label)}</span></button>`).join('')}</div>
     <div class="drawer-foot"><button class="ghost-btn" id="drawer-glass" style="width:100%;justify-content:center;margin-bottom:8px;">✨ المظهر الزجاجي: ${glassOn?'شغّال':'مقفول'}</button><button class="ghost-btn danger" id="drawer-logout" style="width:100%;justify-content:center;">تسجيل الخروج</button></div>
   </aside>`;
