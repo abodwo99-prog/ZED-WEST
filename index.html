@@ -1281,21 +1281,36 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert', adminpanel:'users' };
+
+/* ===== Admin Panel (admin / OPM): sub-screens grouped under one tab ===== */
+const AP_SUBS=[['zones','الزونات'],['tasks','المهمات المجدولة'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي'],['cards','استلام الكروت']];
+function isApStaff(role){ return role==='admin'||role==='opm'; }
+function isApSub(tab){ return AP_SUBS.some(s=>s[0]===tab); }
+function navOn(id){ return S.tab===id || (id==='adminpanel' && isApStaff(S.profile&&S.profile.role) && isApSub(S.tab)); }
+function allowedTabIds(role){ const ids=tabsForRole(role).map(t=>t[0]); return isApStaff(role)? ids.concat(AP_SUBS.map(s=>s[0])) : ids; }
+function renderAdminPanel(){
+  return `<div class="card"><p style="font-size:13px;color:var(--text-dim);margin:0 0 12px;">لوحة الإدارة: كل أدوات الإعداد والمتابعة في مكان واحد.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">${AP_SUBS.map(([id,label])=>`<button class="ghost-btn" data-tab="${id}" style="justify-content:center;padding:16px 10px;font-weight:800;">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](18):''} ${esc(label)}</button>`).join('')}</div></div>`;
+}
+function apSubnav(){
+  if(!(S.profile && isApStaff(S.profile.role) && isApSub(S.tab))) return '';
+  return `<div class="pill-group" style="margin-bottom:14px;"><button class="pill" data-tab="adminpanel">‹ Admin Panel</button>${AP_SUBS.map(([id,label])=>`<button class="pill${S.tab===id?' active':''}" data-tab="${id}">${esc(label)}</button>`).join('')}</div>`;
+}
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['orders','الخدمة المدفوعة'],['deliveries','وحدات التسليمات'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['sideservices','الخدمات الجانبية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['attendance','الحضور'],['violations','مخالفات العملاء'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['adminpanel','Admin Panel']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
-  if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
-  if(role==='facade_sv') return [['facade','نظافة الواجهات'],['emergency','طوارئ']];
-  if(role==='pest_sv') return [['pest','مكافحة الحشرات'],['emergency','طوارئ']];
-  if(role==='waste_sv') return [['waste','رفع المخلفات'],['emergency','طوارئ']];
-  if(role==='supervisor') return [['today','قائمة اليوم'],['verify','التحقق من الهوية'],['violations','مخالفات العملاء'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_manager') return [['home','الرئيسية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
-  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['urgent','تاسك مستعجل'],['emergency','طوارئ']];
+  if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['pest','مكافحة الحشرات'],['complaints','الشكاوى']];
+  if(role==='facade_sv') return [['facade','نظافة الواجهات']];
+  if(role==='pest_sv') return [['pest','مكافحة الحشرات']];
+  if(role==='waste_sv') return [['waste','رفع المخلفات']];
+  if(role==='supervisor') return [['today','قائمة اليوم'],['verify','التحقق من الهوية'],['violations','مخالفات العملاء']];
+  if(role==='hk_manager') return [['home','الرئيسية'],['verify','التحقق من الهوية'],['distribution','التوزيع اليومي'],['violations','مخالفات العملاء'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة'],['tasks','المهمات المجدولة']];
+  if(role==='hk_admin') return [['distribution','توزيع المسئولين'],['attendance','الحضور'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة']];
+  if(role==='hk_senior_supervisor') return [['distribution','التوزيع واعتماد المهمات'],['violations','مخالفات العملاء'],['deliveries','وحدات التسليمات'],['orders','الخدمة المدفوعة']];
   return [];
 }
 
@@ -2105,12 +2120,12 @@ function render(){
   if(!S.session){ app.innerHTML = renderAuthScreen(); bindAuthEvents(); return; }
   if(!S.profile){ app.innerHTML = `<div style="padding:60px;text-align:center;">جارِ التحميل...</div>`; return; }
   const tabs = tabsForRole(S.profile.role);
-  if(!S.tab || !tabs.find(t=>t[0]===S.tab)) S.tab = tabs.length?tabs[0][0]:null;
+  if(!S.tab || !allowedTabIds(S.profile.role).includes(S.tab)) S.tab = tabs.length?tabs[0][0]:null;
   const tabChanged = S._renderedTab!==S.tab; S._renderedTab=S.tab;
   app.innerHTML = `
     ${renderTopbar()}
     <div class="shell">
-      <div class="sidebar">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](16):''}<span>${esc(label)}</span></button>`).join('')}</div>
+      <div class="sidebar">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${navOn(id)?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](16):''}<span>${esc(label)}</span></button>`).join('')}</div>
       <div class="content${tabChanged?' tab-enter':''}" id="tab-body">${(S.profile.role==='supervisor' && S.tab==='today') ? '' : renderGreeting()}${renderTabBody()}</div>
     </div>
     ${renderBottomNav(tabs)}
@@ -2200,7 +2215,7 @@ function renderBellDropdown(){
 
 function bindGlobalEvents(){
   paintStatusSelects();
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; S.tab=b.dataset.tab; if(S.tab==='sideservices') S.modReqsLoaded=false; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='verify') await loadVerify(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async ()=>{ S.drawer=null; S.tasksQr=false; S.tab=b.dataset.tab; if(S.tab==='sideservices') S.modReqsLoaded=false; if(S.tab==='distribution'||S.tab==='today'||S.tab==='home') await refreshAssignments(); if(S.tab==='attendance') await loadAttendance(); if(S.tab==='cards') await loadCardHolders(); if(S.tab==='verify') await loadVerify(); if(S.tab==='violations') await loadViolations(); if(S.tab==='reports') await loadDailyReports(); if(S.tab==='pest' && S.pestSchedLoaded) await loadPestSched(); render(); });
   const mts=document.getElementById('mobile-tab-select'); if(mts) mts.onchange=async e=>{ S.tab=e.target.value; if(S.tab==='verify'){ try{ await loadVerify(); }catch(x){} } render(); };
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=doSignOut;
   document.querySelectorAll('[data-view-photo]').forEach(b=>b.onclick=(e)=>{
@@ -2242,10 +2257,11 @@ function bindGlobalEvents(){
 }
 
 /* ============================= TAB DISPATCH ============================= */
-function renderTabBody(){ return fmUnitBar()+renderTabBodyInner(); }
+function renderTabBody(){ return fmUnitBar()+apSubnav()+renderTabBodyInner(); }
 function renderTabBodyInner(){
   switch(S.tab){
     case 'home': return renderHome();
+    case 'adminpanel': return renderAdminPanel();
     case 'deliveries': return renderDeliveries();
     case 'sideservices': return renderSideServices();
     case 'verify': return renderVerify();
@@ -2254,7 +2270,7 @@ function renderTabBodyInner(){
     case 'pest': return renderPest();
     case 'facade': return renderFacade();
     case 'waste': return renderWaste();
-    case 'tasks': return S.profile.role==='hk_manager' ? renderTasksManager() : renderTasksAdmin();
+    case 'tasks': return S.profile.role==='hk_manager' ? renderTasksManager() : (S.tasksQr ? renderTasksQrView() : renderTasksAdmin());
     case 'zones': return renderZones();
     case 'cards': return renderCards();
     case 'violations': return renderViolations();
@@ -2283,7 +2299,7 @@ function bindTabEvents(){
     case 'pest': bindPest(); break;
     case 'facade': bindFacade(); break;
     case 'waste': bindWaste(); break;
-    case 'tasks': if(S.profile.role==='hk_manager') bindTasksManager(); else bindTasksAdmin(); break;
+    case 'tasks': if(S.profile.role==='hk_manager') bindTasksManager(); else if(S.tasksQr) bindTasksQrView(); else bindTasksAdmin(); break;
     case 'zones': bindZones(); break;
     case 'cards': if(S.profile&&(S.profile.role==='admin'||S.profile.role==='opm')) bindCards(); break;
     case 'violations': bindViolations(); break;
@@ -2358,7 +2374,7 @@ function serviceCard(color, icon, label, valueHtml, tabId){
 }
 function renderHome(){
   const role = S.profile.role;
-  const roleTabs = tabsForRole(role).map(t=>t[0]);
+  const roleTabs = allowedTabIds(role);
   const todayTaskRows = sortedTaskLists().filter(l=>l.active!==false && taskDueToday(l)).map(l=>({l,p:taskProgress(l)})).filter(x=>x.p.run);
 
   const cardDefs = [
@@ -3644,7 +3660,7 @@ function taskAdminParts(l){
 function renderTasksAdmin(){
   const lists=sortedTaskLists();
   return `
-  <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button></div>
+  <div class="toolbar"><button class="primary-btn" id="tl-add">${ICON.plus()} قائمة مهام جديدة</button><button class="ghost-btn" id="tl-qr-sheet">${ICON.printer(14)} طباعة QR</button></div>
   <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">كل قائمة بتنزل أوتوماتيك حسب تكرارها (يومي / أسبوعي / شهري) للمشرفين الحاضرين في الوردية اللي بتحددها (من غير تعيين لحد)، وبعد ما المشرف يأكد الانتهاء المشرف الأول بيعتمدها بمسح كود الـ QR بتاعها.</p>
   ${lists.length? lists.map(l=>`<div class="card" data-tl-drawer="${l.id}" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;${l.active===false?'opacity:.65;':''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">${taskAdminParts(l).sum}<span style="color:var(--mint);font-weight:800;">فتح ›</span></div></div>`).join('') : `<div class="empty-state"><span class="em">📋</span>لسه مفيش قوائم مهام — دوس "قائمة مهام جديدة"</div>`}
   ${(()=>{ const d=S.drawer; if(!d||d.kind!=='tasklist') return ''; const l=lists.find(x=>x.id===d.id); if(!l) return ''; return drawerHtml(esc(l.name), `<div>${taskAdminParts(l).body}</div>`); })()}`;
@@ -3666,6 +3682,7 @@ function bindTasksAdmin(){
   bindDrawer();
   document.querySelectorAll('[data-tl-drawer]').forEach(c=>c.onclick=()=>{ S.drawer={kind:'tasklist', id:c.dataset.tlDrawer}; render(); });
   const add=document.getElementById('tl-add'); if(add) add.onclick=()=>{ S.modal={type:'addTaskList'}; render(); };
+  const qrs=document.getElementById('tl-qr-sheet'); if(qrs) qrs.onclick=()=>{ S.tasksQr=true; render(); };
   document.querySelectorAll('details[data-tl-open]').forEach(d=>d.addEventListener('toggle',()=>{ if(d.open) S.openTaskAdmin.add(d.dataset.tlOpen); else S.openTaskAdmin.delete(d.dataset.tlOpen); }));
   document.querySelectorAll('[data-tl-qr]').forEach(b=>b.onclick=()=>{ const l=S.taskLists.find(x=>x.id===b.dataset.tlQr); S.qrTarget={code:'ZEDWEST|TL|'+l.id, label:l.name}; S.modal={type:'qr'}; render(); });
   document.querySelectorAll('[data-tl-edit]').forEach(b=>b.onclick=()=>{ S.modal={type:'editTaskList', id:b.dataset.tlEdit}; render(); });
@@ -3721,6 +3738,13 @@ function renderSupTaskLists(shift){
   return cards || `<p style="color:var(--text-dim);font-size:13px;">مفيش مهمات مجدولة نازلة عليك للوردية دي النهاردة.</p>`;
 }
 async function ensureTodayTaskRunsAndRender(){ await refreshTasks(); }
+function renderTasksQrView(){
+  return `<div class="toolbar"><button class="ghost-btn" id="tl-qr-back">‹ رجوع للمهمات المجدولة</button></div>`+renderQrSheet();
+}
+function bindTasksQrView(){
+  const b=document.getElementById('tl-qr-back'); if(b) b.onclick=()=>{ S.tasksQr=false; render(); };
+  bindQrSheet();
+}
 function renderQrSheet(){
   return `<div class="card"><p style="font-size:13px;color:var(--text-dim);margin-top:0;">اطبع الصفحة واعلّق كل رمز في مكانه.</p>
   <button class="primary-btn" id="do-print">${ICON.printer(13)} طباعة كل الرموز</button></div>
@@ -7407,7 +7431,7 @@ async function ensurePushSubscription(){
   }catch(e){ console.warn('push subscribe',e&&e.message); }
 }
 function notifTarget(tab){
-  const role=S.profile.role; const allowed=tabsForRole(role).map(t=>t[0]);
+  const role=S.profile.role; const allowed=allowedTabIds(role);
   if(role==='supervisor' && ['deliveries','orders','distribution'].includes(tab)) tab='today';
   return allowed.includes(tab) ? tab : (allowed[0]||null);
 }
@@ -7478,15 +7502,15 @@ function menuIcon(sz){ return `<svg width="${sz}" height="${sz}" viewBox="0 0 24
 function renderBottomNav(tabs){
   const many=tabs.length>5; const primary=many? tabs.slice(0,4) : tabs;
   const short=l=> l.length>11 ? l.slice(0,10)+'…' : l;
-  const btn=([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(short(label))}</span></button>`;
-  const moreActive = many && !primary.some(t=>t[0]===S.tab);
+  const btn=([id,label])=>`<button data-tab="${id}" class="${navOn(id)?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(short(label))}</span></button>`;
+  const moreActive = many && !primary.some(t=>navOn(t[0]));
   return `<nav class="bottom-nav">${primary.map(btn).join('')}${many?`<button id="more-btn" class="${moreActive?'active':''}">${menuIcon(20)}<span>المزيد</span></button>`:''}</nav>`;
 }
 function renderDrawer(tabs){
   return `<div class="drawer-bg" id="drawer-bg"></div>
   <aside class="drawer" id="drawer">
     <div class="drawer-head"><div><div style="font-weight:900;font-size:15px;">${esc(myName())}</div><div style="font-size:12px;opacity:.85;margin-top:2px;">${esc(ROLE_LABEL[S.profile.role]||'')}</div></div><button id="drawer-close" class="tb-menu" style="display:inline-flex;">✕</button></div>
-    <div class="drawer-list">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(label)}</span></button>`).join('')}</div>
+    <div class="drawer-list">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${navOn(id)?'active':''}">${ICON[TAB_ICON[id]]?ICON[TAB_ICON[id]](20):''}<span>${esc(label)}</span></button>`).join('')}</div>
     <div class="drawer-foot"><button class="ghost-btn" id="drawer-glass" style="width:100%;justify-content:center;margin-bottom:8px;">✨ المظهر الزجاجي: ${glassOn?'شغّال':'مقفول'}</button><button class="ghost-btn danger" id="drawer-logout" style="width:100%;justify-content:center;">تسجيل الخروج</button></div>
   </aside>`;
 }
