@@ -1136,6 +1136,7 @@ function toast(msg, ok){
   setTimeout(()=>el.remove(), 2600);
 }
 const ICON = {
+  mail:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>`,
   qr:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="14.01"/><line x1="17.5" y1="14" x2="17.5" y2="17.5"/><line x1="21" y1="14" x2="21" y2="14.01"/><line x1="14" y1="17.5" x2="17.5" y2="17.5"/><line x1="14" y1="21" x2="17.5" y2="21"/><line x1="21" y1="17.5" x2="21" y2="21"/></svg>`,
   check:(s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   clock:(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
@@ -1281,11 +1282,11 @@ async function loadZoneData(){
 async function loadWorkerCounts(){ const r=await dbSelectQuiet('hk_worker_counts',{date:S.today}); if(r) S.workerCounts=r; }
 async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',{date:S.today}); if(r) S.laborDist=r; }
 
-const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert' };
+const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert', inbox:'mail' };
 
 /* ============================= ROLE → TABS ============================= */
 function tabsForRole(role){
-  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي']];
+  const adminTabs = [['home','الرئيسية'],['deliveries','وحدات التسليمات'],['sideservices','خدمات جانبية'],['verify','التحقق من الهوية'],['orders','الخدمة المدفوعة'],['pest','مكافحة الحشرات'],['facade','نظافة الواجهات'],['waste','رفع المخلفات'],['tasks','المهمات المجدولة'],['qrsheet','طباعة QR'],['attendance','الحضور'],['distribution','التوزيع اليومي'],['cards','استلام الكروت'],['violations','مخالفات العملاء'],['zones','الزونات'],['urgent','تاسك مستعجل'],['emergency','طوارئ'],['complaints','الشكاوى'],['suppliers','ملف الموردين'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['inbox','الإيميلات المهمة'],['myname','بياناتي']];
   if(role==='admin') return adminTabs;
   if(role==='opm') return adminTabs; // نفس صلاحيات الإدارة بالظبط
   if(role==='fm_dispatcher') return [['orders','أوردرات الخدمة المدفوعة'],['deliveries','وحدات التسليم اليوم'],['urgent','تاسك مستعجل'],['pest','مكافحة الحشرات'],['complaints','الشكاوى'],['emergency','طوارئ']];
@@ -2269,6 +2270,7 @@ function renderTabBodyInner(){
     case 'reports': return renderReports();
     case 'today': return renderSupervisorToday();
     case 'myname': return renderMyName();
+    case 'inbox': return renderInbox();
     default: return '';
   }
 }
@@ -2298,6 +2300,7 @@ function bindTabEvents(){
     case 'reports': bindReports(); break;
     case 'today': bindSupervisorToday(); break;
     case 'myname': bindMyName(); break;
+    case 'inbox': bindInbox(); break;
   }
   bindFmUnitBar();
   bindModalEvents();
@@ -7570,6 +7573,322 @@ ZW.hooks.onOnline=async()=>{
   registerAuthListener();
   if(S.session) await bootApp(); else render();
 })();
+
+/* ============================= الإيميلات المهمة (فرز Outlook — قراءة فقط) =============================
+   - بيربط Outlook/Microsoft 365 عن طريق Microsoft Graph + MSAL (صلاحية Mail.Read بس).
+   - التوكن بيفضل في ذاكرة المتصفح بس، ومفيش أي إيميل بيتخزّن في Supabase.
+   - الفرز بالقواعد (مبعوتلك أنت؟ اسمك جوه الرسالة؟ طلب/سؤال؟ نشرة/إشعار آلي؟).
+   - الإعدادات (أسماء، مرسلين متكتّمين، إلخ) محفوظة في localStorage لكل مستخدم.
+======================================================================================= */
+const IB_CLIENT_ID_DEFAULT = ''; // ← ضع هنا Application (client) ID من Azure (أو الصقه من الشاشة نفسها)
+const IB_SCOPES = ['Mail.Read'];
+const IB_MSAL_SRC = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+const IB_MAX_FETCH = 150;
+Object.assign(S,{ inbox:{ uid:'', token:null, exp:0, authLost:false, app:null, acct:null, me:'', busy:false, progress:'', err:'', raw:[], items:[], scanned:0, more:false, loadedAt:0, days:3, showMaybe:true, showHidden:false, _init:false } });
+
+function ibUid(){ return (S.session&&S.session.user&&S.session.user.id)||'x'; }
+function ibLs(k,def){ try{ const v=localStorage.getItem('ib_'+ibUid()+'_'+k); return v==null?def:JSON.parse(v); }catch(e){ return def; } }
+function ibLsSet(k,v){ try{ localStorage.setItem('ib_'+ibUid()+'_'+k, JSON.stringify(v)); }catch(e){} }
+
+/* ---------- تطبيع النص العربي/الإنجليزي ---------- */
+function ibStrip(s){ return (s||'').replace(/[\u064B-\u065F\u0670\u0640]/g,''); }
+function ibFoldName(s){ return s.replace(/[أإآٱ]/g,'ا').replace(/ة/g,'ه').toLowerCase(); }           // للأسماء: بدون ى→ي عشان "علي" ≠ "على"
+function ibFoldCue(s){ return ibFoldName(s).replace(/ى/g,'ي'); }                                    // للكلمات الدالة على طلب
+const IB_CUES_AR = ['من فضلك','ياريت','يرجى','برجاء','أرجو','عاجل','ضروري','محتاج','ابعت','ارسل','راجع','اعتمد','وافق','تأكيد','رد على','آخر موعد','مطلوب','متابعة','موعد','اجتماع'].map(c=>ibFoldCue(ibStrip(c)));
+const IB_CUES_EN = ['please','kindly','urgent','asap','deadline','action required','can you','could you','would you','need you','your approval','approve','confirm','reminder','follow up','follow-up','awaiting','by eod','by tomorrow'];
+
+/* ---------- عناوين الإيميل ---------- */
+function ibCanon(e){ e=(e||'').toLowerCase(); const p=e.split('@'); if(p.length!==2) return e; if(p[1]==='gmail.com'||p[1]==='googlemail.com') return p[0].split('+')[0].replace(/\./g,'')+'@gmail.com'; return e; }
+function ibEmails(h){ return ((h||'').match(/[A-Za-z0-9._%+\-']+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+/g)||[]).map(ibCanon); }
+function ibFromName(h){ h=h||''; const m=h.match(/^\s*"?([^"<]*?)"?\s*</); const n=m&&m[1].trim(); return n || (h.match(/[^\s<>]+@[^\s<>]+/)||[''])[0]; }
+
+/* ---------- قراءة جسم الرسالة ---------- */
+// الكلام الجديد بس (من غير الردود المقتبسة)
+function ibFreshText(t){
+  t=(t||'').replace(/\r/g,'');
+  const cut=t.search(/^(?:on .{5,120} wrote:|في .{5,120} كتب.*:|-{2,}\s*original message\s*-{2,}|_{8,}|from:\s.+\nsent:|من:\s.+\nتم الإرسال:)/im);
+  if(cut>0) t=t.slice(0,cut);
+  t=t.split('\n').filter(l=>!/^\s*>/.test(l)).join('\n');
+  return t.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim().slice(0,4000);
+}
+function ibParse(msg){
+  const H={}; (msg.internetMessageHeaders||[]).forEach(h=>{ H[(h.name||'').toLowerCase()]=h.value; });
+  const em=x=>((x&&x.emailAddress&&x.emailAddress.address)||''), rc=arr=>(arr||[]).map(em).filter(Boolean).map(ibCanon);
+  const fr=msg.from&&msg.from.emailAddress||{};
+  const labels=['INBOX'];
+  if(msg.flag&&msg.flag.flagStatus==='flagged') labels.push('STARRED');
+  if(msg.importance==='high') labels.push('IMPORTANT');
+  if(msg.inferenceClassification==='other') labels.push('CATEGORY_UPDATES');
+  const subj=msg.subject||'(بدون عنوان)';
+  return {
+    id:msg.id, threadId:msg.conversationId||msg.id, ts:Date.parse(msg.receivedDateTime)||0, labels, webLink:msg.webLink||'',
+    subject:subj, fromName:fr.name||fr.address||'', fromEmail:ibCanon(fr.address||''),
+    to:rc(msg.toRecipients), cc:rc(msg.ccRecipients),
+    hasListId:!!H['list-id'], hasUnsub:!!H['list-unsubscribe'], precedence:(H['precedence']||'').toLowerCase(),
+    auto:!!H['auto-submitted']&&H['auto-submitted'].toLowerCase()!=='no',
+    invite:/eventMessage/i.test(msg['@odata.type']||'')||/^(invitation|دعوة)/i.test(subj),
+    snippet:msg.bodyPreview||'', fresh:ibFreshText((msg.body&&msg.body.content)||msg.bodyPreview||'')
+  };
+}
+function ibSentence(raw,i){
+  if(i<0||i>=raw.length) return '';
+  const br=/[.\n!؟?]/; let a=i; while(a>0 && !br.test(raw[a-1]) && i-a<160) a--;
+  let b=i; while(b<raw.length && !br.test(raw[b]) && b-i<160) b++;
+  return raw.slice(a,Math.min(b+1,raw.length)).replace(/\s+/g,' ').trim().slice(0,240);
+}
+
+/* ---------- الإعدادات والفرز ---------- */
+function ibMyNames(){
+  const saved=ibLs('names',null); let list=Array.isArray(saved)?saved:[];
+  if(!list.length){
+    const n=((typeof myName==='function'&&myName())||(S.profile&&S.profile.full_name)||'').trim();
+    if(n){ list=[n]; const f=n.split(/\s+/)[0]; if(f&&f!==n) list.push(f); }
+  }
+  return list.map(x=>(x||'').trim()).filter(Boolean);
+}
+function ibCfg(){
+  const me=new Set(); if(S.inbox.me) me.add(ibCanon(S.inbox.me));
+  const nameRes=[];
+  ibMyNames().forEach(n=>{
+    if(n.includes('@')){ me.add(ibCanon(n)); return; }
+    const f=ibFoldName(ibStrip(n)).trim(); if(f.length<3) return;
+    const e=f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+    try{ nameRes.push(new RegExp('(^|[^\\p{L}\\p{N}])(?:[ولبفك]|ال)?'+e+'(?![\\p{L}\\p{N}])','u')); }catch(x){}
+  });
+  return { me, nameRes, vip:new Set(ibLs('vip',[])), muted:new Set(ibLs('muted',[])), done:new Set(ibLs('done',[])) };
+}
+function ibScore(m,cfg){
+  let s=0; const pos=[], neg=[]; let quote='';
+  const inTo=m.to.some(a=>cfg.me.has(a)), inCc=m.cc.some(a=>cfg.me.has(a));
+  const isVip=cfg.vip.has(m.fromEmail);
+  if(isVip){ s+=10; pos.push(['مرسل مهم عندك','imp']); }
+  if(inTo){ if(m.to.length<=3){ s+=3; pos.push(['متبعتلك أنت','imp']); } else { s+=1.5; pos.push(['متبعتلك ضمن مجموعة','may']); } }
+  else if(inCc){ s+=1; pos.push(['إنت في النسخة (CC)','may']); }
+
+  const raw=ibStrip(m.fresh), fName=ibFoldName(raw), fCue=ibFoldCue(raw);
+  let direct=inTo&&m.to.length<=3, mentioned=false;
+  for(const re of cfg.nameRes){
+    const mm=re.exec(fName);
+    if(mm){ const idx=mm.index+mm[1].length, early=idx<140; s+=early?3:2; pos.push([early?'بيناديك بالاسم':'اسمك مذكور في الرسالة','imp']); direct=true; mentioned=true; quote=ibSentence(raw,idx); break; }
+  }
+  if(direct){
+    const hit=IB_CUES_AR.concat(IB_CUES_EN).filter(c=>fCue.includes(c));
+    if(hit.length){ s+=Math.min(2,hit.length); pos.push(['فيه طلب/متابعة','may']); if(!quote) quote=ibSentence(raw,fCue.indexOf(hit[0])); }
+    const q=raw.search(/[?؟]/);
+    if(q>=0){ s+=1; pos.push(['فيه سؤال','may']); if(!quote) quote=ibSentence(raw,q); }
+  }
+  if(m.invite){ s+=2; pos.push(['دعوة اجتماع','imp']); }
+  if(m.labels.includes('STARRED')){ s+=2; pos.push(['عليه علامة (Flag)','imp']); }
+  if(m.labels.includes('IMPORTANT')){ s+=1; pos.push(['المرسل معلّمه مهم','may']); }
+
+  const lp=(m.fromEmail.split('@')[0]||'');
+  const noreply=/^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/i.test(lp);
+  const promo=m.labels.includes('CATEGORY_PROMOTIONS'), social=m.labels.includes('CATEGORY_SOCIAL');
+  const bulk=m.hasUnsub||m.hasListId||m.auto||/bulk|list|junk/.test(m.precedence)||noreply||promo||social;
+  if(bulk) neg.push([promo?'إعلان':social?'سوشيال':noreply?'رسالة آلية (no-reply)':'نشرة/إشعار آلي','low']);
+  if(m.labels.includes('CATEGORY_UPDATES')||m.labels.includes('CATEGORY_FORUMS')){ s-=1.5; if(!bulk) neg.push(['تحديثات/منتديات','low']); }
+  if(!isVip){
+    if(promo||social){ if(s>0.5) s=0.5; }
+    else if(bulk){ const cap=mentioned?2:0.5; if(s>cap) s=cap; }
+  }
+  const cls=s>=3?'imp':s>=1?'may':'low';
+  return { score:s, cls, why:(cls==='low'?neg:pos.concat(bulk?neg:[])), quote:(cls==='low'?'':quote) };
+}
+function ibRescore(){
+  const I=S.inbox, cfg=ibCfg();
+  I.items=I.raw.map(m=>Object.assign({},m,ibScore(m,cfg))).filter(x=>!cfg.done.has(x.id));
+  I.items.forEach(x=>{ if(cfg.muted.has(x.fromEmail)){ x.cls='low'; x.score=-1; x.why=[['مرسل متكتّم','low']]; x.quote=''; x.muted=true; } });
+  I.items.sort((a,b)=>b.score-a.score||b.ts-a.ts);
+}
+
+/* ---------- Microsoft Graph ---------- */
+function ibClientId(){ return ((ibLs('cid','')||IB_CLIENT_ID_DEFAULT)||'').trim(); }
+function ibLoadMsal(){
+  return new Promise((res,rej)=>{
+    if(window.msal&&msal.PublicClientApplication) return res();
+    const old=document.getElementById('ib-msal'); if(old){ old.addEventListener('load',()=>res()); old.addEventListener('error',()=>rej(new Error('تعذّر تحميل خدمة مايكروسوفت'))); return; }
+    const sc=document.createElement('script'); sc.id='ib-msal'; sc.src=IB_MSAL_SRC; sc.async=true;
+    sc.onload=()=>res(); sc.onerror=()=>rej(new Error('تعذّر تحميل خدمة مايكروسوفت — اتأكد من الإنترنت'));
+    document.head.appendChild(sc);
+  });
+}
+async function ibConnect(){
+  const cid=ibClientId(); if(!cid) throw new Error('محتاج Application (client) ID الأول (الخطوات تحت)');
+  await ibLoadMsal();
+  const I=S.inbox;
+  if(!I.app||I.appCid!==cid){
+    I.app=new msal.PublicClientApplication({ auth:{ clientId:cid, authority:'https://login.microsoftonline.com/common', redirectUri:location.origin }, cache:{ cacheLocation:'sessionStorage' } });
+    I.appCid=cid; await I.app.initialize();
+  }
+  const acct=I.acct||I.app.getAllAccounts()[0]||null; let r=null;
+  try{
+    if(acct) r=await I.app.acquireTokenSilent({ scopes:IB_SCOPES, account:acct });
+  }catch(e){ r=null; }
+  if(!r){
+    try{ r=await I.app.acquireTokenPopup({ scopes:IB_SCOPES, account:acct||undefined, prompt:acct?undefined:'select_account' }); }
+    catch(e){
+      const c=(e&&e.errorCode)||'';
+      throw new Error(/user_cancelled/.test(c)?'قفلت نافذة مايكروسوفت قبل الموافقة':/popup_window_error|empty_window/.test(c)?'المتصفح منع نافذة مايكروسوفت — اسمح بالـ popup وجرّب تاني':(e&&e.errorMessage)||'فشل الربط بمايكروسوفت');
+    }
+  }
+  I.acct=r.account||acct; I.token=r.accessToken; I.exp=(r.expiresOn&&+new Date(r.expiresOn))||Date.now()+3000000; I.authLost=false;
+}
+async function ibApi(url){
+  const I=S.inbox; if(!I.token) throw new Error('مش متربوط بمايكروسوفت');
+  for(let a=0;a<4;a++){
+    const r=await fetch(url,{ headers:{ Authorization:'Bearer '+I.token, Prefer:'outlook.body-content-type="text"' } });
+    if(r.status===401){ I.token=null; I.authLost=true; throw new Error('جلسة مايكروسوفت خلصت — اضغط تحديث تاني'); }
+    if(r.ok) return r.json();
+    if(r.status===429||r.status===503||r.status===504){ const w=(+r.headers.get('Retry-After')||0)*1000||700*(a+1); await new Promise(x=>setTimeout(x,Math.min(w,8000))); continue; }
+    let j=null; try{ j=await r.json(); }catch(e){}
+    const code=(j&&j.error&&j.error.code)||'';
+    if(r.status===403||/Authorization_RequestDenied|ErrorAccessDenied/i.test(code)) throw new Error('الصلاحية مش كفاية — تأكد إن Mail.Read مضافة في Azure ووافقت عليها');
+    throw new Error((j&&j.error&&j.error.message)||('خطأ '+r.status));
+  }
+  throw new Error('مايكروسوفت مشغول — جرّب بعد شوية');
+}
+async function ibLoad(){
+  const I=S.inbox; if(I.busy) return;
+  try{
+    if(!I.token||Date.now()>I.exp-60000){ await ibConnect(); }
+    I.uid=ibUid(); I.busy=true; I.err=''; I.progress='بجيب الإيميلات...'; render();
+    const me=await ibApi('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName');
+    I.me=me.mail||me.userPrincipalName||I.me;
+    const since=new Date(Date.now()-I.days*864e5).toISOString();
+    const sel='id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,importance,inferenceClassification,flag,conversationId,webLink,internetMessageHeaders';
+    let url='https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$orderby='+encodeURIComponent('receivedDateTime desc')+'&$filter='+encodeURIComponent('receivedDateTime ge '+since)+'&$select='+sel;
+    const all=[]; let more=false;
+    while(url){
+      const r=await ibApi(url); (r.value||[]).forEach(x=>all.push(x)); url=r['@odata.nextLink']||null;
+      ibProg('جبت '+Math.min(all.length,IB_MAX_FETCH)+' إيميل...');
+      if(all.length>=IB_MAX_FETCH){ if(url||all.length>IB_MAX_FETCH) more=true; break; }
+    }
+    const meC=ibCanon(I.me);
+    I.raw=all.slice(0,IB_MAX_FETCH).map(ibParse).filter(m=>m.fromEmail!==meC);
+    I.scanned=I.raw.length; I.more=more; I.loadedAt=Date.now();
+    ibRescore(); I.busy=false; I.progress=''; render();
+  }catch(e){ I.busy=false; I.progress=''; I.err=(e&&e.message)||String(e); render(); }
+}
+function ibProg(t){ S.inbox.progress=t; const e=document.getElementById('ib-prog'); if(e) e.textContent=t; }
+async function ibDisconnect(){
+  const I=S.inbox;
+  try{ if(I.app) await I.app.logoutRedirect({ account:I.acct||undefined, onRedirectNavigate:()=>false }); }catch(e){}
+  I.token=null; I.exp=0; I.acct=null; I.raw=[]; I.items=[]; I.scanned=0; I.loadedAt=0; I.err=''; render();
+}
+function ibPush(key,val,cap){ const a=ibLs(key,[]); if(!a.includes(val)) a.push(val); ibLsSet(key,a.slice(-(cap||800))); }
+function ibAct(act,id,em){
+  if(act==='done'){ ibPush('done',id,800); }
+  else if(act==='mute'&&em){ ibPush('muted',em,300); ibLsSet('vip',ibLs('vip',[]).filter(x=>x!==em)); }
+  else if(act==='unmute'&&em){ ibLsSet('muted',ibLs('muted',[]).filter(x=>x!==em)); }
+  else if(act==='vip'&&em){ ibPush('vip',em,300); ibLsSet('muted',ibLs('muted',[]).filter(x=>x!==em)); }
+  ibRescore(); render();
+}
+
+/* ---------- الواجهة ---------- */
+function ibWhen(ts){
+  if(!ts) return '';
+  const d=new Date(ts), tz={ timeZone:'Africa/Cairo' };
+  const day=x=>new Intl.DateTimeFormat('en-CA',tz).format(x);
+  const f=o=>new Intl.DateTimeFormat('ar-EG',Object.assign({},tz,o)).format(d);
+  return day(d)===day(new Date()) ? f({ hour:'numeric', minute:'2-digit' }) : f({ day:'numeric', month:'short', hour:'numeric', minute:'2-digit' });
+}
+function ibBadge(t,k){
+  const c={ imp:'background:var(--coral-light);color:var(--coral)', may:'background:var(--amber-light);color:var(--amber)', low:'background:var(--sand);color:var(--text-dim)' }[k]||'';
+  return '<span class="badge" style="'+c+'">'+esc(t)+'</span>';
+}
+function ibItemHtml(x){
+  const link=x.webLink||'https://outlook.office.com/mail/';
+  const em=esc(x.fromEmail);
+  const acts = x.muted
+    ? '<button class="ghost-btn" data-ib="unmute" data-em="'+em+'">رجّع المرسل</button>'
+    : '<button class="ghost-btn" data-ib="done" data-id="'+esc(x.id)+'">تمّ ✓</button>'
+      + (x.cls==='low' ? '<button class="ghost-btn" data-ib="vip" data-em="'+em+'">ده مهم دايمًا</button>' : '<button class="ghost-btn" data-ib="mute" data-em="'+em+'">اكتم المرسل</button>');
+  return '<div class="ib-item '+x.cls+'">'
+    + '<div class="ib-top"><div class="ib-from">'+esc(x.fromName||x.fromEmail)+'</div><div class="ib-time">'+esc(ibWhen(x.ts))+'</div></div>'
+    + '<div class="ib-subj">'+esc(x.subject)+'</div>'
+    + (x.why&&x.why.length?'<div class="ib-why">'+x.why.map(w=>ibBadge(w[0],w[1])).join('')+'</div>':'')
+    + (x.quote?'<div class="ib-quote"><b>الكلام الموجّه ليك:</b> '+esc(x.quote)+'</div>':'')
+    + (x.cls!=='low'&&!x.quote&&x.snippet?'<div class="ib-snip">'+esc(x.snippet.slice(0,220))+'</div>':'')
+    + '<div class="ib-acts"><a class="ghost-btn" href="'+link+'" target="_blank" rel="noopener">فتح في Outlook</a>'+acts+'</div>'
+    + '</div>';
+}
+function ibSetupHtml(){
+  const origin=(location.origin&&location.origin!=='null')?location.origin:'(افتح التطبيق من رابطه الحقيقي مش من ملف على الجهاز)';
+  return '<details class="ib-help"><summary>إزاي أجيب Application (client) ID؟ (مرة واحدة)</summary><ol>'
+    + '<li>ادخل <b>portal.azure.com</b> بنفس حساب Outlook ← ابحث عن <b>App registrations</b> ← <b>New registration</b>.</li>'
+    + '<li>الاسم أي حاجة (مثلًا Mail Triage). في <b>Supported account types</b> اختار: <b>Accounts in any organizational directory and personal Microsoft accounts</b>.</li>'
+    + '<li>في <b>Redirect URI</b> اختار النوع <b>Single-page application (SPA)</b> وحط: <code dir="ltr">'+esc(origin)+'</code> ثم Register.</li>'
+    + '<li>من <b>API permissions</b> ← Add a permission ← Microsoft Graph ← <b>Delegated</b> ← ضيف <b>Mail.Read</b>.</li>'
+    + '<li>من صفحة Overview انسخ <b>Application (client) ID</b> والصقه فوق واضغط ربط. مفيش Secret محتاجه.</li>'
+    + '</ol><div style="font-size:12px;color:var(--text-dim);margin-top:6px;">لو الإيميل بتاع شغل وفيه قيود من الـ IT على تسجيل التطبيقات أو الموافقة على الصلاحيات، ممكن تحتاج موافقة الأدمن عندكم.</div></details>';
+}
+function renderInbox(){
+  const I=S.inbox;
+  if(I.uid&&I.uid!==ibUid()){ I.token=null; I.raw=[]; I.items=[]; I.uid=''; I.err=''; I._init=false; }
+  if(!I._init){ I._init=true; I.days=ibLs('days',3); }
+  const head='<div class="section-title"><h2>الإيميلات المهمة</h2></div>';
+  const cid=ibClientId();
+  let h=head;
+  if(I.err) h+='<div class="card" style="margin-bottom:12px;border-color:var(--coral);color:var(--coral);font-size:13px;">'+esc(I.err)+'</div>';
+  if(I.busy) return h+'<div class="card" style="text-align:center;padding:28px;"><div style="font-weight:800;margin-bottom:6px;">بفرزلك الإيميلات...</div><div id="ib-prog" style="font-size:13px;color:var(--text-dim);">'+esc(I.progress||'')+'</div></div>';
+  if(!I.token && !I.items.length){
+    return h+'<div class="card"><p style="margin:0 0 10px;line-height:1.8;font-size:13.5px;">اربط Outlook (قراءة فقط) وأنا أطلّعلك بس الإيميلات اللي <b>متبعتالك أنت</b> أو فيها كلام <b>موجّه ليك</b> جوه الرسالة، وأخفي النشرات والإعلانات والإشعارات الآلية. الإيميلات مبتتخزّنش في أي مكان.</p>'
+      + '<div class="form-row"><label>Application (client) ID</label><input id="ib-cid" dir="ltr" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value="'+esc(cid)+'"></div>'
+      + '<button class="primary-btn" id="ib-connect">ربط Outlook وفرز الإيميلات</button></div>'
+      + '<div style="margin-top:12px;">'+ibSetupHtml()+'</div>';
+  }
+  const imp=I.items.filter(x=>x.cls==='imp'), may=I.items.filter(x=>x.cls==='may'), low=I.items.filter(x=>x.cls==='low');
+  h+='<div class="card" style="margin-bottom:12px;"><div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<select id="ib-days"><option value="1"'+(I.days===1?' selected':'')+'>آخر يوم</option><option value="3"'+(I.days===3?' selected':'')+'>آخر 3 أيام</option><option value="7"'+(I.days===7?' selected':'')+'>آخر أسبوع</option><option value="14"'+(I.days===14?' selected':'')+'>آخر أسبوعين</option></select>'
+    + '<button class="primary-btn" id="ib-refresh">'+(I.token?'تحديث':'ربط تاني وتحديث')+'</button>'
+    + (I.token?'<button class="ghost-btn" id="ib-disc">فصل الربط</button>':'')
+    + '<span style="font-size:12px;color:var(--text-dim);">'+(I.me?esc(I.me)+' — ':'')+(I.loadedAt?'اتحدّث '+esc(ibWhen(I.loadedAt)):'')+'</span></div>'
+    + '<div class="ib-sum">'
+    + '<span class="badge" style="background:var(--coral-light);color:var(--coral);">مهم: '+imp.length+'</span>'
+    + '<span class="badge" style="background:var(--amber-light);color:var(--amber);">ممكن يهمك: '+may.length+'</span>'
+    + '<span class="badge" style="background:var(--sand);color:var(--text-dim);">اتخفى: '+low.length+'</span>'
+    + '<span style="font-size:12px;color:var(--text-dim);">من '+I.scanned+' إيميل'+(I.more?' (فيه أقدم ما اتفحصش — قلّل الفترة)':'')+'</span></div>'
+    + '<details class="ib-help" style="margin-top:10px;"><summary>أسماء وإيميلات بتميّزك</summary>'
+    + '<div style="font-size:12px;color:var(--text-dim);margin:6px 0;">اكتب الأسماء اللي الناس بتناديك بيها وأي إيميل تاني ليك، مفصولة بفاصلة. دي اللي بدوّر عليها جوه الرسائل.</div>'
+    + '<input id="ib-names" style="width:100%;" value="'+esc(ibMyNames().join('، '))+'"><button class="ghost-btn" id="ib-names-save" style="margin-top:6px;">حفظ وإعادة الفرز</button></details></div>';
+  if(!I.items.length) return h+'<div class="card" style="text-align:center;color:var(--text-dim);">مفيش إيميلات في الفترة دي.</div>';
+  h+= imp.length? imp.map(ibItemHtml).join('') : '<div class="card" style="text-align:center;color:var(--text-dim);margin-bottom:12px;">مفيش إيميلات مهمة دلوقتي 🎉</div>';
+  if(may.length) h+='<div class="section-title" style="margin-top:14px;"><h2 style="font-size:15px;">ممكن يهمك ('+may.length+')</h2><button class="ghost-btn" id="ib-t-may">'+(I.showMaybe?'إخفاء':'عرض')+'</button></div>'+(I.showMaybe?may.map(ibItemHtml).join(''):'');
+  if(low.length) h+='<div class="section-title" style="margin-top:14px;"><h2 style="font-size:15px;">اتخفّت ('+low.length+')</h2><button class="ghost-btn" id="ib-t-hid">'+(I.showHidden?'إخفاء':'عرض')+'</button></div>'+(I.showHidden?low.map(ibItemHtml).join(''):'');
+  return h;
+}
+function bindInbox(){
+  ibLoadMsal().catch(()=>{});
+  const $=id=>document.getElementById(id), I=S.inbox;
+  const on=(id,fn)=>{ const e=$(id); if(e) e.onclick=fn; };
+  on('ib-connect',()=>{ const c=$('ib-cid'); if(c&&c.value.trim()) ibLsSet('cid',c.value.trim()); ibLoad(); });
+  on('ib-refresh',()=>ibLoad());
+  on('ib-disc',()=>ibDisconnect());
+  on('ib-t-may',()=>{ I.showMaybe=!I.showMaybe; render(); });
+  on('ib-t-hid',()=>{ I.showHidden=!I.showHidden; render(); });
+  on('ib-names-save',()=>{ const v=($('ib-names')||{}).value||''; ibLsSet('names',v.split(/[,،\n]/).map(x=>x.trim()).filter(Boolean)); ibRescore(); toast('اتحفظ وأعدت الفرز',true); render(); });
+  const d=$('ib-days'); if(d) d.onchange=()=>{ I.days=+d.value||3; ibLsSet('days',I.days); ibLoad(); };
+  document.querySelectorAll('[data-ib]').forEach(b=>{ b.onclick=()=>ibAct(b.dataset.ib,b.dataset.id||'',b.dataset.em||''); });
+}
+(function ibInjectCss(){
+  if(document.getElementById('ib-css')) return;
+  const st=document.createElement('style'); st.id='ib-css';
+  st.textContent='.ib-sum{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}'
+  +'.ib-item{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}'
+  +'.ib-item.imp{border-right:4px solid var(--coral)}.ib-item.may{border-right:4px solid var(--amber)}.ib-item.low{opacity:.78}'
+  +'.ib-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}'
+  +'.ib-from{font-weight:800;font-size:14px}.ib-time{font-size:11.5px;color:var(--text-dim);white-space:nowrap}'
+  +'.ib-subj{font-weight:700;font-size:13.5px;margin:3px 0}'
+  +'.ib-why{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}'
+  +'.ib-quote{background:var(--amber-light);border-radius:8px;padding:8px 10px;font-size:13px;margin:8px 0;line-height:1.7}'
+  +'.ib-snip{font-size:12.5px;color:var(--text-dim);line-height:1.7}'
+  +'.ib-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}'
+  +'a.ghost-btn{text-decoration:none;display:inline-block}'
+  +'.ib-help{font-size:13px}.ib-help summary{cursor:pointer;font-weight:800}.ib-help ol{line-height:2;padding-inline-start:20px;margin:8px 0 0}'
+  +'.ib-help code{background:var(--sand);padding:2px 6px;border-radius:6px;font-size:12px}';
+  document.head.appendChild(st);
+})();
+
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
