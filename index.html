@@ -1394,7 +1394,7 @@ function fvSecondTick(){
   const ses=S.verify.session; fvSecs++;
   if(ses&&ses.status==='calling'&&fvLeftMs()<=0&&fvSecs%5===0) verifyTick(true);
 }
-(function fvSched(){ const st=S.verify&&S.verify.session&&S.verify.session.status; const ms= st==='calling'?12000 : S.tab==='verify'?30000 : 60000; setTimeout(async()=>{ try{ await verifyTick(); }catch(e){} fvSched(); },ms); })(); setInterval(fvSecondTick,1000); setTimeout(()=>verifyTick(true),4000);
+(function fvSched(){ const st=S.verify&&S.verify.session&&S.verify.session.status; const ms= st==='calling'?12000 : S.tab==='verify'?30000 : (S.profile&&S.profile.role==='supervisor'?90000:180000); setTimeout(async()=>{ try{ await verifyTick(); }catch(e){} fvSched(); },ms); })(); setInterval(fvSecondTick,1000); setTimeout(()=>verifyTick(true),4000);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') verifyTick(); });
 
 /* ---- alarm (supervisor): loud + vibrating until tapped ---- */
@@ -2612,10 +2612,10 @@ async function mfUnitsOfMonth(month){
   const map=new Map();
   (data||[]).forEach(r=>{
     const code=String(r.unit_code||'').trim(); if(!code) return;
+    if(r.status!=='completed') return;   // المنتهية بس — المؤجلة والملغية والمجدولة مش بتتحسب
     const key=code.toUpperCase(); const cur=map.get(key);
-    // كل كود وحدة بيتحسب مرة واحدة؛ التاريخ المعتمد = أول تاريخ "تم الانتهاء" لو موجود، وإلا أول تاريخ للوحدة
-    if(!cur) map.set(key,{ code, date:r.date, done:r.status==='completed' });
-    else if(!cur.done && r.status==='completed') map.set(key,{ code:cur.code, date:r.date, done:true });
+    // كل كود وحدة بيتحسب مرة واحدة؛ التاريخ المعتمد = أول تاريخ "تم الانتهاء"
+    if(!cur) map.set(key,{ code, date:r.date, done:true });
   });
   const list=Array.from(map.values()).sort((x,y)=>String(x.date).localeCompare(String(y.date)) || x.code.localeCompare(y.code,undefined,{numeric:true}));
   return { list };
@@ -2745,7 +2745,7 @@ function renderMonthlyFinance(){
   if(d.error) return bar+'<p style="text-align:center;color:var(--coral);padding:30px 0;">حصل خطأ في تحميل البيانات — جرّب تاني</p>';
   return bar+`<style>${MF_CSS}</style><div style="overflow-x:auto;-webkit-overflow-scrolling:touch;direction:ltr;padding-bottom:8px;"><div style="max-width:760px;margin:0 auto;">${mfSheetHtml(d,true)}</div></div>
   <div style="font-size:12px;color:var(--text-dim);line-height:1.9;margin-top:10px;">
-    • عدد الوحدات (تلقائي) = <b>${d.units}</b> وحدة مختلفة في الشهر. &nbsp; • أوردرات الخدمة المدفوعة "تم الانتهاء" = <b>${d.orders}</b> أوردر (للعرض بس)، وإيراد الخدمة المدفوعة تلقائي = مجموع أسعارها = <b>${mfNum(d.ordersSum,2)}</b> ج.م.<br>
+    • عدد الوحدات (تلقائي) = <b>${d.units}</b> وحدة منتهية (تم الانتهاء) مختلفة في الشهر — المؤجلة والملغية والمجدولة مش محسوبة. &nbsp; • أوردرات الخدمة المدفوعة "تم الانتهاء" = <b>${d.orders}</b> أوردر (للعرض بس)، وإيراد الخدمة المدفوعة تلقائي = مجموع أسعارها = <b>${mfNum(d.ordersSum,2)}</b> ج.م.<br>
     • أي خانة تقدر تكتب فيها رقمك مكان المعادلة (بتتلوّن أصفر) — وامسحها عشان ترجع تلقائي. الأرقام اللي بعدها بتتحدّث لوحدها زي الإكسيل.
   </div>`;
 }
@@ -2843,8 +2843,8 @@ function renderDvExport(){
     <div class="form-row"><label>Unit No. (اختياري)</label><input id="dx-unitno" value="${esc(d.unitNo||'')}"></div>
     <div class="form-row"><label>سعر الخدمة للوحدة (قبل الضريبة)</label><input type="number" id="dx-price" value="${d.price||1500}"></div>
     <div class="form-row"><label>العرض ساري حتى</label><input type="date" id="dx-valid" value="${d.valid||dxDefaultValid()}"></div>
-    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">الكمية (QTY) بتتحسب أوتوماتيك = عدد وحدات التسليم في الشهر بدون تكرار، والضريبة 14%.</p>`
-    :`<p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">هيتسحب كل رقم وحدة (بدون تكرار) مع التاريخ بتاعه — نفس الوحدات اللي في الـ Breakdown.</p>`}
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">الكمية (QTY) بتتحسب أوتوماتيك = عدد وحدات التسليم المنتهية في الشهر بدون تكرار، والضريبة 14%.</p>`
+    :`<p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">هيتسحب كل رقم وحدة منتهية فقط (بدون تكرار) مع التاريخ بتاعه — نفس الوحدات اللي في الـ Breakdown.</p>`}
     <button class="primary-btn" style="width:100%;justify-content:center;" id="dx-go">${quote?'⬇️ توليد PDF':'📥 تحميل Excel'}</button>`);
 }
 function bindDvExport(){
@@ -2854,7 +2854,7 @@ function bindDvExport(){
     S.mfMonth=month; go.disabled=true;
     const ul=await mfUnitsOfMonth(month);
     if(ul.error){ toast('تعذّر تحميل الوحدات',false); go.disabled=false; return; }
-    if(!ul.list.length){ toast('مفيش وحدات تسليم في الشهر ده',false); go.disabled=false; return; }
+    if(!ul.list.length){ toast('مفيش وحدات تسليم منتهية في الشهر ده',false); go.disabled=false; return; }
     if(S.modal.kind==='quote'){
       const g=id=>document.getElementById(id).value;
       const price=parseFloat(g('dx-price')); if(!(price>0)){ toast('اكتب سعر الخدمة',false); go.disabled=false; return; }
@@ -5704,7 +5704,7 @@ function startUrgentPoll(){
     });
     const sig=urgentSignature();
     if((fresh || sig!==S.urgentSig) && document.visibilityState==='visible' && !S.modal && !hasUnsavedInput()){ S.urgentSig=sig; render(); }
-  },60000);
+  },120000);
 }
 
 /* ============================= LOCATIONS (admin) ============================= */
@@ -7108,7 +7108,7 @@ function handleScannedCode(code){
 document.addEventListener('visibilitychange', async ()=>{
   if(document.visibilityState!=='visible' || !S.session || !S.profile || S.modal) return;
   if(hasUnsavedInput()) return;
-  if(Date.now()-(S._visAt||0)<60000) return; S._visAt=Date.now();
+  if(Date.now()-(S._visAt||0)<180000) return; S._visAt=Date.now();
   await refreshAssignments();
   const r = S.profile.role;
   if(urgentRoles().includes(r)) await loadUrgent();
@@ -7368,7 +7368,7 @@ function startSvcPoll(){
     const r=S.profile.role; if(!(r==='admin'||r==='opm'||isSvcSV(r))) return;
     if(hasUnsavedInput()) return;
     await loadSvcData(); if(!S.modal && !hasUnsavedInput()) render();
-  },90000);
+  },180000);
 }
 function startExtraPoll(){
   if(extraPollStarted) return; extraPollStarted = true;
@@ -7476,7 +7476,7 @@ async function notifProbe(){
     if(sig===S._ntfProbe) return; S._ntfProbe=sig; await loadNotifications(false);
   }catch(e){}
 }
-function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(notifProbe,45000); }
+function startNotifPoll(){ if(notifPollStarted) return; notifPollStarted=true; setInterval(notifProbe,90000); }
 let distPollStarted=false;
 function startDistPoll(){
   if(distPollStarted) return; distPollStarted=true;
@@ -7489,7 +7489,7 @@ function startDistPoll(){
     if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
     if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); await loadOrders(); await loadSideSvc(); }catch(e){} }
     if(!S.modal && !hasUnsavedInput()) render();
-  },90000);
+  },180000);
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
