@@ -958,9 +958,14 @@ function t12Sync(w){
 }
 function bindTime12(){ document.querySelectorAll('[data-t12]').forEach(w=>w.querySelectorAll('select').forEach(sel=>sel.onchange=()=>t12Sync(w))); }
 function parseLooseTime(t){
-  const m=/(\d{1,2})\s*[:.]\s*(\d{2})\s*([صمSsAaPp]?)/.exec(String(t||'')); if(!m) return null;
-  let h=+m[1]; const mi=m[2]; const ap=(m[3]||'').toLowerCase();
+  // بيقبل: 9:30 ص / 9.30 م / 09:30 PM / 9 ص / 9:30:00 / أرقام عربية (٩:٣٠). من غير ص/م: الساعات 1–7 = مساءً (التسليم مش بيبدأ قبل 8 الصبح)
+  let x=String(t||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c));
+  let m=/(\d{1,2})\s*[:.]\s*(\d{2})(?:\s*[:.]\s*\d{2})?\s*([صمSsAaPp])?/.exec(x), h, mi, apc;
+  if(m){ h=+m[1]; mi=m[2]; apc=m[3]; }
+  else { m=/(\d{1,2})\s*([صمAaPp])/.exec(x); if(!m) return null; h=+m[1]; mi='00'; apc=m[2]; }
+  const ap=(apc||'').toLowerCase();
   if(ap==='م'||ap==='p'){ if(h<12) h+=12; } else if(ap==='ص'||ap==='a'){ if(h===12) h=0; }
+  else if(!ap && h>=1 && h<=7) h+=12;
   if(h>23||+mi>59) return null; return String(h).padStart(2,'0')+':'+mi;
 }
 function nowTimeStr(){ const d=new Date(); return d.toTimeString().slice(0,5); }
@@ -2548,7 +2553,7 @@ function renderDeliveries(){
   const canWrite = role==='admin'||role==='opm';
   const canChangeStatus = ['admin','opm','supervisor'].includes(role);
   const todayOnly = role==='fm_dispatcher';
-  const list = S.unitQ ? S.deliveries.filter(d=>fmUnitMatch(d.unit_code)).sort((a,b)=>String(b.date).localeCompare(String(a.date))) : S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate)).sort(cmpArrival);
+  const list = S.unitQ ? S.deliveries.filter(d=>fmUnitMatch(d.unit_code)).sort((a,b)=>String(b.date).localeCompare(String(a.date)) || cmpArrival(a,b)) : S.deliveries.filter(d=>d.date===(todayOnly? S.today : S.deliveryDate)).sort(cmpArrival);
   return `
   <div class="toolbar">
     ${todayOnly? '<span style="font-size:13px;font-weight:800;">وحدات تسليم اليوم — للعلم فقط</span>' : `<div class="fgroup"><label>التاريخ</label><input type="date" id="dv-date" value="${S.deliveryDate}"></div>`}
@@ -2566,7 +2571,7 @@ function renderDeliveries(){
         <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
-        <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
+        ${d.status==='postponed'?'<option value="postponed" selected>تم التأجيل (قديم)</option>':''}
       </select>${d.status==='postponed'&&d.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;white-space:normal;max-width:170px;">${esc(d.postpone_reason)}</div>`:''}` : statusBadge(d.status)}</td>
       <td style="white-space:normal;min-width:150px;max-width:260px;word-break:break-word;line-height:1.6;">${esc(d.notes||'-')}</td>
       <td>${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">${noteCount} بلاغ ${ICON.camera(12)}</button>`:'<span style="color:var(--text-dim);">-</span>'}</td>
@@ -3023,7 +3028,7 @@ function renderOrders(){
       <div class="stat mint"><div class="num">${cnt('completed')}</div><div class="lbl">تم الانتهاء</div></div>
       <div class="stat blue"><div class="num">${cnt('in_progress')}</div><div class="lbl">جاري العمل</div></div>
       <div class="stat amber"><div class="num">${cnt('scheduled')}</div><div class="lbl">مجدولة</div></div>
-      <div class="stat coral"><div class="num">${cnt('postponed')}</div><div class="lbl">تم التأجيل</div></div>
+      ${cnt('postponed')?`<div class="stat coral"><div class="num">${cnt('postponed')}</div><div class="lbl">تم التأجيل (قديم)</div></div>`:''}
       <div class="stat coral"><div class="num">${cnt('cancelled')}</div><div class="lbl">تم الإلغاء</div></div>
     </div>
     <div class="stat-row" style="margin-bottom:14px;">
@@ -3052,7 +3057,7 @@ function renderOrders(){
         <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
-        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
+        ${o.status==='postponed'?'<option value="postponed" selected>تم التأجيل (قديم)</option>':''}
         ${canCancelOrder?`<option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>`:''}
       </select>${o.status==='postponed'&&o.postpone_reason?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px;">${esc(o.postpone_reason)}</div>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}` : (canCancelOrder?`${statusBadge(o.status)}${o.status!=='cancelled'?`<button class="ghost-btn danger" style="padding:3px 8px;font-size:11px;margin-top:4px;" data-ord-cancel="${o.id}">إلغاء الأوردر</button>`:''}${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:10.5px;color:var(--coral);margin-top:3px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}`:statusBadge(o.status)));
     return `<tr style="${o.approval_status==='rejected'?'opacity:.6;':''}">
@@ -3467,7 +3472,7 @@ function renderFacadeOrdersForSV(){
   return `<div class="section-title"><h2>أوردرات نظافة الواجهات (الخدمة المدفوعة)</h2></div>
   <div class="tbl-wrap"><table><thead><tr><th>رقم الوحدة</th><th>التاريخ</th><th>الميعاد</th><th>ملاحظات</th><th>الحالة</th></tr></thead><tbody>
   ${list.length? list.map(o=>`<tr><td>${esc(o.unit_code||'-')}</td><td>${esc(o.scheduled_date||'-')}</td><td>${fmt12(o.scheduled_time,'-')}</td><td style="white-space:normal;min-width:150px;max-width:260px;word-break:break-word;line-height:1.6;">${esc(o.opm_notes||'-')}</td>
-    <td><select data-fsv-ord="${o.id}"><option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option><option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option></select></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text-dim);">لا توجد أوردرات</td></tr>'}
+    <td><select data-fsv-ord="${o.id}"><option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option><option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option><option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>${o.status==='postponed'?'<option value="postponed" selected>تم التأجيل (قديم)</option>':''}</select></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text-dim);">لا توجد أوردرات</td></tr>'}
   </tbody></table></div>`;
 }
 /* ============================= FACADE CLEANING ============================= */
@@ -6093,7 +6098,7 @@ function renderSupervisorTodayBase(){
             <option value="scheduled" ${d.status==='scheduled'?'selected':''}>مجدولة</option>
             <option value="in_progress" ${d.status==='in_progress'?'selected':''}>جاري العمل</option>
             <option value="completed" ${d.status==='completed'?'selected':''}>تم الانتهاء</option>
-            <option value="postponed" ${d.status==='postponed'?'selected':''}>تم التأجيل</option>
+            ${d.status==='postponed'?'<option value="postponed" selected>تم التأجيل (قديم)</option>':''}
           </select>
         </div>
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
@@ -6112,7 +6117,7 @@ function renderSupervisorTodayBase(){
         <option value="scheduled" ${o.status==='scheduled'?'selected':''}>مجدولة</option>
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>جاري العمل</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>تم الانتهاء</option>
-        <option value="postponed" ${o.status==='postponed'?'selected':''}>تم التأجيل</option>
+        ${o.status==='postponed'?'<option value="postponed" selected>تم التأجيل (قديم)</option>':''}
         <option value="cancelled" ${o.status==='cancelled'?'selected':''}>تم الإلغاء</option>
       </select>${o.status==='cancelled'&&o.cancel_reason?`<div style="font-size:11px;color:var(--coral);margin-top:4px;">سبب الإلغاء: ${esc(o.cancel_reason)}</div>`:''}
     </div>`).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد أوردرات النهاردة ولا في اليومين الجايين</p>`}`;
