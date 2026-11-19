@@ -6085,7 +6085,7 @@ function renderSupervisorTodayBase(){
     </div>`;
     html += `<div class="section-title"><h2>وحدات التسليم (اليوم + يومين)</h2></div>
     ${myDelivAll.length? myDelivAll.map(d=>{
-      const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id).length;
+      const noteCount = (S.unitNotes||[]).filter(n=>n.delivery_unit_id===d.id && n.created_by===uidMe).length;
       return `<div class="card" style="margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div><b>${esc(d.unit_code)}</b>${d.date!==S.today?` <span style="font-size:11.5px;font-weight:800;color:var(--blue);background:var(--blue-light);border-radius:999px;padding:2px 8px;">${d.date===addDaysStr(S.today,1)?'بكرة':'بعد بكرة'} · ${esc(d.date)}</span>`:''}${deliveryExtraHtml(d)} ${d.notes?`<div style="font-size:12px;color:var(--text-dim);">${esc(d.notes)}</div>`:''}</div>
@@ -6098,7 +6098,7 @@ function renderSupervisorTodayBase(){
         </div>
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
           <button class="ghost-btn" data-add-note="${d.id}">${ICON.camera(13)} إضافة ملاحظة عن عطل/تلفية</button>
-          ${noteCount?`<span style="font-size:11.5px;color:var(--text-dim);">(${noteCount} ملاحظة مسجلة)</span>`:''}
+          ${noteCount?`<button class="ghost-btn" data-view-notes="${d.id}">📋 شوف ملاحظاتي (${noteCount})</button>`:''}
         </div>
       </div>`;
     }).join('') : `<p style="color:var(--text-dim);font-size:13px;">لا توجد وحدات تسليم النهاردة ولا في اليومين الجايين</p>`}`;
@@ -6131,6 +6131,7 @@ function renderSupervisorTodayBase(){
 }
 function bindSupervisorToday(){
   document.querySelectorAll('[data-fv-open]').forEach(b=>b.onclick=()=>{ S.tab='verify'; render(); });
+  document.querySelectorAll('[data-view-notes]').forEach(b=>b.onclick=()=>{ S.modal={type:'viewUnitNotes', id:b.dataset.viewNotes}; render(); });
   const rb=document.getElementById('refresh-my-locs');
   if(rb) rb.onclick=async ()=>{
     rb.disabled=true;
@@ -6617,7 +6618,8 @@ function renderModal(){
       <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} حفظ الملاحظات</button>`);
   }
   if(m.type==='viewUnitNotes'){
-    const notes=(S.unitNotes||[]).filter(n=>n.delivery_unit_id===m.id);
+    const _me=S.session&&S.session.user&&S.session.user.id; const _sup=S.profile&&S.profile.role==='supervisor';
+    const notes=(S.unitNotes||[]).filter(n=>n.delivery_unit_id===m.id && (!_sup || n.created_by===_me)).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     return modalWrap('ملاحظات الوحدة', notes.length? notes.map(n=>`
       <div style="border-bottom:1px dashed var(--line);padding:10px 0;">
         <div style="font-size:13px;">${esc(n.note)}</div>
