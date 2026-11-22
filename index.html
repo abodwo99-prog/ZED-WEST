@@ -918,6 +918,56 @@ const KPI_TEMPLATES_BY_CATEGORY = {
   ],
 };
 function kpiTemplateFor(category){ return KPI_TEMPLATES_BY_CATEGORY[category] || KPI_TEMPLATE_DEFAULT; }
+/* ---- خصم المهام المجدولة من الـ KPI (Housekeeping: Cleaning Performance — Pest: Daily Visual Inspection & Commitment...) ---- */
+const KPI_AUTO_ITEM={ housekeeping:'Cleaning Performance', pest_control:'Daily Visual Inspection & Commitment of the monthly works schedule' };
+function kpiMonthInfo(month){ const [y,m]=month.split('-').map(Number); const D=new Date(y,m,0).getDate(); const days=[]; for(let i=1;i<=D;i++){ const d=month+'-'+String(i).padStart(2,'0'); if(d<S.today) days.push(d); } return { D, days, first:month+'-01', last:month+'-'+String(D).padStart(2,'0') }; }
+function kpiPenaltyFin(out,byDay,weight,D){ Object.values(byDay).forEach(d=>{ out.total+=d.n; out.failed+=d.bad; out.pts+=(weight/D)*(d.bad/d.n); }); out.activeDays=Object.keys(byDay).length; out.pts=Math.round(out.pts*100)/100; return out; }
+async function kpiPenaltyHK(month,weight){
+  const mi=kpiMonthInfo(month), out={ pts:0, total:0, failed:0, activeDays:0, D:mi.D, weight };
+  if(!mi.days.length) return out;
+  const [runs,lists,items]=await Promise.all([
+    fmAllRows(()=>sb.from('task_runs').select('id,date,list_id,status,review_status').gte('date',mi.first).lte('date',mi.last)),
+    fmAllRows(()=>sb.from('task_lists').select('id')), fmAllRows(()=>sb.from('task_items').select('id,list_id,active')) ]);
+  const listIds=new Set(lists.map(l=>l.id)), act={}; items.forEach(i=>{ if(i.active!==false) (act[i.list_id]=act[i.list_id]||[]).push(i.id); });
+  const dr=runs.filter(r=>listIds.has(r.list_id) && mi.days.includes(r.date)), doneSet=new Set(), ids=dr.map(r=>r.id);
+  for(let i=0;i<ids.length;i+=80){ const rows=await fmAllRows(()=>sb.from('task_run_items').select('run_id,item_id').in('run_id',ids.slice(i,i+80)).eq('done',true)); rows.forEach(x=>doneSet.add(x.run_id+'|'+x.item_id)); }
+  const byDay={};
+  dr.forEach(r=>{ const ok=r.status==='completed' && r.review_status!=='rejected' && (act[r.list_id]||[]).every(id=>doneSet.has(r.id+'|'+id)); const d=byDay[r.date]=byDay[r.date]||{ n:0, bad:0 }; d.n++; if(!ok) d.bad++; });
+  return kpiPenaltyFin(out,byDay,weight,mi.D);
+}
+async function kpiPenaltyPest(month,phase,weight){
+  const mi=kpiMonthInfo(month), out={ pts:0, total:0, failed:0, activeDays:0, D:mi.D, weight };
+  if(!mi.days.length) return out;
+  const phs= phase==='Phase 1'?['E1'] : phase==='Phase 2'?['E2'] : ['E1','E2'];
+  const [rows,done]=await Promise.all([ fmAllRows(()=>sb.from('pest_schedule_rows').select('id,phase,weekday')), fmAllRows(()=>sb.from('pest_schedule_done').select('row_id,date').gte('date',mi.first).lte('date',mi.last)) ]);
+  const doneSet=new Set(done.map(d=>d.row_id+'|'+d.date)), byDay={};
+  mi.days.forEach(d=>{ const wd=psWeekdayOf(d), rs=rows.filter(r=>phs.includes(r.phase) && r.weekday===wd); if(!rs.length) return; byDay[d]={ n:rs.length, bad:rs.filter(r=>!doneSet.has(r.id+'|'+d)).length }; });
+  return kpiPenaltyFin(out,byDay,weight,mi.D);
+}
+let _kpiTok=0;
+async function kpiAutoApply(apply){
+  const box=document.getElementById('kpi-auto-note'); if(!box) return;
+  const m=S.modal||{}; let sup;
+  if(m.type==='editKpi'){ const k=(S.supplierKpi||[]).find(x=>x.id===m.id); sup=(S.suppliers||[]).find(x=>x.id===(k&&k.supplier_id)); } else sup=(S.suppliers||[]).find(x=>x.id===m.id);
+  const key=sup&&KPI_AUTO_ITEM[sup.category]; const monthEl=document.getElementById('m-kpi-month'), phaseEl=document.getElementById('m-kpi-phase');
+  if(!key||!monthEl||!monthEl.value){ box.innerHTML=''; return; }
+  const tpl=kpiTemplateFor(sup.category), idx=tpl.findIndex(k=>k.name===key); if(idx<0) return;
+  const month=monthEl.value, phase=phaseEl?phaseEl.value:'عام', weight=tpl[idx].weight, tok=++_kpiTok;
+  box.innerHTML='<span style="color:var(--text-dim);">جاري حساب خصم المهام المجدولة...</span>';
+  let r; try{ r= sup.category==='housekeeping'? await kpiPenaltyHK(month,weight) : await kpiPenaltyPest(month,phase,weight); }catch(e){ if(tok===_kpiTok) box.innerHTML='<span style="color:var(--coral);">تعذّر حساب خصم المهام المجدولة</span>'; return; }
+  if(tok!==_kpiTok) return;
+  const input=document.getElementById('kpi-actual-'+idx), val=Math.max(0,Math.round((weight-r.pts)*100)/100);
+  if(apply && input) input.value=val;
+  const what= sup.category==='housekeeping'? 'المهام المجدولة (Housekeeping)' : 'جدول أعمال المكافحة';
+  box.innerHTML=`<div style="background:var(--amber-light);border-radius:9px;padding:9px 12px;line-height:1.8;">📉 <b>خصم ${what}</b> من بند «${esc(key)}»: <b>${r.pts}</b> من ${weight} — ${r.failed} مهمة غير منفّذة من ${r.total} (على ${r.activeDays} يوم، الشهر ${r.D} يوم، اليوم الحالي مش محسوب).${apply?` تم ضبط الخانة على <b>${val}</b> — تقدر تعدّلها.`:` <button type="button" class="ghost-btn" id="kpi-auto-apply" style="margin-top:6px;">طبّق الخصم على الخانة (${val})</button>`}</div>`;
+  const ab=document.getElementById('kpi-auto-apply'); if(ab) ab.onclick=()=>{ const i2=document.getElementById('kpi-actual-'+idx); if(i2) i2.value=val; toast('تم ضبط الخانة على '+val,true); };
+}
+function bindKpiAuto(isAdd){
+  const me=document.getElementById('m-kpi-month'), pe=document.getElementById('m-kpi-phase'); if(!me||!pe) return;
+  me.onchange=pe.onchange=()=>kpiAutoApply(isAdd);
+  if(!isAdd && me.value) kpiAutoApply(false);
+}
+
 const KPI_SCORING_CRITERIA = [
   { range:'95% and above', level:'satisfactory Performance', adj:'0% of monthly invoice', min:95 },
   { range:'91% – 94%', level:'Meet standards - needs improvement', adj:'5% of monthly invoice', min:91 },
@@ -6595,8 +6645,9 @@ function renderModal(){
         <div class="form-row" style="flex:1;min-width:140px;"><label>المرحلة</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
       </div>
       <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
-        ${kpiTemplateFor(s.category).map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
+        ${kpiTemplateFor(s.category).map((k,idx)=>`<tr><td>${k.category}</td><td>${k.name}</td><td>${k.weight}</td><td><input type="number" min="0" max="${k.weight}" step="0.01" id="kpi-actual-${idx}" value="${k.weight}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`).join('')}
       </tbody></table></div>
+      <div id="kpi-auto-note" style="font-size:12.5px;margin-bottom:8px;"></div>
       <button class="ghost-btn" id="add-kpi-btn" style="width:100%;margin-bottom:14px;">حفظ تقييم الشهر</button>
     `;
     const kpiListHtml = PHASE_OPTIONS.map(ph=>{
@@ -6663,8 +6714,9 @@ function renderModal(){
       <div class="form-row" style="flex:1;min-width:140px;"><label>المرحلة</label><select id="m-kpi-phase">${PHASE_OPTIONS.map(p=>`<option value="${p}" ${((k.phase||'عام')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
     </div>
     <div class="tbl-wrap" style="box-shadow:none;margin-bottom:8px;"><table><thead><tr><th>القسم</th><th>البند</th><th>الوزن %</th><th>الفعلي %</th></tr></thead><tbody>
-      ${tpl.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
+      ${tpl.map((kt,idx)=>{ const existing = items[idx]? items[idx].actual : kt.weight; return `<tr><td>${kt.category}</td><td>${kt.name}</td><td>${kt.weight}</td><td><input type="number" min="0" max="${kt.weight}" step="0.01" id="kpi-actual-${idx}" value="${existing}" style="width:60px;border:1px solid var(--line);border-radius:6px;padding:4px;"></td></tr>`; }).join('')}
     </tbody></table></div>
+    <div id="kpi-auto-note" style="font-size:12.5px;margin-bottom:8px;"></div>
     <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">حفظ التعديل</button>`, true);
   }
   if(m.type==='editInvoice'){
@@ -6703,14 +6755,14 @@ function renderModal(){
   if(m.type==='scan') return modalWrap('مسح رمز QR', `
     <div class="scan-stage" id="scan-stage"><div class="scan-msg" id="scan-msg"><span class="em">📷</span>جارِ محاولة تشغيل الكاميرا...</div></div>
     <p style="font-size:12px;color:var(--text-dim);text-align:center;margin:10px 0 0;">الاعتماد بمسح الكود بالكاميرا مباشرة بس.</p>`);
-  if(m.type==='confirmChecklist') return modalWrap('مراجعة واعتماد القائمة', `
+  if(m.type==='confirmChecklist'){ const _blk=approveBlockedForMe(S.scanCtx&&S.scanCtx.runId); return modalWrap('مراجعة واعتماد القائمة', `${_blk?`<div style="background:var(--coral-light);color:var(--coral);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.7;">⛔ مينفعش تعتمد القائمة — البنود ناقصة (${_blk.done}/${_blk.total}). تقدر بس تعمل "غير مطابق".</div>`:''}
     <div class="form-row"><label>ملاحظات (إلزامية لو غير مطابق)</label><textarea id="cf-notes"></textarea></div>
     <div class="form-row"><label>صورة إثبات (اختياري)</label>
       <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
       <img id="cf-photo-preview" class="photo-preview" style="display:none;">
     </div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} مطابق — اعتماد وإغلاق القائمة</button>
-    <button class="ghost-btn danger" style="width:100%;justify-content:center;margin-top:8px;" id="m-reject">${ICON.x(14)} غير مطابق — مطلوب إعادة الفحص</button>`);
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save" ${_blk?'disabled':''}>${ICON.check(14)} مطابق — اعتماد وإغلاق القائمة</button>
+    <button class="ghost-btn danger" style="width:100%;justify-content:center;margin-top:8px;" id="m-reject">${ICON.x(14)} غير مطابق — مطلوب إعادة الفحص</button>`); }
   return '';
 }
 function modalWrap(title, body, wide){
@@ -6782,6 +6834,7 @@ function bindModalEvents(){
     pestTypeSel.onchange=updatePestPrice; updatePestPrice();
   }
   const addKpiBtn=document.getElementById('add-kpi-btn');
+  if(document.getElementById('kpi-auto-note')) bindKpiAuto(!!addKpiBtn);
   if(addKpiBtn) addKpiBtn.onclick=async ()=>{
     const month=document.getElementById('m-kpi-month').value;
     if(!month){ toast('حدد الشهر',false); return; }
@@ -7163,6 +7216,12 @@ async function decodeFromFile(file){
   const data = await decodeQrFromFile(file);
   if(data) handleScannedCode(data); else toast('لم يتم التعرف على الرمز',false);
 }
+function taskRunIncomplete(runId){
+  const run=(S.taskRuns||[]).find(r=>r.id===runId); if(!run) return null;
+  const items=taskItemsOf(run.list_id); const done=items.filter(it=>taskItemDone(run,it.id)).length;
+  return items.length>done? { done, total:items.length } : null;
+}
+function approveBlockedForMe(runId){ return (S.profile&&S.profile.role==='hk_senior_supervisor')? taskRunIncomplete(runId) : null; }
 function taskRunUnlockedForMe(runId){
   const run=(S.taskRuns||[]).find(r=>r.id===runId); if(!run) return true;
   const l=(S.taskLists||[]).find(x=>x.id===run.list_id);
@@ -7226,6 +7285,12 @@ async function rejectTaskRun(){
 }
 async function submitTaskConfirm(){
   if(!taskRunUnlockedForMe(S.scanCtx&&S.scanCtx.runId)) return;
+  if(S.profile&&S.profile.role==='hk_senior_supervisor'){
+    const rid=S.scanCtx&&S.scanCtx.runId;
+    try{ const q=await sb.from('task_run_items').select('item_id,done').eq('run_id',rid); if(!q.error&&q.data) S.taskRunItems=(S.taskRunItems||[]).filter(x=>x.run_id!==rid).concat(q.data.map(x=>Object.assign({ run_id:rid },x))); }catch(e){}
+    const b=approveBlockedForMe(rid);
+    if(b){ toast('⛔ مينفعش تعتمد — البنود ناقصة ('+b.done+'/'+b.total+'). اعمل "غير مطابق" لو المشرف لسه ما خلّصش',false); return; }
+  }
   const notes=(document.getElementById('cf-notes')||{value:''}).value.trim();
   const patch={ status:'completed', verified_by:S.session.user.id, completed_at:new Date().toISOString(), notes, photo:pendingPhoto, review_status:'approved', reviewed_by:S.session.user.id };
   if(await dbUpdate('task_runs', S.scanCtx.runId, patch)){
