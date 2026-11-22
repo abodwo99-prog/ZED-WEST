@@ -1439,6 +1439,7 @@ function fvEngine(){
       if(!window.faceapi) await fvLoadScript(base+'dist/face-api.js');
       const fa=window.faceapi, m=base+'model';
       await fa.nets.tinyFaceDetector.loadFromUri(m); await fa.nets.faceLandmark68Net.loadFromUri(m); await fa.nets.faceRecognitionNet.loadFromUri(m);
+      try{ await fa.nets.ageGenderNet.loadFromUri(m); }catch(e){ console.warn('gender model',e); }   // اختياري: لو ماتحملش التسجيل بيشتغل والنوع يتحدد يدوي
       return fa; }catch(e){ last=e; } }
     throw last||new Error('engine');
   })().catch(e=>{ fvEngineP=null; throw e; });
@@ -1514,7 +1515,7 @@ function fvOpenScanner(opt){
       msg.textContent='جاري تحميل نموذج التعرف على الوجوه (أول مرة بياخد وقت)...';
       try{ fa=await fvEngine(); }catch(e){ msg.textContent=(typeof ZW!=='undefined'&&ZW.isOffline())? 'نموذج التعرف على الوجوه لسه ماتحمّلش على الجهاز — افتح التطبيق مرة وانت على إنترنت (ومستنى دقيقة) وبعدها هيشتغل أوفلاين' : 'فشل تحميل نموذج التعرف على الوجوه — تأكد من الإنترنت وجرّب تاني'; return; }
       msg.textContent=opt.selfie?'حط وجهك جوا الإطار':'حط وجه كل عامل جوا الإطار واحد واحد';
-      const detect=()=>fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks().withFaceDescriptors();
+      const detect=()=>{ let q=fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({ inputSize:opt.selfie?320:512, scoreThreshold:.5 })).withFaceLandmarks(); if(!opt.selfie && fa.nets.ageGenderNet && fa.nets.ageGenderNet.isLoaded) q=q.withAgeAndGender(); return q.withFaceDescriptors(); };
       const isGood=d=>opt.selfie? (d.detection.score>=.7 && inFrame(d.detection.box,.42)) : (d.detection.score>=.6 && inFrame(d.detection.box,.30));
       // التصوير يدوي: اللي بيصوّر هو اللي يدوس الزرار لما الإطار يبقى أخضر
       const loop=async()=>{
@@ -1555,7 +1556,7 @@ function fvOpenScanner(opt){
             for(const d of good){
               const e=Array.from(d.descriptor).map(x=>Math.round(x*1000)/1000);
               if(faces.some(f=>fvDist(f.e,e)<FV_DEDUP) || ((opt&&opt.seed)||[]).some(f=>fvDist(f.e,e)<FV_DEDUP)){ dup++; continue; }
-              faces.push({ e, t:fvCrop(video,d.detection.box) }); added++;
+              faces.push({ e, t:fvCrop(video,d.detection.box), g:(d.gender==='male'?'m':d.gender==='female'?'f':null) }); added++;
             }
           }
           if(added){ refresh(); fvBeep(); try{ navigator.vibrate&&navigator.vibrate(60); }catch(e){} frameEl.style.transition='none'; frameEl.style.background='rgba(61,220,132,.35)'; setTimeout(()=>{ frameEl.style.background=''; },180); }
@@ -1737,13 +1738,15 @@ function fvTeamCardHtml(){
   if(ses&&['calling','closed'].includes(ses.status)) return '';
   const open=fvEnrolOpen();
   const mine=(v.faces||[]).filter(f=>f.kind==='worker'&&f.owner_id===me);
-  const bm=mine.filter(f=>f.gender==='m'), gf=mine.filter(f=>f.gender==='f');
+  const nm=mine.filter(f=>f.gender==='m').length, nf=mine.filter(f=>f.gender==='f').length, nu=mine.length-nm-nf;
   const dis=open?'':'disabled';
+  const col=g=>g==='m'?'#3b8be6':g==='f'?'#d6579a':'#6c757d';
+  const thumbs=mine.length?`<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px;">${mine.map(f=>`<div style="position:relative;"><img data-fvz="1" src="${f.thumb}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid ${col(f.gender)};cursor:zoom-in;"><button data-fv-flip="${f.id}" title="غيّر النوع" style="position:absolute;bottom:-4px;left:-4px;border:0;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:800;color:#fff;background:${col(f.gender)};cursor:pointer;">${f.gender==='m'?'ولد':f.gender==='f'?'بنت':'؟'}</button></div>`).join('')}</div><div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">النوع بيتحدد أوتوماتيك من الوجه — لو غلط دوس على علامة (ولد/بنت) تحت الصورة وبدّلها.</div>`:'';
   return `<div class="card" style="margin-bottom:14px;"><div style="font-weight:900;font-size:16px;margin-bottom:4px;">🧑‍🤝‍🧑 تسجيل فريقي الصبح</div>
-    <div style="font-size:12.5px;color:${open?'var(--text-dim)':'var(--coral)'};margin-bottom:10px;">${open?'سجّل وجوه عمالتك لحد الساعة 10 ص — الولاد لوحدهم والبنات لوحدهم':'تسجيل العمالة الصباحي اتقفل الساعة 10 ص'}</div>
-    <div class="stat-row"><div class="stat blue"><div class="num">${bm.length}</div><div class="lbl">ولاد</div></div><div class="stat coral"><div class="num">${gf.length}</div><div class="lbl">بنات</div></div><div class="stat mint"><div class="num">${mine.length}</div><div class="lbl">إجمالي فريقي</div></div></div>
-    ${fvThumbs(bm.map(x=>x.thumb),'#3b8be6')}${fvThumbs(gf.map(x=>x.thumb),'#d6579a')}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button class="primary-btn" data-fv-team="m" ${dis}>${ICON.faceScan(16)} مسح الولاد</button><button class="primary-btn" data-fv-team="f" ${dis}>${ICON.faceScan(16)} مسح البنات</button>${mine.length?`<button class="ghost-btn" id="fv-team-reset" ${dis}>🗑️ إعادة فريقي من الأول</button>`:''}</div></div>`;
+    <div style="font-size:12.5px;color:${open?'var(--text-dim)':'var(--coral)'};margin-bottom:10px;">${open?'سجّل وجوه عمالتك لحد الساعة 10 ص — الولاد والبنات مع بعض، والنظام بيفرزهم':'تسجيل العمالة الصباحي اتقفل الساعة 10 ص'}</div>
+    <div class="stat-row"><div class="stat blue"><div class="num">${nm}</div><div class="lbl">ولاد</div></div><div class="stat coral"><div class="num">${nf}</div><div class="lbl">بنات</div></div>${nu?`<div class="stat amber"><div class="num">${nu}</div><div class="lbl">غير محدد</div></div>`:''}<div class="stat mint"><div class="num">${mine.length}</div><div class="lbl">إجمالي فريقي</div></div></div>
+    ${thumbs}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${mine.length?`<button class="primary-btn" id="fv-team-add" ${dis}>➕ إضافة وجوه (لو نسيت حد)</button>`:''}<button class="${mine.length?'ghost-btn':'primary-btn'}" id="fv-team-scan" ${dis}>${ICON.faceScan(16)} ${mine.length?'إعادة مسح وجوه الفريق من الأول':'مسح وجوه الفريق'}</button></div></div>`;
 }
 function fvWorkersAdminHtml(wF,enrolOpen){
   const groups=new Map();
@@ -1754,26 +1757,29 @@ function fvWorkersAdminHtml(wF,enrolOpen){
   h+=fvAdm()? fvTeamCardHtml() : '<div class="card" style="margin-bottom:14px;"><div style="font-size:12.5px;color:var(--text-dim);">تسجيل العمالة بيتم من كل مشرف لفريقه لحد 10 ص — الإدارة بتتابع هنا فقط.</div></div>';
   return h;
 }
-async function fvEnrolTeam(g){
+async function fvEnrolTeam(append){
   const v=S.verify, me=S.session.user.id;
   if(v.session&&v.session.status==='calling'){ toast('فيه تحقق شغّال دلوقتي — استنى لحد ما يخلص',false); return; }
   if(!fvEnrolOpen()){ toast('تسجيل الوجوه الصباحي اتقفل الساعة 10 ص',false); return; }
+  const had=(v.faces||[]).some(f=>f.kind==='worker'&&f.owner_id===me);
+  if(!append && had && !confirm('فيه وجوه متسجلة لفريقك — المسح الجديد هيستبدلها كلها. تكمل؟')) return;
   let seed=[];   // وجوه فريقي المسجّلة قبل كده: عشان ما يتسجّلش حد مرتين
-  try{ const q=await sb.from('verify_faces').select('emb').eq('date',S.today).eq('kind','worker').eq('owner_id',me); seed=((q&&q.data)||[]).map(x=>({ e:x.emb })).filter(x=>Array.isArray(x.e)); }catch(e){}
-  const r=await fvOpenScanner({ title:g==='m'?'تسجيل فريقي — الولاد':'تسجيل فريقي — البنات', selfie:false, zoneCheck:false, seed, finishLabel:'تم — رفع للإدارة' });
+  if(append){ try{ const q=await sb.from('verify_faces').select('emb').eq('date',S.today).eq('kind','worker').eq('owner_id',me); seed=((q&&q.data)||[]).map(x=>({ e:x.emb })).filter(x=>Array.isArray(x.e)); }catch(e){}
+    if(!seed.length && had) toast('تعذّر تحميل الوجوه المسجّلة للمقارنة — اتأكد إن العامل ماتصوّرش قبل كده',false); }
+  const r=await fvOpenScanner({ title:append?'إضافة وجوه لفريقي':'تسجيل وجوه فريقي', selfie:false, zoneCheck:false, seed, finishLabel:append?'تم — إضافة للوجوه المسجّلة':'تم الانتهاء من المسح — رفع للإدارة' });
   if(!r) return;
   if(!r.faces.length){ toast('مفيش وجوه اتسجلت',false); return; }
-  const res=await sb.rpc('verify_enrol_team',{ p_day:S.today, p_faces:r.faces.map(f=>({ e:f.e, t:f.t })), p_gender:g, p_append:true, p_captured:new Date().toISOString() });
+  const res=await sb.rpc('verify_enrol_team',{ p_day:S.today, p_faces:r.faces.map(f=>({ e:f.e, t:f.t, g:f.g||null })), p_gender:null, p_append:!!append, p_captured:new Date().toISOString() });
   if(res.error){ toast('تعذّر رفع الوجوه: '+res.error.message,false); return; }
   await loadVerify(); render();
-  toast(res.queued||ZW.isOffline()? ('اتحفظ '+r.faces.length+' وجه على الموبايل — هيترفعوا أول ما النت يرجع') : ('تم رفع '+r.faces.length+(g==='m'?' ولد':' بنت')),true);
+  toast(res.queued||ZW.isOffline()? ('اتحفظ '+r.faces.length+' وجه على الموبايل — هيترفعوا أول ما النت يرجع') : (append?('اتضاف '+r.faces.length+' وجه لفريقك'):('تم رفع '+r.faces.length+' وجه')),true);
 }
-async function fvTeamReset(){
-  if(!fvEnrolOpen()){ toast('تسجيل الوجوه الصباحي اتقفل الساعة 10 ص',false); return; }
-  if(!confirm('تمسح كل وجوه فريقك (ولاد وبنات) وتبدأ من الأول؟')) return;
-  const res=await sb.rpc('verify_enrol_team',{ p_day:S.today, p_faces:[], p_gender:'all', p_append:false, p_captured:new Date().toISOString() });
-  if(res.error){ toast('تعذّر المسح: '+res.error.message,false); return; }
-  await loadVerify(); render(); toast('اتمسح فريقك — ابدأ التسجيل من الأول',true);
+async function fvFlipGender(id){
+  const f=(S.verify.faces||[]).find(z=>z.id===id); if(!f) return;
+  const ng=f.gender==='m'?'f':'m';
+  const {error}=await sb.from('verify_faces').update({ gender:ng }).eq('id',id);
+  if(error){ toast('تعذّر التعديل: '+error.message,false); return; }
+  f.gender=ng; render();
 }
 function renderVerify(){
   const role=S.profile.role, v=S.verify, ses=v.session, z=v.zone;
@@ -1827,8 +1833,9 @@ function bindVerify(){
   if(b('fv-zone-btn')) b('fv-zone-btn').onclick=fvOpenZone;
   if(b('fv-call')) b('fv-call').onclick=fvStartCall;
   if(b('fv-run')) b('fv-run').onclick=fvRunNow;
-  document.querySelectorAll('[data-fv-team]').forEach(x=>x.onclick=()=>fvEnrolTeam(x.dataset.fvTeam));
-  if(b('fv-team-reset')) b('fv-team-reset').onclick=fvTeamReset;
+  if(b('fv-team-scan')) b('fv-team-scan').onclick=()=>fvEnrolTeam(false);
+  if(b('fv-team-add')) b('fv-team-add').onclick=()=>fvEnrolTeam(true);
+  document.querySelectorAll('[data-fv-flip]').forEach(x=>x.onclick=(ev)=>{ ev.stopPropagation(); fvFlipGender(x.dataset.fvFlip); });
   if(b('fv-enrol-worker')) b('fv-enrol-worker').onclick=()=>fvEnrolScan('worker');
   if(b('fv-enrol-worker-add')) b('fv-enrol-worker-add').onclick=()=>fvEnrolScan('worker',true);
   if(b('fv-enrol-sup')) b('fv-enrol-sup').onclick=()=>fvEnrolScan('supervisor');
