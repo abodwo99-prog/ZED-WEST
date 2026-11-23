@@ -3709,23 +3709,36 @@ function taskRunBadge(run){
   if(run.supervisor_marked_done) return '<span class="badge progress"><span class="dot"></span>بانتظار اعتماد المشرف الأول</span>';
   return '<span class="badge pending"><span class="dot"></span>قيد التنفيذ</span>';
 }
+const TASK_RUN_COLS='id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count';
+const TASK_RECENT_DAYS=14;   // التحميل العادي لآخر 14 يوم بس (توفير Egress) — التقارير بتجيب الأقدم عند الطلب
+function taskDateAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); }
 async function loadTaskData(){
-  // آخر 45 يوم على 3 شرائح: الـ API بيقطع أي استعلام عند 1000 صف — ولما عدد سطور task_runs عدّى 1000 مهام النهاردة كانت بتختفي من عند المشرفين
-  const dAgo=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); };
-  const cols='id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count';
-  const d45=dAgo(45), d30=dAgo(30), d15=dAgo(15);
-  const [lists, items, r1, r2, r3] = await Promise.all([
+  // الـ API بيقطع أي استعلام عند 1000 صف، فبنقسّم على شريحتين
+  const dOld=taskDateAgo(TASK_RECENT_DAYS), dMid=taskDateAgo(Math.round(TASK_RECENT_DAYS/2));
+  const [lists, items, r1, r2] = await Promise.all([
     dbSelect('task_lists'), dbSelect('task_items'),
-    sb.from('task_runs').select(cols).gte('date', d45).lt('date', d30),
-    sb.from('task_runs').select(cols).gte('date', d30).lt('date', d15),
-    sb.from('task_runs').select(cols).gte('date', d15)
+    sb.from('task_runs').select(TASK_RUN_COLS).gte('date', dOld).lt('date', dMid),
+    sb.from('task_runs').select(TASK_RUN_COLS).gte('date', dMid)
   ]);
   if(lists) S.taskLists=lists;
   if(items) S.taskItems=items;
-  const bad=[r1,r2,r3].find(x=>x.error);
+  const bad=[r1,r2].find(x=>x.error);
   if(bad){ console.error('task_runs', bad.error); toast('تعذّر تحميل المهمات المجدولة — '+bad.error.message,false); }
-  else S.taskRuns = [].concat(r1.data||[], r2.data||[], r3.data||[]);
+  else S.taskRuns = [].concat(r1.data||[], r2.data||[]);
   await loadTaskRunItems();
+}
+// أقدم من آخر 14 يوم: بيتحمّل مرة واحدة لما التقارير تطلبه (من تاريخ معيّن)
+async function ensureTaskHistory(from){
+  const dOld=taskDateAgo(TASK_RECENT_DAYS);
+  if(!from || from>=dOld) return false;
+  if(S._taskHistFrom && S._taskHistFrom<=from) return false;
+  const upTo=S._taskHistFrom || dOld; let cur=from, rows=[];
+  try{
+    while(cur<upTo){ const d=new Date(cur+'T00:00:00'); d.setDate(d.getDate()+15); let nxt=dateStr(d); if(nxt>upTo) nxt=upTo;
+      const r=await sb.from('task_runs').select(TASK_RUN_COLS).gte('date',cur).lt('date',nxt);
+      if(r.error) throw r.error; rows=rows.concat(r.data||[]); cur=nxt; }
+  }catch(e){ console.error('task history',e); toast('تعذّر تحميل المهمات القديمة للتقرير',false); return false; }
+  S.taskRunsHist=(S.taskRunsHist||[]).concat(rows); S._taskHistFrom=from; return true;
 }
 async function loadTaskRunItems(){
   const ids=(S.taskRuns||[]).filter(r=>r.date===S.today).map(r=>r.id);
@@ -6047,7 +6060,7 @@ function getReportData(){
     pest: (S.pest||[]).filter(p=>inRange(p.scheduled_date)),
     facade: (S.facade||[]).filter(f=>inRange(f.date)),
     waste: (S.waste||[]).filter(w=>inRange(w.date)),
-    checklist: (S.taskRuns||[]).filter(c=>inRange(c.date)).map(c=>({...c, list_name:((S.taskLists||[]).find(l=>l.id===c.list_id)||{}).name||''})),
+    checklist: (S.taskRuns||[]).concat(S.taskRunsHist||[]).filter(c=>inRange(c.date)).map(c=>({...c, list_name:((S.taskLists||[]).find(l=>l.id===c.list_id)||{}).name||''})),
     attendance: S.attendance.filter(a=>inRange(a.date)),
   };
 }
@@ -6110,20 +6123,22 @@ function renderReportsMain(){
   </tbody></table></div>`;
 }
 function bindReportsMain(){
+  ensureTaskHistory(S.reportFrom).then(ok=>{ if(ok) render(); });   // الافتراضي آخر 30 يوم → بيجيب المهمات الأقدم من 14 يوم مرة واحدة
   document.getElementById('rp-go').onclick=()=>{
     S.reportFrom=document.getElementById('rp-from').value;
     S.reportTo=document.getElementById('rp-to').value;
     S.reportType=document.getElementById('rp-type').value;
-    render();
+    ensureTaskHistory(S.reportFrom).then(()=>render());
   };
   document.getElementById('rp-export').onclick=exportReportExcel;
   ['rp-from','rp-to','rp-type'].forEach(id=>{ const el=document.getElementById(id); if(el) el.onchange=()=>document.getElementById('rp-go').click(); });
 }
-function exportReportExcel(){
+async function exportReportExcel(){
   if(typeof XLSX==='undefined'){ toast('مكتبة Excel لم تُحمّل', false); return; }
   // خُد القيم الحالية من الخانات (مش لازم تدوس تحديث الأول)
   { const f=document.getElementById('rp-from'), t=document.getElementById('rp-to'), ty=document.getElementById('rp-type');
     if(f&&f.value) S.reportFrom=f.value; if(t&&t.value) S.reportTo=t.value; if(ty) S.reportType=ty.value; }
+  await ensureTaskHistory(S.reportFrom);
   const type=S.reportType||'all';
   const want=(k)=> type==='all' || type===k;
   const data = getReportData();
