@@ -3710,15 +3710,21 @@ function taskRunBadge(run){
   return '<span class="badge pending"><span class="dot"></span>قيد التنفيذ</span>';
 }
 async function loadTaskData(){
-  const d=new Date(); d.setDate(d.getDate()-45); const from=dateStr(d);
-  const [lists, items, runsRes] = await Promise.all([
+  // آخر 45 يوم على 3 شرائح: الـ API بيقطع أي استعلام عند 1000 صف — ولما عدد سطور task_runs عدّى 1000 مهام النهاردة كانت بتختفي من عند المشرفين
+  const dAgo=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); };
+  const cols='id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count';
+  const d45=dAgo(45), d30=dAgo(30), d15=dAgo(15);
+  const [lists, items, r1, r2, r3] = await Promise.all([
     dbSelect('task_lists'), dbSelect('task_items'),
-    sb.from('task_runs').select('id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count').gte('date', from)
+    sb.from('task_runs').select(cols).gte('date', d45).lt('date', d30),
+    sb.from('task_runs').select(cols).gte('date', d30).lt('date', d15),
+    sb.from('task_runs').select(cols).gte('date', d15)
   ]);
   if(lists) S.taskLists=lists;
   if(items) S.taskItems=items;
-  if(runsRes.error){ console.error('task_runs', runsRes.error); toast('تعذّر تحميل المهمات المجدولة — '+runsRes.error.message,false); }
-  else S.taskRuns = runsRes.data||[];
+  const bad=[r1,r2,r3].find(x=>x.error);
+  if(bad){ console.error('task_runs', bad.error); toast('تعذّر تحميل المهمات المجدولة — '+bad.error.message,false); }
+  else S.taskRuns = [].concat(r1.data||[], r2.data||[], r3.data||[]);
   await loadTaskRunItems();
 }
 async function loadTaskRunItems(){
