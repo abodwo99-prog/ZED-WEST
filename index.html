@@ -926,13 +926,15 @@ async function kpiPenaltyHK(month,weight){
   const mi=kpiMonthInfo(month), out={ pts:0, total:0, failed:0, activeDays:0, D:mi.D, weight };
   if(!mi.days.length) return out;
   const [runs,lists,items]=await Promise.all([
-    fmAllRows(()=>sb.from('task_runs').select('id,date,list_id,status,review_status').gte('date',mi.first).lte('date',mi.last)),
-    fmAllRows(()=>sb.from('task_lists').select('id')), fmAllRows(()=>sb.from('task_items').select('id,list_id,active')) ]);
+    fmAllRows(()=>sb.from('task_runs').select('id,date,list_id,status,review_status,assigned_to,assigned_at').gte('date',mi.first).lte('date',mi.last)).catch(()=>fmAllRows(()=>sb.from('task_runs').select('id,date,list_id,status,review_status,assigned_to').gte('date',mi.first).lte('date',mi.last))),
+    fmAllRows(()=>sb.from('task_lists').select('id,shift')), fmAllRows(()=>sb.from('task_items').select('id,list_id,active')) ]);
   const listIds=new Set(lists.map(l=>l.id)), act={}; items.forEach(i=>{ if(i.active!==false) (act[i.list_id]=act[i.list_id]||[]).push(i.id); });
   const dr=runs.filter(r=>listIds.has(r.list_id) && mi.days.includes(r.date)), doneSet=new Set(), ids=dr.map(r=>r.id);
   for(let i=0;i<ids.length;i+=80){ const rows=await fmAllRows(()=>sb.from('task_run_items').select('run_id,item_id').in('run_id',ids.slice(i,i+80)).eq('done',true)); rows.forEach(x=>doneSet.add(x.run_id+'|'+x.item_id)); }
   const byDay={};
-  dr.forEach(r=>{ const ok=r.status==='completed' && r.review_status!=='rejected' && (act[r.list_id]||[]).every(id=>doneSet.has(r.id+'|'+id)); const d=byDay[r.date]=byDay[r.date]||{ n:0, bad:0 }; d.n++; if(!ok) d.bad++; });
+  const lmap={}; lists.forEach(l=>lmap[l.id]=l);
+  dr.forEach(r=>{ const dist=(r.date>=DIST_RULE_FROM)? distRunStatus(r,lmap[r.list_id],null) : null;   // ماتوزعتش / اتوزعت متأخر = المهمة غير منفّذة
+    const ok=!dist && r.status==='completed' && r.review_status!=='rejected' && (act[r.list_id]||[]).every(id=>doneSet.has(r.id+'|'+id)); const d=byDay[r.date]=byDay[r.date]||{ n:0, bad:0 }; d.n++; if(!ok) d.bad++; });
   return kpiPenaltyFin(out,byDay,weight,mi.D);
 }
 async function kpiPenaltyPest(month,phase,weight){
@@ -2486,6 +2488,41 @@ function serviceCard(color, icon, label, valueHtml, tabId){
     <div class="lbl">${esc(label)}</div>
   </div>`;
 }
+
+/* ---- المهام اللي المشرف الأول ماوزعهاش: بتظهر للإدارة بعد قفل التوزيع وبتتخصم من الـ KPI ---- */
+const DIST_RULE_FROM='2026-11-24';   // القاعدة بتسري من تاريخ ده — قبله "لكل مشرفيني" كان وضع عادي
+function distDeadlineMin(list){ return (list&&list.shift==='morning')?10*60 : 17*60; }   // صباحي: 10 ص — مسائي أو الاتنين: 5 م
+function distRunStatus(r,list,nowMin){
+  // 'none' = ماتوزعتش بعد قفل التوزيع، 'late' = اتوزعت بعد القفل، null = تمام أو لسه الوقت متاح
+  const dl=distDeadlineMin(list);
+  if(!r.assigned_to) return (nowMin==null||nowMin>=dl)? 'none' : null;
+  if(r.assigned_at){
+    const t=new Date(r.assigned_at); if(isNaN(t)) return null;
+    const parts=new Intl.DateTimeFormat('en-CA',{ timeZone:'Africa/Cairo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(t).reduce((o,x)=>(o[x.type]=x.value,o),{});
+    const d=parts.year+'-'+parts.month+'-'+parts.day, m=(+parts.hour)*60+(+parts.minute);
+    if(d>r.date || (d===r.date && m>dl)) return 'late';
+  }
+  return null;
+}
+function undistributedToday(){
+  if(S.today<DIST_RULE_FROM) return [];
+  const nowMin=fvCairoMin(), out=[];
+  (S.taskRuns||[]).filter(r=>r.date===S.today).forEach(r=>{
+    const l=(S.taskLists||[]).find(x=>x.id===r.list_id); if(!l) return;
+    const st=distRunStatus(r,l,nowMin); if(!st) return;
+    const zt=(S.zoneTasks||[]).find(x=>x.list_id===l.id), z=zt&&(S.hkZones||[]).find(x=>x.id===zt.zone_id);
+    const sen=z&&(S.zoneAssign||[]).filter(x=>x.zone_id===z.id&&x.senior_id).map(x=>shownNameRaw(x.senior_id)||'').filter(Boolean)[0];
+    out.push({ l, st, zone:z&&z.name, senior:sen });
+  });
+  return out;
+}
+function undistributedCardHtml(){
+  const role=S.profile&&S.profile.role; if(!['admin','opm','hk_manager'].includes(role)) return '';
+  const u=undistributedToday(); if(!u.length) return '';
+  return `<div class="card" style="margin-bottom:14px;border-color:var(--coral);"><div style="font-weight:900;color:var(--coral);margin-bottom:4px;">⛔ مهام المشرف الأول ماوزعهاش بعد قفل التوزيع (${u.length})</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;line-height:1.8;">القفل: 10 ص للصباحي و5 م للمسائي. المهمة دي بتتحسب غير منفّذة في الـ KPI لليوم كله حتى لو اتنفذت.</div>
+    ${u.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px dashed var(--line);font-size:13px;"><span><b>${esc(x.l.name)}</b> <span class="tag-shift ${x.l.shift||'both'}">${SHIFT_LABEL[x.l.shift||'both']}</span></span><span style="color:var(--text-dim);">${x.zone?esc(x.zone):''}${x.senior?' — '+esc(x.senior):''} · <b style="color:var(--coral);">${x.st==='late'?'اتوزعت متأخر':'لم تُوزَّع'}</b></span></div>`).join('')}</div>`;
+}
 function renderHome(){
   const role = S.profile.role;
   const roleTabs = allowedTabIds(role);
@@ -2516,6 +2553,7 @@ function renderHome(){
   return `
   <div class="stat-row">${extraCard}${attEditCard}${cardsHtml}${attendanceCard}</div>
   ${(role==='admin'||role==='opm'||role==='hk_manager')? `<div class="card" style="margin-bottom:14px;overflow-x:auto;"><h3 style="margin-top:0;font-size:14px;">هيكل التوزيع اليومي</h3><div id="orgChart"></div></div>` : ''}
+  ${undistributedCardHtml()}
   <div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
       <h3 style="margin:0;font-size:14.5px;">المهمات المجدولة اليوم</h3>
@@ -3710,16 +3748,16 @@ function taskRunBadge(run){
   return '<span class="badge pending"><span class="dot"></span>قيد التنفيذ</span>';
 }
 const TASK_RUN_COLS='id,date,list_id,status,supervisor_marked_done,supervisor_marked_done_at,verified_by,completed_at,notes,assigned_to,marked_by,review_status,review_note,reviewed_by,rework_count';
+const TASK_RUN_COLS_AT=TASK_RUN_COLS+',assigned_at';   // assigned_at بيتضاف بـ update_v42 — لو لسه مش موجود بنرجع للأعمدة القديمة
 const TASK_RECENT_DAYS=14;   // التحميل العادي لآخر 14 يوم بس (توفير Egress) — التقارير بتجيب الأقدم عند الطلب
 function taskDateAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); }
 async function loadTaskData(){
   // الـ API بيقطع أي استعلام عند 1000 صف، فبنقسّم على شريحتين
   const dOld=taskDateAgo(TASK_RECENT_DAYS), dMid=taskDateAgo(Math.round(TASK_RECENT_DAYS/2));
-  const [lists, items, r1, r2] = await Promise.all([
-    dbSelect('task_lists'), dbSelect('task_items'),
-    sb.from('task_runs').select(TASK_RUN_COLS).gte('date', dOld).lt('date', dMid),
-    sb.from('task_runs').select(TASK_RUN_COLS).gte('date', dMid)
-  ]);
+  const fetchRuns=(cols)=>Promise.all([ sb.from('task_runs').select(cols).gte('date', dOld).lt('date', dMid), sb.from('task_runs').select(cols).gte('date', dMid) ]);
+  const [lists, items, rr] = await Promise.all([ dbSelect('task_lists'), dbSelect('task_items'), fetchRuns(S._noAssignedAt?TASK_RUN_COLS:TASK_RUN_COLS_AT) ]);
+  let [r1, r2]=rr;
+  if(!S._noAssignedAt && [r1,r2].some(x=>x.error && /assigned_at/i.test(x.error.message||''))){ S._noAssignedAt=true; [r1,r2]=await fetchRuns(TASK_RUN_COLS); }
   if(lists) S.taskLists=lists;
   if(items) S.taskItems=items;
   const bad=[r1,r2].find(x=>x.error);
@@ -4463,9 +4501,9 @@ function renderSeniorZoneSection(){
   return `<div class="card" style="margin-bottom:16px;">
     <h3 style="margin-top:0;">${sh==='evening'?'المسائية — من غير زونات':'زوني: '+esc(zs.map(x=>x.name).join(' + '))} <span class="tag-shift ${sh}">${SHIFT_LABEL[sh]}</span></h3>
     <div style="font-size:13px;margin-bottom:10px;"><b>المشرفون اللي معايا:</b> ${sups.length? sups.map(a=>esc(shownName(a.supervisor_id))).join('، ') : '<span style="color:var(--text-dim);">لسه مدير الموقع ما ضمّش مشرفين ليك</span>'}</div>
-    <h4 style="font-size:13.5px;margin:12px 0 6px;">توزيع المهمات على مشرفيني</h4>
+    <h4 style="font-size:13.5px;margin:12px 0 2px;">توزيع المهمات على مشرفيني</h4><div style="font-size:11.5px;color:var(--coral);margin-bottom:6px;">لازم توزّع كل مهمة على مشرف بعينه قبل ${sh==='morning'?'10 ص':'5 م'} — المهمة اللي ماتتوزعش بتتخصم من الـ KPI وبتظهر للإدارة.</div>
     ${lists.length? lists.map(l=>{ const run=taskRunOf(l.id); if(!run) return ''; const locked=run.status==='completed';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;"><span style="font-size:13px;"><b>${esc(l.name)}</b> ${taskTimerHtml(l)}</span><select data-task-assign="${run.id}" ${locked?'disabled':''} style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;"><option value="">— لكل مشرفيني —</option>${sups.map(a=>`<option value="${a.supervisor_id}" ${run.assigned_to===a.supervisor_id?'selected':''}>${esc(shownName(a.supervisor_id))}</option>`).join('')}</select></div>`; }).join('') : '<p style="font-size:12.5px;color:var(--text-dim);">مفيش مهمات مجدولة مربوطة بزونك النهاردة.</p>'}
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;"><span style="font-size:13px;"><b>${esc(l.name)}</b> ${taskTimerHtml(l)}</span><select data-task-assign="${run.id}" ${locked?'disabled':''} style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;"><option value="">— لم يتم التوزيع —</option>${sups.map(a=>`<option value="${a.supervisor_id}" ${run.assigned_to===a.supervisor_id?'selected':''}>${esc(shownName(a.supervisor_id))}</option>`).join('')}</select></div>`; }).join('') : '<p style="font-size:12.5px;color:var(--text-dim);">مفيش مهمات مجدولة مربوطة بزونك النهاردة.</p>'}
   </div>`;
 }
 function renderWorkerCountsView(){
