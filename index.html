@@ -1226,15 +1226,11 @@ const ICON = {
 /* ============================= v4: shared helpers (zones / assignments / timers / urgent) ============================= */
 Object.assign(S,{ hkZones:[], zoneTasks:[], zoneAssign:[], supAssign:[], workerCounts:[], laborDist:[], urgent:[], seenUrgent:new Set(), urgentSig:'', openTaskRev:new Set() });
 function userName(id){ const u=(S.users||[]).find(x=>x.id===id); return u? (u.full_name||'') : ''; }
-const GENERIC_SV=/^\s*hk[\s_-]*sv[\s_-]*\d+\s*$/i;   // account labels like "HK SV 3" — shown only in the cards handover screen
-function shownNameRaw(id){
-  const p=presenceOf(id); const a=p&&p.actual_name&&String(p.actual_name).trim(); if(a&&!GENERIC_SV.test(a)) return a;
-  const h=cardHolderOf(id); if(h&&!GENERIC_SV.test(h)) return h;
-  const u=userName(id); return GENERIC_SV.test(u)?'':u;
-}
+const GENERIC_SV=/(?!)/;   // مبقاش فيه اسم "كارت" مخفي: كل مستخدم بيظهر باسمه من حسابه (استلام الكروت اتلغى)
+function shownNameRaw(id){ return userName(id); }
 function shownName(id){ return shownNameRaw(id)||'بدون اسم'; }
 const cleanStored=v=>{ v=String(v==null?'':v); return GENERIC_SV.test(v)?'':v; };
-function plainName(id){ const h=cardHolderOf(id); if(h&&!GENERIC_SV.test(h)) return h; const u=userName(id); return GENERIC_SV.test(u)?'بدون اسم':u; }
+function plainName(id){ return userName(id)||'بدون اسم'; }
 function myName(){ const me=S.session&&S.session.user&&S.session.user.id; const r=me?shownNameRaw(me):''; if(r) return r; const f=(S.profile&&S.profile.full_name)||''; return GENERIC_SV.test(f)?'':f; }
 function renderGreeting(){
   const hr=Math.floor(cairoMinutes()/60);
@@ -1342,7 +1338,7 @@ async function loadLabor(){ const r=await dbSelectQuiet('hk_labor_distribution',
 const TAB_ICON = { home:'home', deliveries:'keyhand', sideservices:'deskwork', verify:'faceScan', logs:'list', orders:'dollar', pest:'bug', facade:'building', waste:'trash2', tasks:'list', emergency:'alert', qrsheet:'printer', attendance:'idcard', cards:'idcard', violations:'alert', distribution:'users', complaints:'idcard', suppliers:'building', users:'users', reports:'chart', today:'list', myname:'idcard', zones:'pin2', urgent:'alert', adminpanel:'users', inbox:'mail' };
 
 /* ===== Admin Panel (admin / OPM): sub-screens grouped under one tab ===== */
-const AP_SUBS=[['zones','الزونات'],['tasks','المهمات المجدولة'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي'],['cards','استلام الكروت']];
+const AP_SUBS=[['zones','الزونات'],['tasks','المهمات المجدولة'],['users','المستخدمون'],['reports','التقارير'],['logs','سجل النشاط'],['myname','بياناتي']];
 function isApStaff(role){ return role==='admin'||role==='opm'; }
 function isApSub(tab){ return AP_SUBS.some(s=>s[0]===tab); }
 function navOn(id){ return S.tab===id || (id==='adminpanel' && isApStaff(S.profile&&S.profile.role) && isApSub(S.tab)); }
@@ -2386,7 +2382,6 @@ function renderTabBodyInner(){
     case 'waste': return renderWaste();
     case 'tasks': return S.profile.role==='hk_manager' ? renderTasksManager() : (S.tasksQr ? renderTasksQrView() : renderTasksAdmin());
     case 'zones': return renderZones();
-    case 'cards': return renderCards();
     case 'violations': return renderViolations();
     case 'urgent': return renderUrgent();
     case 'emergency': return renderEmergency();
@@ -2416,7 +2411,6 @@ function bindTabEvents(){
     case 'waste': bindWaste(); break;
     case 'tasks': if(S.profile.role==='hk_manager') bindTasksManager(); else if(S.tasksQr) bindTasksQrView(); else bindTasksAdmin(); break;
     case 'zones': bindZones(); break;
-    case 'cards': if(S.profile&&(S.profile.role==='admin'||S.profile.role==='opm')) bindCards(); break;
     case 'violations': bindViolations(); break;
     case 'urgent': bindUrgent(); break;
     case 'emergency': bindEmergency(); break;
@@ -4373,7 +4367,7 @@ function renderPresencePart(sh){
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);gap:8px;flex-wrap:wrap;${lock?'opacity:.55;':''}">
       <span style="font-size:13px;">${esc(shownName(u.id))}${(mine&&mine.virtual)?' <span style="font-size:11px;color:var(--amber);font-weight:700;">(مرحّل من الصباحية)</span>':''}${lock?` <span style="font-size:11px;color:var(--text-dim);">(مسجّل حاضر في الوردية ${PRES_WINDOWS[other].name})</span>`:''}${dbl?` <span style="font-size:11px;color:var(--amber);font-weight:700;">(حضر الصباحية — لو سجّلته حاضر هيتحسب دوبل شيفت ويتبعت إشعار للإدارة)</span>`:''}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <input data-presence-name="${u.id}" value="${esc(actualName)}" placeholder="اسم الحاضر فعليًا" ${lock?'disabled':dis} style="${selStyle}width:130px;">
+        
         <select data-presence-select="${u.id}" ${lock?'disabled':dis} style="border:1px solid ${selCol};color:${selCol};border-radius:8px;padding:5px 8px;font-size:12px;font-weight:800;">
           <option value="1" ${val==='1'?'selected':''}>${dbl?'حاضر (دوبل شيفت)':'حاضر'}</option>
           <option value="0" ${val==='0'?'selected':''}>غائب</option>
@@ -4562,48 +4556,10 @@ function bindDistributionExtra(){
 
 /* ---- Zones screen ---- */
 
-/* ============================= CARDS HANDOVER (استلام الكروت) ============================= */
+/* استلام الكروت اتلغى: كل مستخدم باسمه من حسابه. الدوال دي فاضية عشان أي نداء قديم ما يكسرش */
 Object.assign(S,{ cardHolders:[] });
-let cardsWarned=false;
-async function loadCardHolders(){
-  const {data,error}=await sb.from('card_handover').select('*');
-  if(error){ console.warn('card_handover',error.message); if(!cardsWarned){ cardsWarned=true; toast('جدول استلام الكروت ناقص في Supabase — شغّل ملف update_v10.sql',false); } return; }
-  S.cardHolders=data||[];
-}
-function cardHolderOf(userId){ const r=(S.cardHolders||[]).find(x=>x.user_id===userId); return r? String(r.holder_name||'').trim() : ''; }
-const CARD_ROLES=['hk_manager','hk_admin','hk_senior_supervisor','supervisor','fm_dispatcher'];
-const CARD_ROLE_LABEL={ hk_manager:'مدير الموقع', hk_admin:'إداري HK', hk_senior_supervisor:'المشرفون الأوائل', supervisor:'المشرفون', fm_dispatcher:'FM Dispatcher' };
-function renderCards(){
-  if(!S.profile||(S.profile.role!=='admin'&&S.profile.role!=='opm')) return `<div class="card" style="text-align:center;padding:28px;color:var(--text-dim);">🔒 شاشة استلام الكروت متاحة للأدمن وOPM فقط.</div>`;
-  const canEdit=['admin','opm','hk_admin'].includes(S.profile.role);
-  const users=(S.users||[]).filter(u=>u.active && CARD_ROLES.includes(u.role))
-    .sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'ar',{numeric:true}));
-  const got=users.filter(u=>cardHolderOf(u.id)).length;
-  const groups=CARD_ROLES.map(r=>({ r, list:users.filter(u=>u.role===r) })).filter(g=>g.list.length);
-  return `<p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.8;">سجّل اسم مستلم كل كارت دخول. الاسم ده بيظهر قدام اسم الكارت في شاشة تحديد الحضور وبيتكتب لوحده في خانة "اسم الحاضر فعليًا"، ومتقدر تغيّره هناك لو حد تاني استلم الكارت في اليوم ده.</p>
-  <div class="stat-row"><div class="stat mint"><div class="num">${got}</div><div class="lbl">كروت اتسجّل مستلمها</div></div><div class="stat amber"><div class="num">${users.length-got}</div><div class="lbl">كروت لسه ما اتسجّلش مستلمها</div></div></div>
-  ${groups.length? groups.map(g=>`<div class="card" style="margin-bottom:14px;"><h3 style="margin-top:0;">${CARD_ROLE_LABEL[g.r]}</h3>
-    ${g.list.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;"><span style="font-size:13px;font-weight:700;">🪪 ${esc(u.full_name)}</span><input data-card-name="${u.id}" value="${esc(cardHolderOf(u.id))}" placeholder="اسم مستلم الكارت" ${canEdit?'':'disabled'} style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;min-width:170px;flex:1;max-width:260px;"></div>`).join('')}
-  </div>`).join('') : '<div class="empty-state"><span class="em">🪪</span>مفيش كروت للعرض</div>'}
-  ${canEdit?`<button class="primary-btn" id="cards-save">${ICON.check(14)} حفظ مستلمي الكروت</button>`:'<p style="font-size:12px;color:var(--text-dim);">عرض فقط — التسجيل من إداري HK أو الإدارة.</p>'}`;
-}
-function bindCards(){
-  const btn=document.getElementById('cards-save'); if(!btn) return;
-  btn.onclick=async ()=>{
-    const ups=[], dels=[];
-    document.querySelectorAll('[data-card-name]').forEach(inp=>{
-      const id=inp.dataset.cardName, v=inp.value.trim(), old=cardHolderOf(id);
-      if(v===old) return;
-      if(v) ups.push({ user_id:id, holder_name:v, updated_by:S.session.user.id, updated_at:new Date().toISOString() }); else dels.push(id);
-    });
-    if(!ups.length && !dels.length){ toast('مفيش تغيير للحفظ',false); return; }
-    btn.disabled=true;
-    if(ups.length){ const r=await sb.from('card_handover').upsert(ups,{onConflict:'user_id'}); if(r.error){ console.error(r.error); toast('حصل خطأ: '+r.error.message,false); btn.disabled=false; return; } }
-    if(dels.length){ const r=await sb.from('card_handover').delete().in('user_id',dels); if(r.error){ console.error(r.error); toast('حصل خطأ: '+r.error.message,false); btn.disabled=false; return; } }
-    await loadCardHolders(); render(); toast('تم حفظ مستلمي الكروت',true);
-  };
-}
-
+async function loadCardHolders(){ return; }
+function cardHolderOf(userId){ return ''; }
 
 /* ============================= CLIENT VIOLATIONS (مخالفات العملاء) ============================= */
 Object.assign(S,{ violations:[], violPhotos:{}, violOpen:new Set(), violDraft:null });
@@ -5892,7 +5848,7 @@ function startUrgentPoll(){
 /* ============================= USERS (admin) ============================= */
 function renderUsers(){
   return `
-  <div class="toolbar"><button class="primary-btn" id="add-user-btn">${ICON.plus()} إضافة مستخدم جديد</button><button class="ghost-btn" id="bulk-sv-btn">${ICON.users(14)} إضافة مشرفين HK SV دفعة واحدة</button></div>
+  <div class="toolbar"><button class="primary-btn" id="add-user-btn">${ICON.plus()} إضافة مستخدم جديد</button><button class="ghost-btn" id="bulk-sv-btn">${ICON.users(14)} إضافة مشرفين HK SV دفعة واحدة</button>${(S.users||[]).filter(u=>!u.active&&u.id!==S.session.user.id).length?`<button class="ghost-btn danger" id="del-susp-btn">${ICON.trash()} حذف الموقوفين نهائيًا (${(S.users||[]).filter(u=>!u.active&&u.id!==S.session.user.id).length})</button>`:''}</div>
   <div class="tbl-wrap"><table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>دخول QR</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{
     const qrRow = (S.qrTokens||[]).find(x=>x.user_id===u.id);
@@ -5919,6 +5875,16 @@ function renderUsers(){
 function bindUsers(){
   document.getElementById('add-user-btn').onclick=()=>{ S.modal={type:'addUser'}; render(); };
   document.getElementById('bulk-sv-btn').onclick=()=>{ S.modal={type:'bulkSupervisors'}; render(); };
+  const dsb=document.getElementById('del-susp-btn');
+  if(dsb) dsb.onclick=async ()=>{
+    const list=(S.users||[]).filter(u=>!u.active&&u.id!==S.session.user.id); if(!list.length) return;
+    if(!confirm('هتمسح نهائيًا '+list.length+' مستخدم موقوف:\n\n'+list.map(u=>'• '+(u.full_name||'')+' — '+(u.email||'')).join('\n')+'\n\nمينفعش التراجع. تكمل؟')) return;
+    dsb.disabled=true; let ok=0; const failed=[];
+    for(const u of list){ try{ const res=await callAdminUsersFn({ action:'delete', user_id:u.id }); if(res&&res.error) failed.push((u.full_name||u.email)+' ('+res.error+')'); else ok++; }catch(e){ failed.push((u.full_name||u.email)+' ('+(e.message||e)+')'); } }
+    await loadUsers(); render();
+    toast('تم حذف '+ok+' مستخدم موقوف'+(failed.length?' — وتعذّر '+failed.length:''), !failed.length);
+    if(failed.length){ console.error('delete suspended failed',failed); alert('تعذّر حذف:\n'+failed.join('\n')); }
+  };
   document.querySelectorAll('[data-save-user]').forEach(b=>b.onclick=async ()=>{
     const id=b.dataset.saveUser;
     const full_name=document.querySelector(`[data-u-name="${id}"]`).value.trim();
