@@ -3775,9 +3775,31 @@ async function ensureTaskHistory(from){
 async function loadTaskRunItems(){
   const ids=(S.taskRuns||[]).filter(r=>r.date===S.today).map(r=>r.id);
   if(!ids.length){ S.taskRunItems=[]; return; }
-  const {data,error}=await sb.from('task_run_items').select('*').in('run_id',ids);
-  if(error){ console.error('task_run_items',error); return; }
-  S.taskRunItems=data||[];
+  let all=[];
+  for(let k=0;k<ids.length;k+=25){   // شرائح: عشان ما نتخطاش حد الـ1000 صف
+    const {data,error}=await sb.from('task_run_items').select('*').in('run_id',ids.slice(k,k+25));
+    if(error){ console.error('task_run_items',error); return; }
+    all=all.concat(data||[]);
+  }
+  S.taskRunItems=all;
+}
+// تحديث خفيف: مهام النهاردة وبنودها بس (بدل تحميل 14 يوم) — بيستخدمه المشرف والمشرف الأول
+async function refreshTodayTasks(){
+  const cols=S._noAssignedAt?TASK_RUN_COLS:TASK_RUN_COLS_AT;
+  let r=await sb.from('task_runs').select(cols).eq('date',S.today);
+  if(r.error && /assigned_at/i.test(r.error.message||'')){ S._noAssignedAt=true; r=await sb.from('task_runs').select(TASK_RUN_COLS).eq('date',S.today); }
+  if(r.error||!r.data) return false;
+  S.taskRuns=(S.taskRuns||[]).filter(x=>x.date!==S.today).concat(r.data);
+  await loadTaskRunItems(); return true;
+}
+// مهمة واحدة طازة من الداتا بيز (قبل ما المشرف الأول يراجع ويعتمد)
+async function refreshRunFresh(runId){
+  try{
+    const cols=S._noAssignedAt?TASK_RUN_COLS:TASK_RUN_COLS_AT;
+    const [a,b]=await Promise.all([ sb.from('task_runs').select(cols).eq('id',runId), sb.from('task_run_items').select('*').eq('run_id',runId) ]);
+    if(!a.error && a.data && a.data[0]) S.taskRuns=(S.taskRuns||[]).filter(x=>x.id!==runId).concat(a.data[0]);
+    if(!b.error && b.data) S.taskRunItems=(S.taskRunItems||[]).filter(x=>x.run_id!==runId).concat(b.data);
+  }catch(e){ console.error('refreshRunFresh',e); }
 }
 async function ensureTodayTaskRuns(){
   const date=S.today;
@@ -6786,7 +6808,7 @@ function renderModal(){
       <label class="ghost-btn file-btn" style="display:block;text-align:center;">${ICON.camera()} إضافة صورة<input type="file" accept="image/*" capture="environment" id="cf-photo"></label>
       <img id="cf-photo-preview" class="photo-preview" style="display:none;">
     </div>
-    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save" ${_blk?'disabled':''}>${ICON.check(14)} مطابق — اعتماد وإغلاق القائمة</button>
+    <button class="primary-btn" style="width:100%;justify-content:center;" id="m-save">${ICON.check(14)} مطابق — اعتماد وإغلاق القائمة</button>
     <button class="ghost-btn danger" style="width:100%;justify-content:center;margin-top:8px;" id="m-reject">${ICON.x(14)} غير مطابق — مطلوب إعادة الفحص</button>`); }
   return '';
 }
@@ -7261,18 +7283,18 @@ function handleScannedCode(code){
   if(run.list_id !== listId){ toast('هذا الرمز يخص قائمة مختلفة',false); return; }
   if(!taskRunUnlockedForMe(run.id)) return;
   stopScanner();
-  S.modal={type:'confirmChecklist'};
-  render();
+  refreshRunFresh(run.id).then(()=>{ S.modal={type:'confirmChecklist'}; render(); });
 }
 document.addEventListener('visibilitychange', async ()=>{
   if(document.visibilityState!=='visible' || !S.session || !S.profile || S.modal) return;
   if(hasUnsavedInput()) return;
-  if(Date.now()-(S._visAt||0)<180000) return; S._visAt=Date.now();
+  const r = S.profile.role, light=['supervisor','hk_senior_supervisor'].includes(r);
+  if(Date.now()-(S._visAt||0)<(light?45000:180000)) return; S._visAt=Date.now();
   await refreshAssignments();
-  const r = S.profile.role;
   if(urgentRoles().includes(r)) await loadUrgent();
   if(r==='admin'||r==='opm'){ await loadOrders(); await loadAttEditReqs(); checkPendingExtras(true); }
-  if(['admin','opm','hk_manager','hk_senior_supervisor','supervisor'].includes(r)){ await loadTaskData(); await ensureTodayTaskRuns(); }
+  if(light){ await refreshTodayTasks(); await ensureTodayTaskRuns(); }
+  else if(['admin','opm','hk_manager'].includes(r)){ await loadTaskData(); await ensureTodayTaskRuns(); }
   if(r==='supervisor'){ await loadDeliveries(); await loadOrders(); await loadSideSvc(); }
   if(!S.modal && !hasUnsavedInput()) render();
 });
@@ -7651,10 +7673,10 @@ function startDistPoll(){
     if(!['admin','opm','hk_manager','hk_admin','hk_senior_supervisor','supervisor'].includes(S.profile.role)) return;
     if(hasUnsavedInput()) return;
     await refreshAssignments();
-    if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await loadTaskData(); }catch(e){} }
+    if(['supervisor','hk_senior_supervisor'].includes(S.profile.role)){ try{ await refreshTodayTasks(); }catch(e){} }
     if(S.profile.role==='supervisor'){ try{ await loadDeliveries(); await loadOrders(); await loadSideSvc(); }catch(e){} }
     if(!S.modal && !hasUnsavedInput()) render();
-  },180000);
+  },90000);
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{
